@@ -7,9 +7,15 @@ import type { PlannerPlan, PlannerStep } from "./planner-plan.type";
 /**
  * Discriminator literal the planner stamps onto its report's `type`
  * field. A member of the shared
- * {@link import("../result/base-report.type").ReportType} closed union,
- * so {@link PlannerReport} narrows `type` against the shared union
- * directly rather than overriding it.
+ * {@link import("../result/base-report.type").ReportType} closed union.
+ *
+ * {@link PlannerReport} re-declares `type` as this literal by *overriding*
+ * it (`Omit<BaseReport, "type"> & { type: PlannerReportType }`) rather than
+ * intersecting (`BaseReport & { type: "planner" }`). Intersecting a single
+ * literal against `BaseReport.type` (the whole `ReportType` union) lets a
+ * strict TypeScript collapse the entire report to `never` ("property `type`
+ * has conflicting types in some constituents"); the `Omit` override sidesteps
+ * that while still producing the same `type: "planner"` for consumers.
  */
 export type PlannerReportType = "planner";
 
@@ -52,7 +58,7 @@ export type PlannerStepSnapshot = {
  * per-step record (one entry per step the planner attempted), and
  * `plan` is the verbatim LLM output before any step ran.
  */
-export type PlannerReport = BaseReport & {
+export type PlannerReport = Omit<BaseReport, "type"> & {
   type: PlannerReportType;
   /** Structural fingerprint — same value exposed on the planner instance. */
   signature: string;
@@ -85,7 +91,7 @@ export type PlannerReport = BaseReport & {
  *
  * console.log(report.plan?.summary, usage.total);
  */
-export type PlannerResult<TOutput = unknown> = ExecuteResult<TOutput> & {
+export type PlannerResult<TOutput = unknown> = Omit<ExecuteResult<TOutput>, "report"> & {
   /** Discriminant for narrowing a heterogeneous result union. */
   type: "planner";
   report: PlannerReport;

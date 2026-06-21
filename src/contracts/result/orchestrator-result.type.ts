@@ -8,10 +8,14 @@ import type { Usage } from "./usage.type";
 
 /**
  * Discriminator literal the orchestrator stamps onto its report's
- * `type` field (design §15.5). Now a member of the shared
- * {@link ReportType} closed union in `base-report.type.ts`, so
- * {@link OrchestratorReport} narrows `type` against the shared union
- * directly rather than overriding it.
+ * `type` field (design §15.5). A member of the shared
+ * {@link ReportType} closed union in `base-report.type.ts`.
+ *
+ * {@link OrchestratorReport} re-declares `type` as this literal by
+ * *overriding* it (`Omit<BaseReport, "type"> & { type: ... }`) rather than
+ * intersecting `BaseReport` with it: intersecting a single literal against
+ * `BaseReport.type` (the whole `ReportType` union) lets a strict TypeScript
+ * collapse the report to `never` ("conflicting types in some constituents").
  */
 export type OrchestratorReportType = "orchestrator";
 
@@ -101,13 +105,13 @@ export type TurnSnapshot = Readonly<{
  * recurse via `children[]` will NOT reach prior turns — intentional.
  *
  * @remarks
- * `type` and `status` narrow the shared {@link BaseReport} fields to
- * the orchestrator-specific literals. Both `"orchestrator"` and
- * `"awaiting-input"` are now members of the shared {@link ReportType} /
- * {@link ReportStatus} unions, so this inherits {@link BaseReport}
- * directly and re-declares the two fields as compatible narrowings.
+ * `type` and `status` are the orchestrator-specific literals — both
+ * `"orchestrator"` and `"awaiting-input"` are members of the shared
+ * {@link ReportType} / {@link ReportStatus} unions. `type` is OVERRIDDEN
+ * via `Omit<BaseReport, "type">` (not intersected) so a strict TypeScript
+ * can't collapse the report to `never`; `status` is re-declared compatibly.
  */
-export type OrchestratorReport = BaseReport & {
+export type OrchestratorReport = Omit<BaseReport, "type"> & {
   type: OrchestratorReportType;
   status: OrchestratorReportStatus;
   sessionId: string;
@@ -144,7 +148,7 @@ export type OrchestratorReport = BaseReport & {
  *   await myMessageStore.applyCompaction(result.sessionId, result.compaction);
  * }
  */
-export type OrchestratorResult<TOutput = unknown> = ExecuteResult<TOutput> & {
+export type OrchestratorResult<TOutput = unknown> = Omit<ExecuteResult<TOutput>, "report"> & {
   sessionId: string;
   turnIndex: number;
   compaction?: CompactionResult;

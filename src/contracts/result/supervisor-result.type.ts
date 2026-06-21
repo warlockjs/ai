@@ -31,7 +31,7 @@ export type SupervisorTerminatedBy =
  * on {@link BaseReport.children}, which duplicates nothing: it's the
  * reports of the child agents/workflows dispatched across iterations.
  */
-export type SupervisorReport = BaseReport & {
+export type SupervisorReport = Omit<BaseReport, "type"> & {
   supervisorName: string;
   /** Structural fingerprint — same value exposed on the instance. */
   signature: string;

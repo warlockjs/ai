@@ -22,8 +22,8 @@ import type { BaseReport } from "./base-report.type";
  *   console.log(call.name, call.tripIndex, call.input, call.output);
  * }
  */
-export type ToolCall = BaseReport & {
-  /** Discriminator already fixed on BaseReport, narrowed to "tool" here. */
+export type ToolCall = Omit<BaseReport, "type"> & {
+  /** Discriminator overridden to "tool" via `Omit<BaseReport, "type">`. */
   type: "tool";
   /** Which LLM trip triggered this tool call (0-indexed). */
   tripIndex: number;

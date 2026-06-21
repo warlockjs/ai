@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - **Planner: OpenAI strict structured-output 400.** The generated plan schema now lists every property in `required` (the optional `id` / `reason` / `dependsOn` are nullable) and no longer emits `minItems` / `maxItems`, so `ai.planner()` no longer fails with `400 Invalid schema for response_format … 'required' … Missing 'id'` against OpenAI strict `json_schema` mode. `maxSteps` and the non-empty-plan check are enforced at runtime / in `validate()`.
+- **Report/result types no longer risk collapsing to `never` under strict TypeScript.** The narrowing report types (`PlannerReport`, `OrchestratorReport`, `SupervisorReport`, `WorkflowReport`, `ToolCall`) and the two result types that re-declare `report` (`PlannerResult`, `OrchestratorResult`) now *override* the discriminant via `Omit<BaseReport, "type">` / `Omit<ExecuteResult, "report">` instead of intersecting `BaseReport & { type: "…" }`. Intersecting one literal against the whole `ReportType` union let some strict TS configs reduce the report to `never` (`result.report.plan` → *"Property 'plan' does not exist on type 'never'"*); the override yields the same `type` literal without the reduction. Type-only change — no runtime impact.
 
 ## 4.3.0 - 2026-06-21
 
