@@ -11,19 +11,42 @@ function jsonSchemaOf(schema: ReturnType<typeof planSchema>): Record<string, unk
 }
 
 describe("planSchema", () => {
-  it("emits steps.maxItems when maxSteps is provided", () => {
-    const json = jsonSchemaOf(planSchema(["a", "b"], 3));
-    const steps = (json.properties as { steps: Record<string, unknown> }).steps;
+  it("emits a strict-mode-compatible schema (every property required, no item bounds)", () => {
+    // Guards the OpenAI strict-mode contract: every object must list ALL
+    // its properties in `required` (optionals expressed as nullable), and
+    // no array may carry minItems/maxItems — both 400 under strict
+    // `json_schema`. Regression guard for the planner's plan schema.
+    const assertStrict = (node: Record<string, unknown>): void => {
+      expect(node.minItems).toBeUndefined();
+      expect(node.maxItems).toBeUndefined();
 
-    expect(steps.maxItems).toBe(3);
-    expect(steps.minItems).toBe(1);
+      if (node.type === "object" && node.properties) {
+        const props = node.properties as Record<string, Record<string, unknown>>;
+        const keys = Object.keys(props);
+        const required = (node.required as string[]) ?? [];
+
+        expect(required).toEqual(expect.arrayContaining(keys));
+        expect(required).toHaveLength(keys.length);
+
+        for (const key of keys) {
+          assertStrict(props[key]);
+        }
+      }
+
+      if (node.items) {
+        assertStrict(node.items as Record<string, unknown>);
+      }
+    };
+
+    assertStrict(jsonSchemaOf(planSchema(["a", "b"], 3)));
   });
 
-  it("omits steps.maxItems when maxSteps is absent", () => {
-    const json = jsonSchemaOf(planSchema(["a", "b"]));
-    const steps = (json.properties as { steps: Record<string, unknown> }).steps;
+  it("never emits steps.maxItems (strict-incompatible; maxSteps is enforced at runtime)", () => {
+    const steps = (json: Record<string, unknown>) =>
+      (json.properties as { steps: Record<string, unknown> }).steps;
 
-    expect(steps.maxItems).toBeUndefined();
+    expect(steps(jsonSchemaOf(planSchema(["a", "b"], 3))).maxItems).toBeUndefined();
+    expect(steps(jsonSchemaOf(planSchema(["a", "b"]))).maxItems).toBeUndefined();
   });
 
   it("still validates a well-formed plan after the refactor", () => {

@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## [Unreleased]
+
+### Fixed
+
+- **Planner: OpenAI strict structured-output 400.** The generated plan schema now lists every property in `required` (the optional `id` / `reason` / `dependsOn` are nullable) and no longer emits `minItems` / `maxItems`, so `ai.planner()` no longer fails with `400 Invalid schema for response_format … 'required' … Missing 'id'` against OpenAI strict `json_schema` mode. `maxSteps` and the non-empty-plan check are enforced at runtime / in `validate()`.
+
 ## 4.3.0 - 2026-06-21
 
 ### ⚠ BREAKING

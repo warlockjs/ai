@@ -24,27 +24,29 @@ export function planSchema(
   capabilityNames: string[],
   maxSteps?: number,
 ): StandardSchemaV1<PlannerPlan> {
-  const stepsSchema: Record<string, unknown> = {
-    type: "array",
-    minItems: 1,
-    description: "Ordered steps to execute, one capability dispatch each.",
-    items: stepItemsSchema(capabilityNames),
-  };
-
-  if (maxSteps !== undefined) {
-    stepsSchema.maxItems = maxSteps;
-  }
+  // OpenAI strict `json_schema` mode (and other native structured-output
+  // providers) require EVERY property to appear in `required` — with truly
+  // optional fields expressed as nullable — and reject array `minItems` /
+  // `maxItems`. So the schema is strict-shaped: all keys required, the
+  // optional ones nullable, no item-count bounds. A non-empty plan is
+  // enforced in `validate()`, and `maxSteps` by the runtime's tail
+  // truncation, so neither bound is needed on the wire.
+  void maxSteps;
 
   const jsonSchema = {
     type: "object",
     properties: {
       summary: {
-        type: "string",
+        type: ["string", "null"],
         description: "One-line summary of the overall strategy.",
       },
-      steps: stepsSchema,
+      steps: {
+        type: "array",
+        description: "Ordered steps to execute, one capability dispatch each.",
+        items: stepItemsSchema(capabilityNames),
+      },
     },
-    required: ["steps"],
+    required: ["summary", "steps"],
     additionalProperties: false,
   };
 
@@ -95,7 +97,10 @@ function stepItemsSchema(capabilityNames: string[]): Record<string, unknown> {
   return {
     type: "object",
     properties: {
-      id: { type: "string", description: "Stable step id, referenced by dependsOn." },
+      id: {
+        type: ["string", "null"],
+        description: "Stable step id, referenced by dependsOn.",
+      },
       capability: {
         type: "string",
         enum: capabilityNames,
@@ -105,14 +110,17 @@ function stepItemsSchema(capabilityNames: string[]): Record<string, unknown> {
         type: "string",
         description: "Concrete input passed to the capability's execute().",
       },
-      reason: { type: "string", description: "Why this step exists." },
+      reason: { type: ["string", "null"], description: "Why this step exists." },
       dependsOn: {
-        type: "array",
+        type: ["array", "null"],
         items: { type: "string" },
         description: "Ids of steps this one conceptually follows.",
       },
     },
-    required: ["capability", "input"],
+    // Strict mode: every property required; the genuinely-optional ones
+    // (id / reason / dependsOn) are nullable. `validate()` treats null and
+    // missing identically, so a model emitting `null` round-trips fine.
+    required: ["id", "capability", "input", "reason", "dependsOn"],
     additionalProperties: false,
   };
 }
