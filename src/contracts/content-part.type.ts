@@ -27,15 +27,23 @@
  *   source: { base64: "iVBORw0KGgo...", mediaType: "image/png" },
  * };
  */
-export type ContentPart = { type: "text"; text: string } | { type: "image"; source: ImageSource };
+export type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image"; source: ImageSource }
+  | { type: "pdf"; source: BinarySource }
+  | { type: "audio"; source: BinarySource };
 
 /**
- * Where an image's bytes live in a resolved `ContentPart`.
+ * Where binary media bytes live in a resolved `ContentPart`.
  *
  * - `{ url }` — remote URL the provider can fetch directly. Used for
  *   public URLs and StorageFile entries that already expose a URL.
  * - `{ base64, mediaType }` — inlined base64 bytes with an explicit
- *   IANA media type (e.g. `"image/png"`). Used for local file paths
- *   and StorageFile entries with only an absolute path.
+ *   IANA media type (e.g. `"image/png"`, `"application/pdf"`,
+ *   `"audio/mpeg"`). Used for local file paths and StorageFile entries
+ *   with only an absolute path.
  */
-export type ImageSource = { url: string } | { base64: string; mediaType: string };
+export type BinarySource = { url: string } | { base64: string; mediaType: string };
+
+/** Image bytes for an `{ type: "image" }` part. Alias of {@link BinarySource}. */
+export type ImageSource = BinarySource;

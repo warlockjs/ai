@@ -31,7 +31,14 @@ export type SupervisorTerminatedBy =
  * on {@link BaseReport.children}, which duplicates nothing: it's the
  * reports of the child agents/workflows dispatched across iterations.
  */
-export type SupervisorReport = Omit<BaseReport, "type"> & {
+export type SupervisorReport = BaseReport & {
+  /**
+   * Discriminator for the supervisor engine. `"team"` when produced by
+   * `ai.team` (thin sugar over the same engine) so team runs are
+   * distinguishable on the wire — group/filter as their own type — while
+   * sharing this report shape; `"supervisor"` for a plain `ai.supervisor`.
+   */
+  type: "supervisor" | "team";
   supervisorName: string;
   /** Structural fingerprint — same value exposed on the instance. */
   signature: string;
@@ -88,8 +95,12 @@ export type SupervisorReport = Omit<BaseReport, "type"> & {
  * return { answer: data, cost: usage.total, turns: report.iterations };
  */
 export type SupervisorResult<TOutput = unknown> = BaseResult & {
-  /** Discriminant for narrowing `SessionSendResult.executionResult`. */
-  type: "supervisor";
+  /**
+   * Discriminant for narrowing `SessionSendResult.executionResult`.
+   * `"team"` for `ai.team` runs (sugar over the same engine), else
+   * `"supervisor"` — matches the report's discriminator.
+   */
+  type: "supervisor" | "team";
   data?: TOutput;
   report: SupervisorReport;
 };

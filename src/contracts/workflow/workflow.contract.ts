@@ -1,5 +1,6 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { ToolContract } from "../../tool/tool";
+import type { FlowObserveOption } from "../../observe/resolve-observers";
 import type { SnapshotStore } from "../orchestrator/snapshot-store.contract";
 import type { WorkflowEventMap } from "../events/event-map.type";
 import type { ExecutableContract } from "../executable.contract";
@@ -122,6 +123,21 @@ export type WorkflowDefinition<
   ) => NextStepResult | Promise<NextStepResult>;
   output?: StepOutputSpec<TOutput, TInput, TState, TContext>;
   on?: WorkflowEventHandlers;
+  /**
+   * Observability for this workflow. Additive and gated — when omitted,
+   * the workflow follows the global observe-all flag (off unless an
+   * observability tool turned it on), so behavior is unchanged by
+   * default.
+   *
+   * - `true` → route this run's completed report to the globally
+   *   registered observers, even when observe-all is off.
+   * - `false` → opt this workflow out entirely, even when observe-all is on.
+   * - an `Observer` object → a flow-local collector receiving only this
+   *   workflow's report. Typed as the structural `Observer` so core stays
+   *   panoptic-agnostic; a panoptic flow-local collector can be passed
+   *   directly. Observer errors are swallowed — they never break the run.
+   */
+  observe?: FlowObserveOption;
 };
 
 /**

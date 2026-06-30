@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { AttachmentPolicy } from "../attachment-policy.type";
 import type { Attachment } from "../attachment.type";
 import type { Message } from "../conversation-message.type";
 import type { AgentEventMap } from "../events/event-map.type";
@@ -11,9 +12,9 @@ import type { ToolContext } from "../tool.contract";
  * Options passed to AgentContract.execute() to configure a single execution run.
  *
  * @example
- * const result = await agent.execute("Analyze this document", {
+ * const result = await agent.execute("Describe this image", {
  *   history: previousMessages,
- *   attachments: ["/path/to/doc.pdf"],
+ *   attachments: ["/path/to/screenshot.png"],
  *   placeholders: { language: "English" },
  *   output: z.object({ summary: z.string(), keyPoints: z.array(z.string()) }),
  *   on: {
@@ -27,6 +28,13 @@ export type AgentExecuteOptions<TOutput = unknown> = {
   history?: Message[];
   /** Files or URLs to attach to the message */
   attachments?: Attachment[];
+  /**
+   * Trust-boundary policy for {@link attachments} (S1) — overrides
+   * `AgentConfig.attachmentPolicy` for this call. Governs remote-text
+   * fetch (default-deny), the outbound `OutboundPolicy`, and the local-
+   * file `allowedRoots` sandbox. Omit to inherit the factory policy.
+   */
+  attachmentPolicy?: AttachmentPolicy;
   /** Values to inject into {{mustache}} placeholders in prompts */
   placeholders?: Placeholders;
   /**

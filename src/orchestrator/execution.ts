@@ -27,7 +27,9 @@ import {
   resolveDefaultCheckpointStore,
   resolveDefaultSnapshotStore,
 } from "../config";
+import type { AIError } from "../errors/ai-error";
 import { OrchestratorConfigError, OrchestratorDriftError } from "../errors";
+import { notifyObservers } from "../observe/resolve-observers";
 import type { ResolvedIntentEntry } from "../supervisor/entries";
 import { generateRunId } from "../utils/generate-run-id";
 import { persistCheckpoint, summarizeRoute } from "./checkpoint";
@@ -142,6 +144,11 @@ export class OrchestratorExecution<TOutput, TState> {
         this.params.input,
         this.params.options,
       );
+
+      // Route the orchestrator's report to observers (per-flow `observe` +
+      // the global observe-all gate) — parity with agent/workflow/supervisor,
+      // so a durable session root no longer needs a manual observe.collect().
+      await notifyObservers(this.ctx.config.observe, result.report);
 
       this.streamController?.end(result);
 
@@ -333,6 +340,7 @@ function buildReport(
   status: OrchestratorReportStatus,
   turnSnapshot: TurnSnapshot | undefined,
   childReport: BaseReport | undefined,
+  error?: AIError,
 ): OrchestratorReport {
   const now = new Date().toISOString();
   const usage = turnSnapshot?.usage ?? childReport?.usage ?? ZERO_USAGE;
@@ -345,6 +353,10 @@ function buildReport(
     sessionId,
     type: "orchestrator",
     status,
+    // Stamp the terminal error so the observe path surfaces it on the
+    // orchestrator span (an observer never sees the result envelope).
+    // Absent on a clean turn.
+    ...(error ? { error } : {}),
     startedAt: turnSnapshot?.startedAt ?? now,
     endedAt: turnSnapshot?.endedAt ?? now,
     duration: turnSnapshot?.duration ?? 0,
@@ -501,6 +513,7 @@ export async function runTurn<TOutput, TState>(
         status,
         turnSnapshot,
         result.report,
+        result.error,
       );
 
       emitTerminal(ctx as OrchestratorEngineContext, sessionId, loaded.turnIndex, status);

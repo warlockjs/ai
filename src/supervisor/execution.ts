@@ -56,7 +56,7 @@ import {
   SupervisorCancelledError,
   SupervisorFailedError,
 } from "../errors";
-import { stampReportLineage } from "../utils";
+import { mergeUsage, stampReportLineage, withoutRunFrame, withRunFrame } from "../utils";
 import type { AgentMiddleware } from "../contracts/middleware/middleware.contract";
 import type { MiddlewareSupervisorContext } from "../contracts/middleware/middleware-context.type";
 import type { MiddlewareState } from "../contracts/middleware/middleware-state.type";
@@ -931,7 +931,11 @@ export class SupervisorExecution<TOutput> {
     let branchUsage: Usage = { input: 0, output: 0, total: 0 };
 
     try {
-      rawResult = await this.invokeUnit(entry, resolvedInput, placeholders, routeContext);
+      // Run the unit nested so observe-all doesn't ALSO self-route it as a
+      // standalone trace — its report is captured into `childReports` below.
+      rawResult = await withoutRunFrame(() =>
+        this.invokeUnit(entry, resolvedInput, placeholders, routeContext),
+      );
 
       if (rawResult.error) {
         branchError = rawResult.error;
@@ -1074,14 +1078,35 @@ export class SupervisorExecution<TOutput> {
       childReports,
     );
 
+    // The runId this callback node will own — pre-computed so the
+    // ambient `RunFrame` installed around the callback body can stamp
+    // it as the `parentRunId` of any agent run nested inside.
+    const callbackRunId = `${this.runId}.${entry.intent}`;
+
     const startedAt = new Date();
     const startPerf = performance.now();
 
     let rawOutput: unknown;
     let error: AIError | undefined;
 
+    // Install an ambient run frame for the full async subtree of the
+    // callback. Any `agent.execute(...)` / `workflow.execute(...)` /
+    // `supervisor.execute(...)` the callback invokes DIRECTLY — without
+    // going through `ctx.run(...)` or `ctx.intents.X.execute()` — reads
+    // this frame at report-build time and auto-attaches its report onto
+    // `childReports`, nesting under this callback node with usage/cost
+    // rolled up. Mirrors how `workflow step.agent` captures child agent
+    // reports, but driven ambiently so the dev threads no ids.
     try {
-      rawOutput = await entry.callback(dispatchCtx);
+      rawOutput = await withRunFrame(
+        {
+          sink: childReports,
+          rootRunId: this.runId,
+          parentRunId: callbackRunId,
+          sessionId: this.options?.sessionId,
+        },
+        () => Promise.resolve(entry.callback(dispatchCtx)),
+      );
     } catch (thrown) {
       error =
         thrown instanceof AIError
@@ -1116,7 +1141,7 @@ export class SupervisorExecution<TOutput> {
     const rolledUsage = aggregateChildUsage(childReports);
 
     const report: BaseReport = {
-      runId: `${this.runId}.${entry.intent}`,
+      runId: callbackRunId,
       rootRunId: this.runId,
       name: entry.intent,
       type: "callback",
@@ -1253,10 +1278,15 @@ export class SupervisorExecution<TOutput> {
         // applies. The original outer dispatch already passed a sliced
         // view; this sub-call mirrors that behavior.
         const reentryHistory = this.applyAgentsWindow();
-        const result = await entry.unit.execute(inputString, {
-          signal: this.options?.signal,
-          ...(reentryHistory.length > 0 ? { history: reentryHistory } : {}),
-        });
+        // Suppress the enclosing callback's ambient run frame for this
+        // call — we capture the report onto `reportSink` explicitly
+        // below, so the agent must NOT also self-capture (double-count).
+        const result = await withoutRunFrame(() =>
+          entry.unit.execute(inputString, {
+            signal: this.options?.signal,
+            ...(reentryHistory.length > 0 ? { history: reentryHistory } : {}),
+          }),
+        );
 
         if (result.report) {
           reportSink.push(result.report);
@@ -1269,10 +1299,12 @@ export class SupervisorExecution<TOutput> {
         return result.data ?? result.text ?? undefined;
       }
 
-      // workflow
-      const result = await entry.unit.execute(inputString as never, {
-        signal: this.options?.signal,
-      });
+      // workflow — suppress the ambient frame (explicit capture below).
+      const result = await withoutRunFrame(() =>
+        entry.unit.execute(inputString as never, {
+          signal: this.options?.signal,
+        }),
+      );
 
       if (result.report) {
         reportSink.push(result.report);
@@ -1378,11 +1410,16 @@ export class SupervisorExecution<TOutput> {
     try {
       const merged = this.mergeInlineOptions(options);
       const inputForExecutable = this.coerceInlineInput(executable, input);
-      const result = (await (
-        executable as {
-          execute: (input: unknown, options?: unknown) => Promise<SupervisableResult>;
-        }
-      ).execute(inputForExecutable, merged)) as SupervisableResult;
+      // Suppress the enclosing callback's ambient frame — `ctx.run(...)`
+      // captures the report onto `reportSink` explicitly below, so the
+      // executable must not also self-capture (double-count).
+      const result = (await withoutRunFrame(() =>
+        (
+          executable as {
+            execute: (input: unknown, options?: unknown) => Promise<SupervisableResult>;
+          }
+        ).execute(inputForExecutable, merged),
+      )) as SupervisableResult;
 
       if (result.report) {
         reportSink.push(result.report);
@@ -1456,11 +1493,16 @@ export class SupervisorExecution<TOutput> {
     release: () => void,
   ): StreamContract<SupervisableResult> {
     const merged = this.mergeInlineOptions(options);
-    const stream = (
-      executable as {
-        stream: (input: unknown, options?: unknown) => StreamContract<SupervisableResult>;
-      }
-    ).stream(input, merged);
+    // Suppress the enclosing callback's ambient frame — the inner report
+    // is captured onto `reportSink` explicitly when `.result` settles
+    // below, so the executable must not also self-capture (double-count).
+    const stream = withoutRunFrame(() =>
+      (
+        executable as {
+          stream: (input: unknown, options?: unknown) => StreamContract<SupervisableResult>;
+        }
+      ).stream(input, merged),
+    );
 
     // Bubble inner deltas under the CALLING callback's intent name.
     // Agents fire `agent.trip.streaming`; supervisors fire
@@ -2153,7 +2195,7 @@ export class SupervisorExecution<TOutput> {
         error,
       };
 
-      this.aggregateUsage(this.usage, usage);
+      mergeUsage(this.usage, usage);
 
       this.emit("supervisor.classifier.failed", { error });
 
@@ -2184,7 +2226,7 @@ export class SupervisorExecution<TOutput> {
         error,
       };
 
-      this.aggregateUsage(this.usage, usage);
+      mergeUsage(this.usage, usage);
 
       this.emit("supervisor.classifier.failed", { error });
 
@@ -2220,7 +2262,7 @@ export class SupervisorExecution<TOutput> {
           error,
         };
 
-        this.aggregateUsage(this.usage, usage);
+        mergeUsage(this.usage, usage);
 
         this.emit("supervisor.classifier.failed", { error });
 
@@ -2242,7 +2284,7 @@ export class SupervisorExecution<TOutput> {
           error: interpretation.error,
         };
 
-        this.aggregateUsage(this.usage, usage);
+        mergeUsage(this.usage, usage);
 
         this.emit("supervisor.classifier.failed", { error: interpretation.error });
 
@@ -2284,7 +2326,7 @@ export class SupervisorExecution<TOutput> {
       usage,
     };
 
-    this.aggregateUsage(this.usage, usage);
+    mergeUsage(this.usage, usage);
 
     this.emit("supervisor.classifier.completed", {
       output: {
@@ -2925,13 +2967,17 @@ export class SupervisorExecution<TOutput> {
 
     const endedAt = new Date();
 
-    // `max-iterations` and the orchestrator-only `awaiting-input` are
-    // members of the shared `ReportStatus` union but not of the narrower
+    // `max-iterations`, the orchestrator-only `awaiting-input`, and the
+    // planner-only `awaiting-approval` are members of the shared
+    // `ReportStatus` union but not of the narrower
     // `SupervisorSnapshotStatus`. A supervisor never reaches
-    // `awaiting-input` at runtime; both collapse to the existing
-    // `failed` fallback here so the snapshot status stays representable.
+    // `awaiting-input` / `awaiting-approval` at runtime; all collapse to
+    // the existing `failed` fallback here so the snapshot status stays
+    // representable.
     const finalStatus: SupervisorSnapshotStatus =
-      this.status === "max-iterations" || this.status === "awaiting-input"
+      this.status === "max-iterations" ||
+      this.status === "awaiting-input" ||
+      this.status === "awaiting-approval"
         ? "failed"
         : this.status;
 
@@ -2942,10 +2988,16 @@ export class SupervisorExecution<TOutput> {
       rootRunId: this.runId,
       name: this.config.name,
       version: this.config.version,
-      type: "supervisor",
+      // "team" when this engine was driven by ai.team (config.reportType),
+      // else "supervisor" — so team runs are distinguishable on the wire.
+      type: this.config.reportType ?? "supervisor",
       supervisorName: this.config.name,
       signature: this.signature,
       status: this.status,
+      // Stamp the terminal error so the observe path surfaces it on the
+      // supervisor span (an observer never sees the result envelope).
+      // Absent on a completed run.
+      ...(this.error ? { error: this.error } : {}),
       terminatedBy: this.terminatedBy,
       iterations: this.snapshots.length,
       startedAt: this.startedAtIso,
@@ -2969,7 +3021,7 @@ export class SupervisorExecution<TOutput> {
     });
 
     return {
-      type: "supervisor",
+      type: this.config.reportType ?? "supervisor",
       data: this.data,
       report,
       usage: this.usage,
@@ -3083,13 +3135,11 @@ export class SupervisorExecution<TOutput> {
       return;
     }
 
-    this.usage.input += partial.input;
-    this.usage.output += partial.output;
-    this.usage.total += partial.total;
-
-    iterationUsage.input += partial.input;
-    iterationUsage.output += partial.output;
-    iterationUsage.total += partial.total;
+    // Route both the run-wide and iteration-local totals through the shared
+    // all-channel merge so cost + cache/reasoning propagate (a bare
+    // input/output/total sum silently dropped them).
+    mergeUsage(this.usage, partial);
+    mergeUsage(iterationUsage, partial);
   }
 
   /**
@@ -3260,14 +3310,11 @@ function toAIError(thrown: unknown): AIError {
  * `ctx.intents.X.execute()`. Mirrors `compositeAsTool` semantics.
  */
 function aggregateChildUsage(children: BaseReport[]): Usage {
-  return children.reduce<Usage>(
-    (acc, child) => ({
-      input: acc.input + child.usage.input,
-      output: acc.output + child.usage.output,
-      total: acc.total + child.usage.total,
-    }),
-    { input: 0, output: 0, total: 0 },
-  );
+  const total: Usage = { input: 0, output: 0, total: 0 };
+  for (const child of children) {
+    mergeUsage(total, child.usage);
+  }
+  return total;
 }
 
 /**

@@ -121,8 +121,13 @@ export function compositeAsTool<TInput, TOutput>(contract: {
   version?: string;
   meta?: ToolConfig["meta"];
   input: StandardSchemaV1<TInput>;
-  /** Runs the underlying composite and returns its full envelope. */
-  execute: (input: TInput) => Promise<{
+  /**
+   * Runs the underlying composite and returns its full envelope. The
+   * optional `ctx` relays the outer run's cancellation `signal` so a
+   * cancelled parent aborts the nested primitive instead of letting it
+   * outlive the cancellation (C2).
+   */
+  execute: (input: TInput, ctx?: ToolContext) => Promise<{
     data?: TOutput;
     error?: AIError;
     usage: Usage;
@@ -147,12 +152,13 @@ export function compositeAsTool<TInput, TOutput>(contract: {
     input: contract.input,
     execute: publicExecute,
 
-    async invoke(rawInput: unknown, _ctx?: ToolContext): Promise<ToolInvokeResult<TOutput>> {
-      // Composite tools (asTool-wrapped agent/workflow/supervisor) do
-      // NOT relay the ctx into their inner execution — composites
-      // have their own state/scope; an inner supervisor gets a fresh
-      // artifacts bag. The parameter is accepted for signature parity
-      // with `tool()` so callers can use both interchangeably.
+    async invoke(rawInput: unknown, ctx?: ToolContext): Promise<ToolInvokeResult<TOutput>> {
+      // Composite tools (asTool-wrapped agent/workflow/supervisor) run in
+      // their own state/scope — the ctx's `artifacts` bag is NOT shared
+      // into the inner primitive (an inner supervisor gets a fresh bag).
+      // The cancellation `signal`, however, IS relayed (below, into
+      // `contract.execute`) so a cancelled outer run aborts the nested
+      // primitive instead of letting it outlive the cancellation (C2).
       const startedAtDate = new Date();
       const start = performance.now();
       const runId = generateRunId("tool");
@@ -204,7 +210,7 @@ export function compositeAsTool<TInput, TOutput>(contract: {
       }
 
       try {
-        const composite = await contract.execute(validationResult.value);
+        const composite = await contract.execute(validationResult.value, ctx);
         // Surface the inner primitive's full envelope. The outer
         // ToolInvokeResult carries the composite's usage and report
         // verbatim; the agent runtime nests the report as a child of

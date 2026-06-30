@@ -9,9 +9,27 @@ import type {
   EvalScorer,
   EvalScorerContext,
 } from "../contracts/agent/eval.type";
+import type { EvalCase as EvalCaseType } from "../contracts/agent/eval.type";
 import { AgentExecutionError } from "../errors";
 import { log } from "@warlock.js/logger";
 import { judge as judgeScorer } from "./judge-scorer";
+import { diff } from "./regression";
+
+/**
+ * Narrow `EvalOptions.cases` to the underlying `EvalCase[]`. A
+ * `DatasetContract` is identified structurally by its `cases` property
+ * (an array carried alongside `name` / `filter` / `shard`); a raw
+ * `EvalCase[]` is used as-is.
+ */
+function resolveCases<TOutput>(
+  cases: EvalOptions<TOutput>["cases"],
+): EvalCaseType<TOutput>[] {
+  if (Array.isArray(cases)) {
+    return cases;
+  }
+
+  return cases.cases;
+}
 
 const LOG_MODULE = "ai.eval";
 const DEFAULT_PASS_THRESHOLD = 0.5;
@@ -136,9 +154,10 @@ export async function runEval<TOutput>(
   const passThreshold = options.passThreshold ?? DEFAULT_PASS_THRESHOLD;
   const start = performance.now();
 
+  const suiteCases = resolveCases(options.cases);
   const cases: EvalCaseResult<TOutput>[] = [];
 
-  for (const evalCase of options.cases) {
+  for (const evalCase of suiteCases) {
     const caseResult = await runCase(agent, evalCase, options, passThreshold);
 
     cases.push(caseResult);
@@ -161,7 +180,7 @@ export async function runEval<TOutput>(
   const meanScore =
     total > 0 ? cases.reduce((sum, entry) => sum + entry.score, 0) / total : 0;
 
-  return {
+  const report: EvalReport<TOutput> = {
     agentName: agent.name,
     total,
     passedCount,
@@ -172,4 +191,10 @@ export async function runEval<TOutput>(
     cases,
     duration: performance.now() - start,
   };
+
+  if (options.baseline) {
+    report.regression = diff(report, options.baseline, options.tolerance);
+  }
+
+  return report;
 }

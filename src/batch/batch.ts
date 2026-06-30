@@ -16,6 +16,12 @@ import type {
 import { runBatchItem } from "./run-batch-item";
 import { runWithConcurrency } from "./run-with-concurrency";
 
+/** Batch size above which an unset (unbounded) concurrency warns once (D5). */
+const BATCH_UNBOUNDED_WARN_THRESHOLD = 50;
+
+/** Process-lifetime flag so the unbounded-batch warning fires at most once. */
+let warnedUnboundedBatch = false;
+
 /**
  * Run an executable AI primitive (agent, workflow, supervisor, tool,
  * or anything satisfying {@link ExecutableContract}) over a dataset
@@ -83,13 +89,45 @@ class BatchRun<TInput, TOptions, TResult extends BaseResult> {
    * the rolled-up {@link BatchResult}. Runs once per `batch()` call.
    */
   public async run(): Promise<BatchResult<TResult>> {
-    const concurrency = this.options.concurrency ?? this.items.length;
+    const concurrency = this.resolveConcurrency();
 
     await runWithConcurrency(this.items.length, concurrency, (index) =>
       this.processItem(index),
     );
 
     return this.buildResult();
+  }
+
+  /**
+   * Resolve the effective concurrency from {@link BatchOptions.concurrency}
+   * (D5). An explicit number or `"unbounded"` is honored as-is; an omitted
+   * value runs unbounded for back-compat but warns once (outside tests)
+   * for a large batch so an accidental all-at-once run is visible.
+   */
+  private resolveConcurrency(): number {
+    const configured = this.options.concurrency;
+
+    if (configured === "unbounded") {
+      return this.items.length;
+    }
+    if (typeof configured === "number") {
+      return configured;
+    }
+
+    if (
+      this.items.length > BATCH_UNBOUNDED_WARN_THRESHOLD &&
+      !warnedUnboundedBatch &&
+      !process.env.VITEST &&
+      process.env.NODE_ENV !== "test"
+    ) {
+      warnedUnboundedBatch = true;
+      console.warn(
+        `[warlock-ai] ai.batch() is running ${this.items.length} items with unbounded concurrency (no \`concurrency\` set). ` +
+          'Each concurrent item consumes tokens/quota/memory — pass an explicit `concurrency` cap, or `concurrency: "unbounded"` to silence this.',
+      );
+    }
+
+    return this.items.length;
   }
 
   /**

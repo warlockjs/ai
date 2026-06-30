@@ -119,17 +119,20 @@ export type ModelCapabilities = {
    */
   promptCaching?: boolean;
   /**
-   * True when the adapter accepts audio `ContentPart` input. When
-   * false/absent and the caller passes audio attachments, the agent
-   * throws upfront rather than dropping them at the wire layer (mirrors
-   * `vision`).
+   * True when the adapter accepts audio `ContentPart` input (A2). The
+   * agent gates `{ type: "audio" }` attachments on this flag — when
+   * false/absent it throws upfront rather than dropping them at the wire
+   * layer (mirrors `vision`). Wired end-to-end: audio `ContentPart` +
+   * attachment resolution exist; today Google (Gemini, via `inlineData`)
+   * declares it.
    */
   audio?: boolean;
   /**
-   * True when the adapter accepts PDF / document `ContentPart` input.
-   * When false/absent and the caller passes PDF attachments, the agent
-   * throws upfront rather than dropping them at the wire layer (mirrors
-   * `vision`).
+   * True when the adapter accepts PDF / document `ContentPart` input (A2).
+   * The agent gates `{ type: "pdf" }` attachments on this flag — when
+   * false/absent it throws upfront (mirrors `vision`). Wired end-to-end:
+   * Anthropic (`document` block), Bedrock Converse (`document` block), and
+   * Google (Gemini `inlineData`) map PDF parts.
    */
   pdf?: boolean;
 };

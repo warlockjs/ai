@@ -14,6 +14,7 @@ export * from "./sdk-adapter.contract";
 export * from "./supervisor";
 export * from "./tool.contract";
 export * from "./workflow";
+export * from "./attachment-policy.type";
 export * from "./attachment.type";
 export * from "./content-part.type";
 export * from "./conversation-message.type";

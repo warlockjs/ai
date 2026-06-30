@@ -1,5 +1,28 @@
+import type { ModelToolCallRequest } from "../model-tool-call-request.type";
 import type { BaseReport, ReportStatus } from "./base-report.type";
 import type { LLMTrip } from "./llm-trip.type";
+
+/**
+ * One normalized turn of an agent's assembled conversation, captured
+ * onto {@link AgentReport.messages} when `captureMessages` is enabled.
+ *
+ * A faithful, JSON-safe projection of the runtime `Message`: the `tool`
+ * role returns a tool's output; an `assistant` turn that requested tools
+ * carries `toolCalls`; a `tool` turn carries the `toolCallId` it answers.
+ * `content` is always a string here (the runtime stringifies tool
+ * results and flattens text), so the captured array survives JSON
+ * serialization and downstream exporters forward it verbatim.
+ */
+export type CapturedMessage = {
+  /** Who produced this turn. */
+  role: "system" | "user" | "assistant" | "tool";
+  /** The turn's text content (tool results are stringified JSON). */
+  content: string;
+  /** Tool calls the assistant requested — present only on assistant turns that triggered tools. */
+  toolCalls?: ModelToolCallRequest[];
+  /** Provider tool-call id this turn answers — present only on tool-result turns. */
+  toolCallId?: string;
+};
 
 /**
  * Terminal status alias retained for backwards-compatibility with
@@ -43,4 +66,38 @@ export type AgentReport = BaseReport & {
   model: { name: string; provider: string };
   /** Every LLM round-trip that happened during execution. */
   trips: LLMTrip[];
+  /**
+   * The resolved system-prompt text sent as the `role: "system"` message
+   * (persona + instructions + any auto-appended structured-output
+   * instruction). Captured for observability; absent when the agent ran
+   * without a system prompt. Note `LLMTrip.input` holds only the user
+   * message — the system prompt is recorded here.
+   */
+  systemPrompt?: string;
+  /**
+   * Registry name of the named `SystemPromptContract` this run resolved —
+   * its `meta.name`, addressable in `ai.prompts`. Present ONLY when the agent
+   * ran against a *named* prompt; absent for a raw-string prompt, an anonymous
+   * contract, or no prompt at all. Together with {@link AgentReport.promptVersion}
+   * it links a run to the exact prompt version that produced it, so downstream
+   * consumers (Panoptic) can group / filter runs by `promptName@promptVersion`.
+   */
+  promptName?: string;
+  /**
+   * Registry version label of the named prompt this run resolved — its
+   * `meta.version` (defaulting to `"1"` when the prompt is named but carries
+   * no explicit version, mirroring the `ai.prompts` registry default). Present
+   * ONLY alongside {@link AgentReport.promptName}.
+   */
+  promptVersion?: string;
+  /**
+   * The full assembled multi-turn conversation — every role
+   * (system / user / assistant / tool), every trip — captured as a
+   * {@link CapturedMessage}[]. Present ONLY when the agent's
+   * `captureMessages` option was set; absent otherwise (byte-for-byte
+   * as before). Opt-in because messages can be large and sensitive.
+   * Unlike `trips[].input` (which stubs non-first trips with
+   * `"[tool results]"`), this preserves the real turn array.
+   */
+  messages?: CapturedMessage[];
 };

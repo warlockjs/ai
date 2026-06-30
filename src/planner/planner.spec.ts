@@ -498,3 +498,102 @@ describe("ai.planner — error categories", () => {
     expect(new PlannerCancelledError("x", { cancelledAt: "t" }).category).toBe("cancelled");
   });
 });
+
+describe("ai.planner — default sequential path unchanged (no new flags)", () => {
+  it("threads ALL prior outputs into every later step (sequential digest, not DAG-scoped)", async () => {
+    const search = mockAgent({
+      name: "search",
+      responses: [{ content: "STEP-ONE-OUTPUT", finishReason: "stop" }],
+    });
+    const enrichModel = MockSDK({
+      responses: [{ content: "STEP-TWO-OUTPUT", finishReason: "stop" }],
+    }).model({ name: "e" }) as MockModel;
+    const enrich = agent({ name: "enrich", model: enrichModel });
+    const finalModel = MockSDK({
+      responses: [{ content: "final", finishReason: "stop" }],
+    }).model({ name: "f" }) as MockModel;
+    const final = agent({ name: "final", model: finalModel });
+
+    // No `dependsOn` anywhere and `dag` unset — the legacy loop must feed
+    // the THIRD step a digest of BOTH prior steps' outputs.
+    const plan: PlannerPlan = {
+      steps: [
+        { capability: "search", input: "find" },
+        { capability: "enrich", input: "enrich" },
+        { capability: "final", input: "compose" },
+      ],
+    };
+
+    const instance = planner({
+      name: "sequential-digest",
+      model: planModel(plan),
+      capabilities: [
+        { name: "search", description: "search", executable: search },
+        { name: "enrich", description: "enrich", executable: enrich },
+        { name: "final", description: "final", executable: final },
+      ],
+    });
+
+    await instance.execute("go");
+
+    const serialized = JSON.stringify(finalModel.callHistory[0]?.messages ?? []);
+    // Legacy "all prior outputs into every step" behavior, byte-for-byte.
+    expect(serialized).toContain("STEP-ONE-OUTPUT");
+    expect(serialized).toContain("STEP-TWO-OUTPUT");
+  });
+
+  it("status is never awaiting-approval without mode: plan-only", async () => {
+    const plan: PlannerPlan = { steps: [{ capability: "a", input: "1" }] };
+
+    const instance = planner({
+      name: "no-mode",
+      model: planModel(plan),
+      capabilities: [
+        { name: "a", description: "a", executable: mockAgent({ name: "a", responses: [{ content: "ok", finishReason: "stop" }] }) },
+      ],
+    });
+
+    const result = await instance.execute("go");
+
+    expect(result.report.status).toBe("completed");
+    // The `plan` field on the result is only set in plan-only mode.
+    expect(result.plan).toBeUndefined();
+  });
+
+  it("onStep is never invoked when the option is omitted (default loop is untouched)", async () => {
+    // Indirect proof: with no onStep + no replan, a passing run completes
+    // normally and a single planning trip happened (no regeneration).
+    const search = mockAgent({
+      name: "search",
+      responses: [{ content: "found", finishReason: "stop" }],
+    });
+    const write = mockAgent({
+      name: "write",
+      responses: [{ content: "drafted", finishReason: "stop" }],
+    });
+
+    const plan: PlannerPlan = {
+      steps: [
+        { capability: "search", input: "find" },
+        { capability: "write", input: "compose" },
+      ],
+    };
+
+    const instance = planner({
+      name: "no-onstep",
+      model: planModel(plan),
+      capabilities: [
+        { name: "search", description: "search", executable: search },
+        { name: "write", description: "write", executable: write },
+      ],
+    });
+
+    const result = await instance.execute("go");
+
+    expect(result.report.status).toBe("completed");
+    expect(result.report.executedSteps.map((step) => step.status)).toEqual([
+      "completed",
+      "completed",
+    ]);
+  });
+});

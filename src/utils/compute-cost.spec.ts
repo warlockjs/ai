@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ModelPricing } from "../contracts/result/model-pricing.type";
 import type { Usage } from "../contracts/result/usage.type";
-import { accumulateCost, computeCost } from "./compute-cost";
+import { accumulateCost, computeCost, mergeUsage } from "./compute-cost";
 
 const PRICING: ModelPricing = {
   input: 0.15,
@@ -146,5 +146,59 @@ describe("accumulateCost", () => {
     const child: ModelPricing = { input: 0.05, output: 0.1 };
 
     expect(accumulateCost(parent, child)?.cachedOutput).toBe(0.003);
+  });
+});
+
+describe("mergeUsage", () => {
+  it("sums the scalar token channels into the target in place", () => {
+    const target: Usage = { input: 10, output: 5, total: 15 };
+
+    mergeUsage(target, { input: 20, output: 10, total: 30 });
+
+    expect(target).toMatchObject({ input: 30, output: 15, total: 45 });
+  });
+
+  it("accumulates cachedTokens / reasoningTokens / cacheWriteTokens when reported", () => {
+    const target: Usage = { input: 0, output: 0, total: 0, cachedTokens: 4, reasoningTokens: 2 };
+
+    mergeUsage(target, {
+      input: 0,
+      output: 0,
+      total: 0,
+      cachedTokens: 6,
+      reasoningTokens: 3,
+      cacheWriteTokens: 8,
+    });
+
+    expect(target.cachedTokens).toBe(10);
+    expect(target.reasoningTokens).toBe(5);
+    expect(target.cacheWriteTokens).toBe(8);
+  });
+
+  it("leaves an optional channel undefined when no contributor reports it", () => {
+    const target: Usage = { input: 0, output: 0, total: 0 };
+
+    mergeUsage(target, { input: 1, output: 1, total: 2 });
+
+    expect(target.cachedTokens).toBeUndefined();
+    expect(target.reasoningTokens).toBeUndefined();
+    expect(target.cacheWriteTokens).toBeUndefined();
+  });
+
+  it("merges the cost breakdown so an unpriced child can't erase a priced target", () => {
+    const target: Usage = { input: 0, output: 0, total: 0, cost: { input: 0.1, output: 0.2 } };
+
+    mergeUsage(target, { input: 0, output: 0, total: 0 });
+
+    expect(target.cost).toEqual({ input: 0.1, output: 0.2 });
+  });
+
+  it("propagates a priced child's cost onto an unpriced target", () => {
+    const target: Usage = { input: 0, output: 0, total: 0 };
+
+    mergeUsage(target, { input: 0, output: 0, total: 0, cost: { input: 0.03, output: 0.04 } });
+
+    expect(target.cost?.input).toBeCloseTo(0.03);
+    expect(target.cost?.output).toBeCloseTo(0.04);
   });
 });

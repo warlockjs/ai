@@ -124,8 +124,10 @@ export interface ToolConfig<TInput = unknown, TOutput = unknown> {
    *
    * Two forms:
    * - **string** — static, used as-is.
-   * - **function** — receives the validated input and returns a
-   *   string, so callers can include input data
+   * - **function** — receives the model's **raw, pre-validation**
+   *   input (resolved at the dispatch boundary, before `execute`'s
+   *   schema validation runs) and returns a string, so callers can
+   *   include input data
    *   (`(input) => \`Searching for "${input.query}"\``).
    *
    * Resolved at the framework boundary; consumers receive a

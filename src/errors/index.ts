@@ -47,6 +47,7 @@ export {
   type OrchestratorDriftErrorOptions,
 } from "./orchestrator-drift-error";
 export { OrchestratorFailedError } from "./orchestrator-failed-error";
+export { OutboundPolicyError } from "./outbound-policy-error";
 export {
   PlannerCancelledError,
   type PlannerCancelledErrorOptions,

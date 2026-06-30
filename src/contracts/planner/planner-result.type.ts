@@ -95,4 +95,12 @@ export type PlannerResult<TOutput = unknown> = Omit<ExecuteResult<TOutput>, "rep
   /** Discriminant for narrowing a heterogeneous result union. */
   type: "planner";
   report: PlannerReport;
+  /**
+   * The generated plan, surfaced WITHOUT execution when the run was
+   * invoked with `mode: "plan-only"` (`report.status ===
+   * "awaiting-approval"`). Pass it back as `approvedPlan` on a follow-up
+   * `execute()` to run it. Absent on a normal execute run — the executed
+   * plan lives on `report.plan`.
+   */
+  plan?: PlannerPlan;
 };

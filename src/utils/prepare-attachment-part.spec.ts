@@ -10,8 +10,20 @@ import {
   it,
   vi,
 } from "vitest";
-import { InvalidRequestError } from "../errors";
+import { InvalidRequestError, OutboundPolicyError } from "../errors";
+import type { AttachmentPolicy } from "../contracts/attachment-policy.type";
 import { prepareAttachmentPart } from "./prepare-attachment-part";
+
+/** Policy that permits remote fetch via an injected fetch, no DNS guard. */
+function allowRemote(fetchImpl: () => Promise<Response>): AttachmentPolicy {
+  return {
+    allowRemoteFetch: true,
+    outbound: {
+      denyPrivateIPsAfterDNS: false,
+      fetch: fetchImpl as unknown as typeof fetch,
+    },
+  };
+}
 
 describe("prepareAttachmentPart", () => {
   let tempDir: string;
@@ -171,32 +183,124 @@ describe("prepareAttachmentPart", () => {
       expect(part).toEqual({ type: "text", text: "inline text" });
     });
 
-    it("fetches remote URL for tagged text attachments", async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockResolvedValue(new Response("remote body", { status: 200 }));
+    it("fetches remote URL for tagged text attachments when the policy allows it", async () => {
+      const fetchSpy = vi.fn(async () => new Response("remote body", { status: 200 }));
 
-      const part = await prepareAttachmentPart({
-        type: "text",
-        source: "https://cdn.example.com/readme",
-      });
-
-      expect(part).toEqual({ type: "text", text: "remote body" });
-      expect(fetchSpy).toHaveBeenCalledWith("https://cdn.example.com/readme");
-    });
-
-    it("throws InvalidRequestError when remote text fetch fails", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("nope", { status: 404 }),
+      const part = await prepareAttachmentPart(
+        { type: "text", source: "https://cdn.example.com/readme" },
+        allowRemote(fetchSpy),
       );
 
-      const promise = prepareAttachmentPart({
-        type: "text",
-        source: "https://cdn.example.com/missing",
-      });
+      expect(part).toEqual({ type: "text", text: "remote body" });
+      expect(fetchSpy).toHaveBeenCalled();
+    });
+
+    it("throws InvalidRequestError when remote text fetch returns a non-OK status", async () => {
+      const promise = prepareAttachmentPart(
+        { type: "text", source: "https://cdn.example.com/missing" },
+        allowRemote(async () => new Response("nope", { status: 404 })),
+      );
 
       await expect(promise).rejects.toBeInstanceOf(InvalidRequestError);
       await expect(promise).rejects.toThrow(/Failed to fetch text attachment/);
+    });
+  });
+
+  describe("pdf + audio modalities (A2)", () => {
+    it("infers a pdf part from a .pdf path and base64-encodes it", async () => {
+      const filePath = join(tempDir, "doc.pdf");
+      await writeFile(filePath, "%PDF-1.4 fake", "utf8");
+
+      const part = await prepareAttachmentPart(filePath, { allowedRoots: [tempDir] });
+
+      expect(part.type).toBe("pdf");
+      expect((part as { source: { mediaType: string } }).source.mediaType).toBe(
+        "application/pdf",
+      );
+    });
+
+    it("passes a tagged pdf URL through without fetching", async () => {
+      const part = await prepareAttachmentPart({
+        type: "pdf",
+        source: "https://cdn.example.com/report.pdf",
+      });
+
+      expect(part).toEqual({
+        type: "pdf",
+        source: { url: "https://cdn.example.com/report.pdf" },
+      });
+    });
+
+    it("infers an audio part and its media type from a .mp3 path", async () => {
+      const filePath = join(tempDir, "clip.mp3");
+      await writeFile(filePath, "ID3 fake", "utf8");
+
+      const part = await prepareAttachmentPart(filePath, { allowedRoots: [tempDir] });
+
+      expect(part.type).toBe("audio");
+      expect((part as { source: { mediaType: string } }).source.mediaType).toBe("audio/mpeg");
+    });
+
+    it("decodes inline base64 for a tagged audio attachment", async () => {
+      const base64 = Buffer.from("fake-wav", "utf8").toString("base64");
+      const part = await prepareAttachmentPart({
+        type: "audio",
+        source: { base64, mediaType: "audio/wav" },
+      });
+
+      expect(part).toEqual({ type: "audio", source: { base64, mediaType: "audio/wav" } });
+    });
+  });
+
+  describe("AttachmentPolicy enforcement (S1)", () => {
+    it("default-denies a remote text fetch when no policy opts in", async () => {
+      await expect(
+        prepareAttachmentPart({ type: "text", source: "https://cdn.example.com/readme" }),
+      ).rejects.toBeInstanceOf(OutboundPolicyError);
+    });
+
+    it("blocks a remote text fetch that resolves to a private/metadata address", async () => {
+      // allowRemoteFetch is on, but the default outbound private-IP guard
+      // refuses the link-local metadata address.
+      await expect(
+        prepareAttachmentPart(
+          { type: "text", source: "https://169.254.169.254/latest/meta-data" },
+          { allowRemoteFetch: true },
+        ),
+      ).rejects.toBeInstanceOf(OutboundPolicyError);
+    });
+
+    it("hard-denies a bare-string local path when allowBareLocalPaths is false", async () => {
+      const filePath = join(tempDir, "secret.txt");
+      await writeFile(filePath, "top secret", "utf8");
+
+      await expect(
+        prepareAttachmentPart(filePath, { allowBareLocalPaths: false }),
+      ).rejects.toBeInstanceOf(OutboundPolicyError);
+    });
+
+    it("rejects a local path outside the allowedRoots sandbox", async () => {
+      const filePath = join(tempDir, "notes.txt");
+      await writeFile(filePath, "in temp", "utf8");
+
+      await expect(
+        prepareAttachmentPart(
+          { type: "text", source: filePath },
+          { allowedRoots: ["/some/other/root"] },
+        ),
+      ).rejects.toBeInstanceOf(OutboundPolicyError);
+    });
+
+    it("allows a local path inside the allowedRoots sandbox", async () => {
+      const filePath = join(tempDir, "inside.txt");
+      await writeFile(filePath, "allowed", "utf8");
+
+      const part = await prepareAttachmentPart(
+        { type: "text", source: filePath },
+        { allowedRoots: [tempDir] },
+      );
+
+      expect(part).toEqual({ type: "text", text: "allowed" });
     });
   });
 });

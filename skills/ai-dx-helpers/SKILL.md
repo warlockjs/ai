@@ -38,8 +38,8 @@ A drop-in `ModelContract` that wraps an ordered list and advances to the next mo
 
 ```ts
 const model = ai.fallbackModel([
-  ai.openai.model({ name: "gpt-4o" }),
-  ai.anthropic.model({ name: "claude-3-5-sonnet" }),
+  openai.model({ name: "gpt-4o" }),
+  anthropic.model({ name: "claude-3-5-sonnet" }),
 ]);
 
 const agent = ai.agent({ model });   // hand it anywhere a model goes

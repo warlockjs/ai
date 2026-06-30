@@ -7,6 +7,7 @@ export type { ModelPricing } from "./model-pricing.type";
 export type { ExecuteResult } from "./execute-result.type";
 export type {
   AgentReport,
+  CapturedMessage,
   ExecutionReport,
   ExecutionStatus,
 } from "./execution-report.type";

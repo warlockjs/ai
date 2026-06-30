@@ -15,11 +15,18 @@ import type { Message } from "../../contracts/conversation-message.type";
  *   wins (correct when the agent has history + a fresh prompt).
  * - Returns a plain string directly when `content` is a string.
  * - Joins `text` parts with `"\n"` when `content` is a multipart
- *   `ContentPart[]`. Non-text parts (images, audio) are skipped —
+ *   `ContentPart[]`. Non-text parts (images, audio, pdf) are skipped —
  *   callers concerned with multimodal content inspect `request`
  *   / attachments separately.
  * - Returns `""` when there is no user message at all (e.g. a trip
  *   composed entirely of tool results).
+ *
+ * **Coverage limit (D3).** Because only `text` parts are extracted, any
+ * guardrail / PII detector built on this helper inspects **text only** —
+ * image / PDF / audio attachment content is NOT scanned. A guardrail is
+ * therefore not a multimodal safety control: for non-text inputs add an
+ * attachment-level policy (e.g. an OCR / moderation pass before the call)
+ * rather than relying on input detectors.
  *
  * @example
  * const prompt = extractUserText(context.messages);

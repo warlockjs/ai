@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { FlowObserveOption } from "../../observe/resolve-observers";
 import type { AgentContract } from "../agent/agent.contract";
 import type { Message } from "../conversation-message.type";
 import type { MemoryTier } from "../memory/memory-item.type";
@@ -13,6 +14,7 @@ import type { RouterEntry } from "../supervisor/router-entry.type";
 import type { SystemPromptContract } from "../system-prompt.contract";
 import type { CheckpointStore } from "./checkpoint-store.contract";
 import type { OrchestratorEventHandlers } from "./orchestrator-event.type";
+import type { SessionLock } from "./session-lock.contract";
 import type { SnapshotStore } from "./snapshot-store.contract";
 
 /**
@@ -142,6 +144,14 @@ export type OrchestratorConfig<
   name: string;
   /** Dev-curated version string. Metadata only (§10.2) — never parsed. */
   version?: string;
+  /**
+   * Per-flow observability routing. `true` routes each turn's report to the
+   * globally-registered observers (even with observe-all off); `false` opts
+   * out; an `Observer` is a flow-local collector; omitted follows the global
+   * observe-all flag. Parity with agent/workflow/supervisor — a durable
+   * session root no longer needs a manual `observe.collect()`.
+   */
+  observe?: FlowObserveOption;
   /** Prepended to the router agent's system prompt (router mode only). */
   systemPrompt?: SystemPromptContract | string;
 
@@ -186,6 +196,25 @@ export type OrchestratorConfig<
 
   /** Durable session-state store. Falls back to `ai.config({ defaultCheckpointStore })`. */
   checkpointStore?: CheckpointStore;
+  /**
+   * Per-session turn serialization (C4). Each `execute` / `stream` /
+   * `resume` turn runs under `sessionLock.withLock(sessionId, …)` so a
+   * concurrent same-session turn can't race the checkpoint's read-modify-
+   * write and lose an update.
+   *
+   * - Omitted (default) → an in-process mutex keyed by `sessionId`. Fully
+   *   serializes same-session turns within ONE process; for a
+   *   horizontally-scaled deployment supply a distributed lock instead.
+   * - A {@link SessionLock} → your own (e.g. Redis/Postgres advisory
+   *   locks) for cross-process serialization.
+   * - `false` → no locking. Only when an external mechanism (sticky
+   *   routing, single-writer guarantee) already serializes the session.
+   *
+   * When a durable `checkpointStore` is configured but no explicit lock
+   * is supplied, the orchestrator warns once (outside tests) that the
+   * in-process default does not protect across processes.
+   */
+  sessionLock?: SessionLock | false;
   /** Internal-supervisor snapshot store. Required when `iterate: true`. */
   snapshotStore?: SnapshotStore;
   /**

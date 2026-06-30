@@ -3,11 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import type { Message } from "../contracts/conversation-message.type";
 import type { AgentEventMap } from "../contracts/events/event-map.type";
 import type { ToolCall } from "../contracts/result/tool-call.type";
-import type { SystemPromptContract } from "../contracts/system-prompt.contract";
+import type {
+  SystemPromptContract,
+  SystemPromptMeta,
+} from "../contracts/system-prompt.contract";
 import { AgentExecutionError, AIError, SchemaValidationError } from "../errors";
 import { MockModel } from "../mock/mock-model";
 import { MockSDK } from "../mock/mock-sdk";
 import { tool } from "../tool/tool";
+import { systemPrompt } from "../system-prompt/system-prompt";
 import { agent } from "./agent";
 
 // ---------------------------------------------------------------------------
@@ -51,16 +55,45 @@ const summarySchema = makeSchema<{ summary: string }>((v) => {
 function makeSystemPrompt(resolved: string): SystemPromptContract {
   return {
     blocks: [],
+    meta(meta?: SystemPromptMeta): SystemPromptMeta | undefined | SystemPromptContract {
+      return meta === undefined ? undefined : this;
+    },
     instruction() {
       return this;
     },
     persona() {
       return this;
     },
+    merge() {
+      return this;
+    },
     resolve(_placeholders) {
       return resolved;
     },
-  };
+    validate() {
+      return Promise.resolve({ ok: true, missing: [] });
+    },
+  } as SystemPromptContract;
+}
+
+/**
+ * Like {@link makeSystemPrompt}, but the contract carries identity metadata
+ * (`meta.name` / optional `meta.version`) so the prompt-version-linkage path
+ * — which reads `prompt.meta()` to stamp `promptName` / `promptVersion` onto
+ * the report — is exercised without touching the real `ai.prompts` registry.
+ */
+function makeNamedSystemPrompt(
+  resolved: string,
+  identity: SystemPromptMeta,
+): SystemPromptContract {
+  const prompt = makeSystemPrompt(resolved);
+
+  return {
+    ...prompt,
+    meta(meta?: SystemPromptMeta): SystemPromptMeta | undefined | SystemPromptContract {
+      return meta === undefined ? identity : prompt;
+    },
+  } as SystemPromptContract;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +144,33 @@ describe("agent()", () => {
     expect(result.error).toBeUndefined();
     expect(result.report.trips).toHaveLength(1);
     expect(result.report.trips[0].finishReason).toBe("stop");
+  });
+
+  it("captures the resolved string system prompt on the report", async () => {
+    const mock = MockSDK({ responses: [{ content: "ok", finishReason: "stop" }] });
+    const model = mock.model({ name: "mock-gpt" });
+
+    const result = await agent({ model, systemPrompt: "You are a helpful assistant." }).execute("hi");
+
+    expect(result.report.systemPrompt).toBe("You are a helpful assistant.");
+  });
+
+  it("captures a resolved SystemPromptContract on the report", async () => {
+    const mock = MockSDK({ responses: [{ content: "ok", finishReason: "stop" }] });
+    const model = mock.model({ name: "mock-gpt" });
+
+    const result = await agent({ model, systemPrompt: makeSystemPrompt("Persona + rules") }).execute("hi");
+
+    expect(result.report.systemPrompt).toBe("Persona + rules");
+  });
+
+  it("leaves report.systemPrompt undefined when no system prompt is configured", async () => {
+    const mock = MockSDK({ responses: [{ content: "ok", finishReason: "stop" }] });
+    const model = mock.model({ name: "mock-gpt" });
+
+    const result = await agent({ model }).execute("hi");
+
+    expect(result.report.systemPrompt).toBeUndefined();
   });
 
   // 2. Aggregates usage across trips
@@ -307,6 +367,74 @@ describe("agent()", () => {
     expect(firstCall.messages[0].content).toBe("Resolved system prompt");
   });
 
+  // 6b. Prompt-version linkage: a named SystemPromptContract stamps
+  //     promptName + promptVersion onto the report.
+  it("records promptName + promptVersion on the report from a named prompt", async () => {
+    const mock = MockSDK({
+      responses: [{ content: "ok", finishReason: "stop" }],
+    });
+    const model = mock.model({ name: "mock" });
+
+    const named = systemPrompt("You are support.", {
+      name: "support-agent",
+      version: "3",
+    });
+
+    const { report } = await agent({ model, systemPrompt: named }).execute("Hi");
+
+    expect(report.promptName).toBe("support-agent");
+    expect(report.promptVersion).toBe("3");
+  });
+
+  // 6c. A named prompt WITHOUT an explicit version defaults to "1"
+  //     (mirroring the ai.prompts registry default).
+  it("defaults promptVersion to \"1\" for a named prompt with no version", async () => {
+    const mock = MockSDK({
+      responses: [{ content: "ok", finishReason: "stop" }],
+    });
+    const model = mock.model({ name: "mock" });
+
+    const named = makeNamedSystemPrompt("Resolved.", { name: "greeter" });
+
+    const { report } = await agent({ model, systemPrompt: named }).execute("Hi");
+
+    expect(report.promptName).toBe("greeter");
+    expect(report.promptVersion).toBe("1");
+  });
+
+  // 6d. An anonymous contract (no meta.name) leaves the linkage fields absent.
+  it("omits promptName / promptVersion for an anonymous prompt", async () => {
+    const mock = MockSDK({
+      responses: [{ content: "ok", finishReason: "stop" }],
+    });
+    const model = mock.model({ name: "mock" });
+
+    const anonymous = makeSystemPrompt("Resolved system prompt");
+
+    const { report } = await agent({ model, systemPrompt: anonymous }).execute(
+      "Hi",
+    );
+
+    expect(report.promptName).toBeUndefined();
+    expect(report.promptVersion).toBeUndefined();
+  });
+
+  // 6e. A raw-string system prompt carries no registry identity either.
+  it("omits promptName / promptVersion for a raw-string system prompt", async () => {
+    const mock = MockSDK({
+      responses: [{ content: "ok", finishReason: "stop" }],
+    });
+    const model = mock.model({ name: "mock" });
+
+    const { report } = await agent({
+      model,
+      systemPrompt: "Be concise.",
+    }).execute("Hi");
+
+    expect(report.promptName).toBeUndefined();
+    expect(report.promptVersion).toBeUndefined();
+  });
+
   // 7. Merges factory + execute placeholders (execute wins)
   it("merges factory and execute placeholders — execute options win on conflict", async () => {
     const mock = MockSDK({
@@ -315,16 +443,25 @@ describe("agent()", () => {
     const model = mock.model({ name: "mock" });
 
     const resolveMock = vi.fn((_p?: Record<string, unknown>) => "resolved");
-    const prompt: SystemPromptContract = {
+    const prompt = {
+      meta(meta?: SystemPromptMeta): SystemPromptMeta | undefined | SystemPromptContract {
+        return meta === undefined ? undefined : this;
+      },
       instruction() {
         return this;
       },
       persona() {
         return this;
       },
+      merge() {
+        return this;
+      },
       blocks: [],
       resolve: resolveMock,
-    };
+      validate() {
+        return Promise.resolve({ ok: true, missing: [] });
+      },
+    } as SystemPromptContract;
 
     await agent({
       model,
@@ -874,10 +1011,15 @@ describe("agent()", () => {
   });
 
   // 21. ai.agent namespace
+  // Dynamically importing the full `../ai` facade cold-transforms the entire
+  // primitive graph through vitest's esbuild; as the facade grows this cold
+  // import can exceed the default 5s test budget (a test-time transform cost
+  // only — the shipped package is precompiled JS). The assertion is a trivial
+  // identity check, so allow a generous timeout for the one-time cold import.
   it("ai.agent from @warlock.js/ai points to the same factory function", async () => {
     const { ai } = await import("../ai");
     expect(ai.agent).toBe(agent);
-  });
+  }, 30_000);
 
   // 22. No system message when systemPrompt is absent
   it("omits the system message when no systemPrompt is configured", async () => {

@@ -1,6 +1,6 @@
 ---
 name: run-ai-agent
-description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, and auto-adapting raw executables in tools:[]. Triggers: `ai.agent`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — `@warlock.js/ai/define-ai-tool/SKILL.md`; workflows — `@warlock.js/ai/run-ai-workflow/SKILL.md`; eval matchers / batch / fallback detail — `@warlock.js/ai/ai-dx-helpers/SKILL.md`; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
+description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `ai.agent`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — `@warlock.js/ai/define-ai-tool/SKILL.md`; workflows — `@warlock.js/ai/run-ai-workflow/SKILL.md`; eval matchers / batch / fallback detail — `@warlock.js/ai/ai-dx-helpers/SKILL.md`; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
 ---
 
 # `ai.agent()` — single-turn primitive
@@ -182,6 +182,31 @@ await myAgent.execute(input, {
 ```
 
 Disabled by default. Each repair attempt counts against `maxTrips`.
+
+## `judge` preset — resilient LLM-as-judge / verdict classifiers
+
+For graders and verdict classifiers running on models that emit **corrupted** structured output — notably the Amazon Nova family, which wraps verdicts in fenced ` ```json ` blocks, prepends prose, or trails commentary — set `judge: true` (or a `JudgeConfig`). It turns on three behaviors at once:
+
+```ts
+const grader = ai.agent.judge({
+  model: nova.model({ name: "amazon.nova-pro-v1:0" }),
+  systemPrompt: "Grade the answer. Respond with JSON only.",
+  output: verdictSchema,
+});
+
+const result = await grader.execute(prompt);
+if (result.error) {
+  // graceful default — the judge couldn't produce a clean verdict
+}
+```
+
+1. **Repair** — a couple of re-ask attempts by default (`repairAttempts`, defaults to `2`; bounded by `maxTrips`) when the verdict fails to parse / validate. The caller's per-call `options.repair` still wins.
+2. **Lenient verdict parsing** — extracts the first balanced JSON object / array (tolerating fenced blocks + surrounding prose) instead of the strict parser.
+3. **Never throws on a parse miss** — even an unparseable verdict yields a well-formed result (`result.error` populated, `result.data` undefined), so a flaky judge degrades instead of crashing the flow.
+
+`ai.agent.judge(config, judge?)` is sugar for `ai.agent({ ...config, judge })`; the bare `ai.agent({ judge: true })` option does the same. `judge: {}` ≡ `judge: true` (every field falls back to its resilient default); `judge: { repairAttempts: 0 }` keeps the lenient parser + never-throw guarantee but disables repair.
+
+**Trade-off — resilience over strictness.** The lenient parse can recover JSON the strict parser would (correctly) reject — leave `judge` **off** for normal structured output, where a hard parse failure is a useful signal. Off by default; omitting it parses strictly and never auto-enables repair, byte-for-byte as before. (This is the same Nova-safe judge the unified prompt `validate()` uses — see [`@warlock.js/ai/manage-prompts/SKILL.md`](@warlock.js/ai/manage-prompts/SKILL.md).)
 
 ## Pattern — image attachments
 

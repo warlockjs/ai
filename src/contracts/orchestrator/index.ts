@@ -10,6 +10,7 @@ export type {
   RedisClientLike,
   SnapshotStore,
 } from "./snapshot-store.contract";
+export type { SessionLock } from "./session-lock.contract";
 
 // Orchestrator contract + factory surface (orchestrator.md §15). The
 // per-turn result/report types (OrchestratorResult, OrchestratorReport,

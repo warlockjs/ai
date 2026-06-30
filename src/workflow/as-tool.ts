@@ -43,8 +43,13 @@ export function asTool<TInput, TOutput, TToolInput = TInput>(
     name: workflowInstance.name,
     description: options.description ?? `Invoke workflow "${workflowInstance.name}" as a tool.`,
     input: options.inputSchema,
-    execute: async (input) => {
-      const result = await workflowInstance.execute(input as unknown as TInput);
+    execute: async (input, ctx) => {
+      // Relay the outer agent's cancellation signal so cancelling the
+      // parent aborts this nested workflow run (C2).
+      const result = await workflowInstance.execute(
+        input as unknown as TInput,
+        ctx?.signal ? { signal: ctx.signal } : undefined,
+      );
 
       if (result.error) {
         // Throw the workflow error so the surrounding wrapper catches

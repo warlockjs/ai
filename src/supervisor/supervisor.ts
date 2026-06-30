@@ -1,4 +1,5 @@
 import type { SupervisorEventMap } from "../contracts/events/event-map.type";
+import type { ExecutionReport } from "../contracts/result/execution-report.type";
 import type { SupervisorResult } from "../contracts/result/supervisor-result.type";
 import type { StreamContract } from "../contracts/stream/stream.contract";
 import type { SupervisorIntentValue } from "../contracts/supervisor/intent-entry.type";
@@ -17,6 +18,7 @@ import type {
   SupervisorContract,
 } from "../contracts/supervisor/supervisor.contract";
 import { SupervisorFailedError } from "../errors";
+import { notifyObservers } from "../observe/resolve-observers";
 import type { ToolContract } from "../tool/tool";
 import { asTool } from "./as-tool";
 import { SupervisorEmitter } from "./emitter";
@@ -82,7 +84,19 @@ export function supervisor<
       options,
     });
 
-    return execution.run();
+    const result = await execution.run();
+
+    // Route the finished report to any resolved observers (F1/F3).
+    // Gated by `config.observe` + the global observe-all flag; observer
+    // errors are swallowed inside `notifyObservers`. `ai.team(...)`
+    // forwards its `observe` into this same config, so a team inherits
+    // observability through here with no extra wiring. Bridge the
+    // pre-existing `SupervisorReport = Omit<BaseReport, "type">` drift
+    // (the report carries `type: "supervisor"` at runtime) so this call
+    // site adds no new type error beyond the documented baseline.
+    await notifyObservers(config.observe, result.report as unknown as ExecutionReport);
+
+    return result;
   }
 
   function stream(
@@ -103,7 +117,14 @@ export function supervisor<
       streamController: controller,
     });
 
-    void execution.run();
+    // Route the finished report to resolved observers once the streamed
+    // run settles. Attached to the run promise (not awaited — `stream`
+    // returns synchronously); `notifyObservers` swallows observer errors.
+    void execution
+      .run()
+      .then((result) =>
+        notifyObservers(config.observe, result.report as unknown as ExecutionReport),
+      );
 
     return contract;
   }
@@ -130,7 +151,11 @@ export function supervisor<
       resumeFrom: snapshot,
     });
 
-    return execution.run();
+    const result = await execution.run();
+
+    await notifyObservers(config.observe, result.report as unknown as ExecutionReport);
+
+    return result;
   }
 
   const instance: SupervisorContract<TOutput> = {

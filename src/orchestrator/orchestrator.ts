@@ -22,11 +22,13 @@ import { OrchestratorConfigError } from "../errors/orchestrator-config-error";
 import { resolveIntentEntries, type ResolvedIntentEntry } from "../supervisor/entries";
 import { SupervisorFailedError } from "../errors";
 import type { ToolContract } from "../tool/tool";
+import type { SessionLock } from "../contracts/orchestrator/session-lock.contract";
 import { asTool as orchestratorAsTool } from "./as-tool";
 import { createCommandDispatcher } from "./commands";
 import { OrchestratorEmitter } from "./emitter";
 import { OrchestratorExecution } from "./execution";
 import { createOrchestratorStream } from "./orchestrator-stream";
+import { inProcessSessionLock, noopSessionLock } from "./session-lock";
 import { computeOrchestratorSignature } from "./signature";
 
 /**
@@ -80,6 +82,12 @@ export function orchestrator<
   );
   const emitter = new OrchestratorEmitter(config.on);
 
+  // Per-session turn serialization (C4). Resolved ONCE so every turn on
+  // this orchestrator shares the same lock — that's what lets the
+  // in-process default actually serialize concurrent same-session calls.
+  const sessionLock = resolveSessionLock(config as unknown as OrchestratorConfig<unknown>);
+  warnOnUnlockedDurableStore(config as unknown as OrchestratorConfig<unknown>);
+
   async function execute(
     input: SupervisorInput,
     options: OrchestratorExecuteOptions<TState>,
@@ -93,7 +101,12 @@ export function orchestrator<
       options,
     });
 
-    return execution.run();
+    // Serialize the whole turn (load → dispatch → persist) against any
+    // concurrent turn for the same session, so the checkpoint's
+    // read-modify-write can't lose an update.
+    return sessionLock.withLock(options.sessionId, () => execution.run(), {
+      signal: options.signal,
+    });
   }
 
   function stream(
@@ -114,7 +127,12 @@ export function orchestrator<
       streamController: controller,
     });
 
-    void execution.run();
+    // The background run waits for the session lock before it starts —
+    // same serialization guarantee as `execute`; the stream contract is
+    // still returned synchronously.
+    void sessionLock.withLock(options.sessionId, () => execution.run(), {
+      signal: options.signal,
+    });
 
     return contract;
   }
@@ -132,7 +150,9 @@ export function orchestrator<
       resumeOptions: options,
     });
 
-    return execution.resume();
+    return sessionLock.withLock(sessionId, () => execution.resume(), {
+      signal: options?.signal,
+    });
   }
 
   // The dispatcher owns command ROUTING only; the `compact` handler
@@ -298,4 +318,39 @@ function assertInitialAgent(
       { context: { authoring: true } },
     );
   }
+}
+
+/**
+ * Resolve the per-session lock (C4): an explicit {@link SessionLock} when
+ * supplied, a no-op when `sessionLock: false`, otherwise the framework
+ * default in-process mutex.
+ */
+function resolveSessionLock(config: OrchestratorConfig<unknown>): SessionLock {
+  if (config.sessionLock === false) return noopSessionLock();
+  if (config.sessionLock) return config.sessionLock;
+  return inProcessSessionLock();
+}
+
+/** Orchestrator names already warned about an unlocked durable store. */
+const warnedUnlockedStores = new Set<string>();
+
+/**
+ * Warn once when a durable `checkpointStore` is configured but no explicit
+ * `sessionLock` was supplied (C4). The in-process default serializes
+ * same-session turns within one process only — a horizontally-scaled
+ * deployment needs a distributed lock or sticky routing. Suppressed in
+ * tests and when the dev explicitly chose a lock (or `sessionLock: false`).
+ */
+function warnOnUnlockedDurableStore(config: OrchestratorConfig<unknown>): void {
+  if (config.sessionLock !== undefined) return;
+  if (!config.checkpointStore) return;
+  if (process.env.NODE_ENV === "test" || process.env.VITEST) return;
+  if (warnedUnlockedStores.has(config.name)) return;
+  warnedUnlockedStores.add(config.name);
+
+  console.warn(
+    `[warlock-ai] orchestrator "${config.name}" uses a durable checkpointStore with the default in-process sessionLock. ` +
+      "That serializes same-session turns within ONE process only; in a horizontally-scaled deployment supply a distributed " +
+      "`sessionLock` (Redis/Postgres advisory locks) or use sticky routing. Pass `sessionLock: false` to silence this.",
+  );
 }

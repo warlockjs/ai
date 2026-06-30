@@ -114,3 +114,41 @@ function sumOptional(parent: number | undefined, child: number | undefined): num
 
   return (parent ?? 0) + (child ?? 0);
 }
+
+/**
+ * Accumulate a child {@link Usage} into a running parent total, mutating
+ * `target` in place. Scalar token channels (`input` / `output` / `total`)
+ * sum directly; the optional sub-channels (`cachedTokens`,
+ * `reasoningTokens`, `cacheWriteTokens`) accumulate only when some
+ * contributor reported them (preserving the "never reported anywhere"
+ * signal); and the cost breakdown merges via {@link accumulateCost} so a
+ * single unpriced child can never erase a priced sibling's cost.
+ *
+ * This is the ONE canonical usage rollup — every aggregator (agent,
+ * workflow, supervisor, team, planner, batch) routes through it so cost +
+ * cache/reasoning telemetry propagates identically to the top-level
+ * `result.usage`. Re-implementing a bare `input/output/total` sum at a
+ * call site silently drops those optional channels.
+ */
+export function mergeUsage(target: Usage, child: Usage): void {
+  target.input += child.input;
+  target.output += child.output;
+  target.total += child.total;
+
+  if (child.cachedTokens !== undefined) {
+    target.cachedTokens = (target.cachedTokens ?? 0) + child.cachedTokens;
+  }
+
+  if (child.reasoningTokens !== undefined) {
+    target.reasoningTokens = (target.reasoningTokens ?? 0) + child.reasoningTokens;
+  }
+
+  if (child.cacheWriteTokens !== undefined) {
+    target.cacheWriteTokens = (target.cacheWriteTokens ?? 0) + child.cacheWriteTokens;
+  }
+
+  const mergedCost = accumulateCost(target.cost, child.cost);
+  if (mergedCost !== undefined) {
+    target.cost = mergedCost;
+  }
+}

@@ -1,12 +1,23 @@
 import { agent } from "./agent/agent";
 import { batch } from "./batch";
+import { streamObject } from "./object-stream";
+import { serve } from "./serve";
 import {
   checkpointMemory,
   checkpointPg,
   checkpointRedis,
 } from "./checkpoint";
 import { setAIConfig } from "./config";
-import { evalScorers } from "./eval";
+import { dataset, evalScorers } from "./eval";
+import { humanApproval } from "./human/human-approval";
+import { human } from "./human/register";
+import { resume } from "./human/resume";
+import {
+  interruptMemory,
+  interruptPg,
+  interruptRedis,
+} from "./human/stores";
+import { guardrail as guardrailSuite } from "./guard/guardrail";
 import { budget, readBudgetFallbackSignal } from "./middleware/builtins/budget";
 import { memory } from "./memory";
 import { guardrail } from "./middleware/builtins/guardrail";
@@ -16,16 +27,115 @@ import { mockRouter } from "./mock";
 import { fallbackModel } from "./model";
 import { orchestrator } from "./orchestrator";
 import { planner } from "./planner";
+import { defaultPromptsManager } from "./prompts/prompts-manager";
+import { rag } from "./rag";
+import { keywordReranker } from "./rag/rerank/keyword-reranker";
+import { llmReranker } from "./rag/rerank/llm-reranker";
 import { spawnSubAgent } from "./agent/spawn-sub-agent";
+import { skills } from "./skills";
+import { prompt } from "./prompt";
+import { vcr } from "./vcr";
 import { snapshotMemory, snapshotPg, snapshotRedis } from "./snapshot";
 import { fanOut, router } from "./supervisor";
 import { supervisor } from "./supervisor/supervisor";
+import { team } from "./team/team";
 import { instruction } from "./system-prompt/instruction";
 import { persona } from "./system-prompt/persona";
 import { systemPrompt } from "./system-prompt/system-prompt";
 import { tool } from "./tool/tool";
 import { step } from "./workflow/step";
 import { workflow } from "./workflow/workflow";
+
+/**
+ * The shape of the top-level `ai` namespace. Declared as an `interface` (not an
+ * inferred `const` type) so satellite packages can attach their verb via
+ * `declare module "@warlock.js/ai" { interface Ai { … } }` — e.g. `ai.workspace`,
+ * `ai.tools`, `ai.mcp`, `ai.human`. The runtime object below is asserted to this
+ * type; a satellite assigns its member on import.
+ */
+export interface Ai {
+  config: typeof setAIConfig;
+  tool: typeof tool;
+  agent: typeof agent;
+  systemPrompt: typeof systemPrompt;
+  persona: typeof persona;
+  instruction: typeof instruction;
+  workflow: typeof workflow;
+  step: typeof step;
+  supervisor: typeof supervisor;
+  team: typeof team;
+  orchestrator: typeof orchestrator;
+  memory: typeof memory;
+  skills: typeof skills;
+  planner: typeof planner;
+  rag: typeof rag & {
+    keywordReranker: typeof keywordReranker;
+    llmReranker: typeof llmReranker;
+  };
+  spawnSubAgent: typeof spawnSubAgent;
+  router: typeof router;
+  fanOut: typeof fanOut;
+  batch: typeof batch;
+  /** Structured-output streaming — partial-object snapshots + a strict final parse (A1). */
+  streamObject: typeof streamObject;
+  /** Serve an executable as an SSE HTTP endpoint — production serving primitive (A3). */
+  serve: typeof serve;
+  fallbackModel: typeof fallbackModel;
+  eval: typeof evalScorers;
+  dataset: typeof dataset;
+  prompt: typeof prompt;
+  /**
+   * Process-wide registry of named, versioned `systemPrompt(...)` builders,
+   * keyed by `name@version`. A `systemPrompt(input, { name })` (or any
+   * `.meta({ name })` rename) auto-registers here; `ai.prompts.get(name)` /
+   * `.resolve(name)` reads them back, and `systemPrompt().merge(name)` folds a
+   * registered prompt into a new one.
+   */
+  prompts: ReturnType<typeof defaultPromptsManager>;
+  vcr: typeof vcr;
+  mockRouter: typeof mockRouter;
+  middleware: {
+    budget: typeof budget;
+    guardrail: typeof guardrail;
+    semanticCache: typeof semanticCache;
+    compose: typeof composeMiddleware;
+    forTool: typeof forTool;
+    readBudgetFallbackSignal: typeof readBudgetFallbackSignal;
+  };
+  checkpoint: {
+    memory: typeof checkpointMemory;
+    pg: typeof checkpointPg;
+    redis: typeof checkpointRedis;
+  };
+  snapshot: {
+    memory: typeof snapshotMemory;
+    pg: typeof snapshotPg;
+    redis: typeof snapshotRedis;
+  };
+  /**
+   * Human-in-the-loop tool approval (interrupt / resume).
+   *
+   * - `human.approval(options)` — the `tool.before` approval-gate middleware.
+   * - `human.resume(id, decision, options)` — out-of-process durable resume.
+   * - `human.interrupt.{memory,pg,redis}()` — durable {@link InterruptStore}
+   *   factories (memory ships real; pg/redis are lazy optional peers).
+   */
+  human: {
+    approval: typeof humanApproval;
+    resume: typeof resume;
+    interrupt: {
+      memory: typeof interruptMemory;
+      pg: typeof interruptPg;
+      redis: typeof interruptRedis;
+    };
+  };
+  /**
+   * Content-intelligence guardrail. `ai.guardrail(options)` builds a composed
+   * input / output / tool middleware; `ai.guardrail.{pii,topic,injection,moderation}`
+   * are the built-in detector factories.
+   */
+  guardrail: typeof guardrailSuite;
+}
 
 /**
  * Top-level `ai` namespace — holds built-in factories and user-registered SDK adapters.
@@ -38,6 +148,7 @@ import { workflow } from "./workflow/workflow";
  * - `ai.instruction(text)` — reusable instruction block (can be passed to `systemPrompt`).
  * - `ai.orchestrator(...)` — session-state manager wrapped around a supervisor (durable session, drift detection, resume, commands).
  * - `ai.memory(...)` — build an agent-memory store with WORKING (in-run scratch) and SEMANTIC (cache-driver `.similar()` recall) tiers.
+ * - `ai.skills(...)` — build a runtime skills library (always-injected metadata catalog + on-demand loadSkill tool).
  * - `ai.planner(...)` — build an executable that generates an ordered plan over registered capabilities, then runs it step-by-step.
  * - `ai.spawnSubAgent(spec)` — thin wrapper that builds a fresh one-shot `agent()` with an optional per-task `budget` and runs the task once. A general primitive (not planner-specific).
  * - `ai.router(...)` — build a supervisor-compatible routing agent from named intents.
@@ -48,6 +159,8 @@ import { workflow } from "./workflow/workflow";
  * - `ai.mockRouter(decisions, opts?)` — deterministic supervisor `route` callback for tests.
  * - `ai.checkpoint.{memory,pg,redis}()` — durable orchestrator session checkpoint stores.
  * - `ai.snapshot.{memory,pg,redis}()` — supervisor-run snapshot stores for `iterate: true` resume.
+ * - `ai.human.approval(...)` / `ai.human.resume(...)` / `ai.human.interrupt.{memory,pg,redis}()` — human-in-the-loop tool approval (interrupt / resume).
+ * - `ai.guardrail(options)` + `ai.guardrail.{pii,topic,injection,moderation}(...)` — content-intelligence guardrails (moderation / PII / injection / topic).
  * - `ai.openai.model(...)` / `ai.anthropic.model(...)` / ... once the adapter SDK is registered.
  *
  * @example
@@ -76,15 +189,24 @@ export const ai = {
   workflow,
   step,
   supervisor,
+  team,
   orchestrator,
   memory,
+  skills,
   planner,
+  rag: Object.assign(rag, { keywordReranker, llmReranker }),
   spawnSubAgent,
   router,
   fanOut,
   batch,
+  streamObject,
+  serve,
   fallbackModel,
   eval: evalScorers,
+  dataset,
+  prompt,
+  prompts: defaultPromptsManager(),
+  vcr,
   mockRouter,
   middleware: {
     budget,
@@ -104,4 +226,8 @@ export const ai = {
     pg: snapshotPg,
     redis: snapshotRedis,
   },
-};
+  human,
+  guardrail: guardrailSuite,
+  // Asserted (not `: Ai`) so a consumer build that augments `Ai` with a
+  // satellite verb (e.g. `workspace`) doesn't flag this literal as missing it.
+} as Ai;

@@ -5,7 +5,7 @@ description: 'Wire agent middleware — ai.middleware.budget (token / USD caps +
 
 # Middleware — agent-level pipeline
 
-Cross-cutting concerns wrapped around an agent run at three granularities: `execute`, `trip`, `tool`. One middleware = one object. Ships with `budget`, `guardrail`, and `semanticCache` built-ins.
+Cross-cutting concerns wrapped around an agent run at three agent-level granularities (`execute`, `trip`, `tool`), plus a `supervisor` level that wraps a whole supervisor run (see below). One middleware = one object. Ships with `budget`, `guardrail`, and `semanticCache` built-ins.
 
 ## Install order at a glance
 

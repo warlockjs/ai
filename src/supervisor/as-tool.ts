@@ -50,9 +50,15 @@ export function asTool<TOutput, TToolInput>(
     name: options.name ?? supervisorInstance.name,
     description: options.description ?? `Invoke supervisor "${supervisorInstance.name}" as a tool.`,
     input: options.inputSchema,
-    execute: async (input) => {
+    execute: async (input, ctx) => {
       const coerced = coerceInput(input);
-      const result = await supervisorInstance.execute(coerced);
+      // Relay the outer agent's cancellation signal so cancelling the
+      // parent aborts this nested supervisor run — its mid-iteration
+      // aborts then propagate into every in-flight child (C2).
+      const result = await supervisorInstance.execute(
+        coerced,
+        ctx?.signal ? { signal: ctx.signal } : undefined,
+      );
 
       if (result.error) {
         // Surface the typed supervisor error — the outer ToolContract

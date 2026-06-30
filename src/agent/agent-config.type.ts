@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { AttachmentPolicy } from "../contracts/attachment-policy.type";
 import type { CompleteEvent } from "../contracts/events/complete-event.type";
 import type { AgentEventMap } from "../contracts/events/event-map.type";
 import type { UsageEvent } from "../contracts/events/usage-event.type";
@@ -7,7 +8,11 @@ import type { ModelCallOptions, ModelContract } from "../contracts/model.contrac
 import type { Placeholders } from "../contracts/placeholders.type";
 import type { StreamingToolGuardConfig } from "../contracts/streaming-tool-guard-config.type";
 import type { SystemPromptContract } from "../contracts/system-prompt.contract";
+import type { FlowObserveOption } from "../observe/resolve-observers";
+import type { SkillsConfig } from "../skills/contracts/skills-config.type";
+import type { SkillsContract } from "../skills/contracts/skills.contract";
 import type { AgentToolEntry } from "../tool/executable-as-tool";
+import type { JudgeConfig } from "./judge-config.type";
 
 /**
  * Map of factory-level event handlers. Every key is optional; handlers
@@ -97,6 +102,28 @@ export type AgentConfig<TOutput = unknown> = {
    *   takes precedence when you need a custom name / schema per use.
    */
   tools?: AgentToolEntry<any, any>[];
+  /**
+   * Factory-level trust-boundary policy for attachments (S1). Governs
+   * server-side attachment I/O: remote-text fetch is default-deny, a
+   * permitted fetch runs through the shared `OutboundPolicy`
+   * (scheme/host/private-IP/max-bytes/timeout), and local reads honor an
+   * `allowedRoots` sandbox. A per-call `AgentExecuteOptions.attachmentPolicy`
+   * overrides this. Omit to keep the safe defaults.
+   */
+  attachmentPolicy?: AttachmentPolicy;
+  /**
+   * Attach a runtime skills library. Accepts the {@link SkillsContract}
+   * returned by `ai.skills(...)` or a raw {@link SkillsConfig} (the agent
+   * passes it to `skills()` for you). When set the agent owns the skills
+   * runtime flow at execute time: it prepends the always-injected metadata
+   * catalog (and, under `inject`, the preloaded bodies) in front of the
+   * developer's system prompt, auto-registers the `loadSkill` tool (plus
+   * `saveSkill` only when a `review` gate is configured), and threads the
+   * run id so `maxLoadsPerRun` is enforced per execution.
+   *
+   * Omitted ⇒ no skills behavior; the agent runs byte-for-byte as today.
+   */
+  skills?: SkillsContract | SkillsConfig;
   /** Placeholder values merged into system prompt templates */
   placeholders?: Placeholders;
   /**
@@ -115,6 +142,41 @@ export type AgentConfig<TOutput = unknown> = {
    * no merging.
    */
   output?: StandardSchemaV1<TOutput>;
+  /**
+   * Judge-safe preset for structured-output judges (LLM-as-judge graders,
+   * verdict classifiers) running on models that may emit *corrupted* JSON —
+   * notably the Amazon Nova family, which wraps verdicts in fenced
+   * ` ```json ` blocks, prepends an explanation paragraph, or trails the
+   * object with commentary.
+   *
+   * `true` (or a {@link JudgeConfig} object) turns on three behaviors at
+   * once:
+   * 1. **Repair** — a couple of re-ask attempts by default
+   *    ({@link JudgeConfig.repairAttempts}) when the verdict fails to parse
+   *    or validate, bounded by `maxTrips`. The caller's per-call
+   *    `options.repair` still wins when explicitly set.
+   * 2. **Lenient verdict parsing** — tolerates fenced ` ```json ` blocks,
+   *    leading / trailing prose, and minor malformations by extracting the
+   *    first balanced JSON object / array from the response (via
+   *    `extractJsonLenient`) instead of the strict `extractJsonPayload`.
+   * 3. **Never throws on a parse miss** — `execute()` already attaches
+   *    errors to `result.error` rather than throwing; the preset hardens
+   *    that into a guarantee: even an unparseable verdict yields a
+   *    well-formed result (`result.error` populated, `result.data`
+   *    undefined) so a flaky judge degrades gracefully instead of crashing
+   *    the surrounding flow.
+   *
+   * **Trade-off — resilience over strictness.** The lenient slice can in
+   * principle recover JSON the strict parser would (correctly) reject, so
+   * only enable it where a tolerant parse is wanted (judges / classifiers
+   * over Nova-class models). Leave it off for normal structured output,
+   * where a hard parse failure is a useful signal that the prompt or model
+   * needs fixing rather than papering over.
+   *
+   * Off by default — when omitted the agent parses strictly and never
+   * auto-enables repair, byte-for-byte as before.
+   */
+  judge?: boolean | JudgeConfig;
   /**
    * Factory-level event handlers. Fire before instance-level `.on()`
    * additions and before per-call `options.on` handlers on every
@@ -172,4 +234,31 @@ export type AgentConfig<TOutput = unknown> = {
    * Distinct from the existing `agent.completed` event — both fire.
    */
   onComplete?: (event: CompleteEvent<TOutput>) => void | Promise<void>;
+  /**
+   * Persist the full multi-turn message array onto
+   * `AgentReport.messages`. Off by default — the captured conversation
+   * can be large and may contain sensitive content (full prompts, tool
+   * inputs/outputs). When omitted the report carries no `messages` field
+   * and the agent runs byte-for-byte as before. Required for panoptic
+   * full-history capture.
+   */
+  captureMessages?: boolean;
+  /**
+   * Observability for this flow. Additive and gated — when omitted, the
+   * flow follows the global observe-all flag (off unless an
+   * observability tool turned it on), so behavior is unchanged by
+   * default.
+   *
+   * - `true` → route this flow's completed report to the globally
+   *   registered observers, even when observe-all is off.
+   * - `false` → opt this flow out entirely, even when observe-all is on.
+   * - an `Observer` object → a flow-local collector; only this flow's
+   *   report is routed, and only to it. Core types this as the
+   *   structural `Observer` (NOT a panoptic-specific type) so core stays
+   *   panoptic-agnostic; a panoptic flow-local collector implements
+   *   `Observer` and can be passed directly.
+   *
+   * Observer errors are swallowed — they never break the run.
+   */
+  observe?: FlowObserveOption;
 };

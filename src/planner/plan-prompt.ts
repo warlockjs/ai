@@ -14,6 +14,7 @@ export function buildPlanSystemPrompt(
   capabilities: PlannerCapability[],
   maxSteps: number,
   prefix: SystemPromptContract | string | undefined,
+  dag = false,
 ): string {
   const capabilityLines = capabilities.map(
     (capability) => `- ${capability.name}: ${capability.description}`,
@@ -41,6 +42,18 @@ export function buildPlanSystemPrompt(
     "- Never invent a capability name that is not listed.",
     "- Keep the plan minimal — only the steps actually needed to satisfy the goal.",
   );
+
+  if (dag) {
+    // DAG mode — the runtime schedules independent steps in parallel off
+    // `dependsOn`, so the model should declare dependencies explicitly
+    // rather than relying purely on array order.
+    sections.push(
+      "- Give each step a stable `id` and list the ids it builds on in `dependsOn`.",
+      "- Steps with no `dependsOn` between them run in PARALLEL — only add a",
+      "  dependency when a step genuinely needs an earlier step's output.",
+      "- The plan must converge: avoid dependency cycles.",
+    );
+  }
 
   return sections.join("\n");
 }

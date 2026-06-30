@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { FlowObserveOption } from "../../observe/resolve-observers";
 import type { AgentContract } from "../agent/agent.contract";
 import type { ModelContract } from "../model.contract";
 import type { SystemPromptContract } from "../system-prompt.contract";
@@ -37,6 +38,14 @@ export type PlannerConfig<TOutput = unknown> = {
   /** Dev-curated version string. Metadata only — never parsed. */
   version?: string;
   /**
+   * Per-flow observability routing. `true` routes this planner's report to
+   * the globally-registered observers (even with observe-all off); `false`
+   * opts out; an `Observer` is a flow-local collector; omitted follows the
+   * global observe-all flag. Brings the planner to parity with
+   * agent/workflow/supervisor instead of only ever routing under observe-all.
+   */
+  observe?: FlowObserveOption;
+  /**
    * Model used to build the internal planning agent that GENERATES the
    * plan. Mutually exclusive with `planner`.
    */
@@ -73,4 +82,25 @@ export type PlannerConfig<TOutput = unknown> = {
    * untyped.
    */
   output?: StandardSchemaV1<TOutput>;
+  /**
+   * Schedule independent steps in parallel off `dependsOn`. When true the
+   * planner builds a DAG from step `id` / `dependsOn`, runs each ready
+   * level concurrently, and feeds each step ONLY its dependencies'
+   * outputs. A cycle or a `dependsOn` that names an unknown step raises a
+   * typed {@link import("../../errors/planner-plan-invalid-error").PlannerPlanInvalidError}
+   * before any step runs. Default `false` ⇒ today's strict array-order
+   * loop, byte-for-byte unchanged.
+   */
+  dag?: boolean;
+  /** Max concurrent steps when `dag` is true. Default 4. */
+  maxConcurrency?: number;
+  /**
+   * Adaptive re-planning. When set, a failed step (or a `replan` verdict
+   * from the `onStep` execute-option) revises the REMAINING plan instead
+   * of aborting — re-asking the planning agent for a fresh plan seeded
+   * with the executed-step digest plus the feedback. Bounded by
+   * `maxReplans`; on exhaustion the run ends with the last failure.
+   * Default off ⇒ a failure aborts exactly as today.
+   */
+  replan?: { maxReplans: number };
 };

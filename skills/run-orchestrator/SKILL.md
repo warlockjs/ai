@@ -86,6 +86,8 @@ result.compaction;                // CompactionResult when a turn compacted (and
 
 `report.children[]` carries ONLY the current turn's dispatched primitive reports. Full session history lives on `report.turns[]` — a `children[]` walker will NOT reach prior turns (intentional). Child `supervisor.*` / `agent.*` events bubble up unmodified under their own identity.
 
+A turn callback that calls `agent.execute()` **directly** (not via `ctx.run` / `ctx.intents`) still nests `callback → agent → tool` inside the turn's report tree, with usage rolled up and the session's `sessionId` stamped onto the captured subtree — an ambient `RunFrame` handles the self-attach. See [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md).
+
 **`awaiting-input` is the only non-terminal status across the unified result tree.** Code branching on `status === "completed"` MUST explicitly handle `"awaiting-input"` as a session-continues path, not a failure.
 
 ## `iterate` — single dispatch vs. internal supervisor

@@ -22,8 +22,25 @@ import type { SnapshotStore } from "./contracts/orchestrator/snapshot-store.cont
  * Phase 3.2 deliberately removed the previous `configureAI()` bag
  * because it was growing unbounded. Treat new fields here with the
  * same suspicion.
+ *
+ * **Augmentable.** Declared as an `interface` (not a `type` alias) so
+ * observability/tooling packages can attach their own opaque config slot
+ * via declaration merging WITHOUT core importing them — keeping core
+ * dependency-free. For example `@warlock.js/ai-panoptic` adds a
+ * `panoptic?` field:
+ *
+ * ```ts
+ * declare module "@warlock.js/ai" {
+ *   interface AIConfig {
+ *     panoptic?: PanopticConfig;
+ *   }
+ * }
+ * ```
+ *
+ * `setAIConfig` stores the whole object via `Object.assign`, so any
+ * augmented field is preserved even though core never reads it.
  */
-export type AIConfig = {
+export interface AIConfig {
   /**
    * Default `@warlock.js/cache` driver for cache-backed consumers that
    * didn't supply their own `store` — currently the `semanticCache`
@@ -80,6 +97,31 @@ export type AIConfig = {
 
 const aiConfig: AIConfig = {};
 
+/** A listener notified after every `setAIConfig` merge. */
+type ConfigListener = (config: AIConfig) => void;
+
+const configListeners: ConfigListener[] = [];
+
+/**
+ * Subscribe to config changes. The listener fires after every
+ * {@link setAIConfig} merge with a fresh snapshot of the full config —
+ * the seam observability/tooling packages use to react when their
+ * augmented slot (e.g. `panoptic`) is set, WITHOUT core importing them.
+ *
+ * Mirrors the dependency-inversion of the `Observer` registry: core
+ * exposes the structural hook; the tool subscribes on its side-effect
+ * import. To also catch config that was applied *before* the subscription,
+ * read {@link getAIConfig} once right after subscribing.
+ *
+ * @example
+ * import { onConfigApplied, getAIConfig } from "@warlock.js/ai";
+ * onConfigApplied((config) => applyPanopticConfig(config.panoptic));
+ * applyPanopticConfig(getAIConfig().panoptic); // catch pre-set config
+ */
+export function onConfigApplied(listener: ConfigListener): void {
+  configListeners.push(listener);
+}
+
 /**
  * Set or extend process-wide AI configuration. Merges over existing
  * values — fields not present in `partial` keep whatever was set
@@ -97,7 +139,20 @@ const aiConfig: AIConfig = {};
  */
 export function setAIConfig(partial: Partial<AIConfig>): AIConfig {
   Object.assign(aiConfig, partial);
-  return { ...aiConfig };
+  const snapshot = { ...aiConfig };
+
+  // Notify subscribers (e.g. panoptic) after the merge. Errors are
+  // swallowed so a misbehaving listener never breaks config application,
+  // mirroring the observer / onUsage swallow-on-throw discipline.
+  for (const listener of configListeners) {
+    try {
+      listener(snapshot);
+    } catch {
+      // intentionally ignored
+    }
+  }
+
+  return snapshot;
 }
 
 /**

@@ -130,11 +130,18 @@ export type BatchItemHandler<TResult extends BaseResult = ExecuteResult> = (
  */
 export type BatchOptions<TResult extends BaseResult = ExecuteResult> = {
   /**
-   * Maximum number of items running at once. A positive integer.
-   * Defaults to `items.length` (all at once). Values `<= 0` are
-   * treated as `1` (fully serial).
+   * Maximum number of items running at once. A positive integer, or the
+   * literal `"unbounded"` to run the whole dataset at once (every item
+   * concurrent). Values `<= 0` are treated as `1` (fully serial).
+   *
+   * Omitting it still runs unbounded (back-compat), but for a large batch
+   * (> 50 items) that emits a one-time warning (outside tests) — each
+   * concurrent item can consume tokens, provider quota, and memory, so an
+   * accidental unbounded run is a cost/DoS foot-gun. Pass an explicit
+   * number to cap it, or `"unbounded"` to acknowledge the all-at-once
+   * behavior and silence the warning. (D5)
    */
-  concurrency?: number;
+  concurrency?: number | "unbounded";
   /**
    * Per-item retry policy, reusing the workflow {@link RetryConfig}
    * semantics (attempts, backoff, `retryOn`, `onRetry`). Applied

@@ -1,3 +1,4 @@
+import type { AIError } from "../../errors/ai-error";
 import type { AttemptEntry } from "./attempt-entry.type";
 import type { Usage } from "./usage.type";
 
@@ -25,6 +26,7 @@ export type ReportType =
   | "agent"
   | "workflow"
   | "supervisor"
+  | "team"
   | "orchestrator"
   | "batch"
   | "planner";
@@ -48,13 +50,19 @@ export type ReportType =
  *   non-terminal member of this union; consumers branching on
  *   `status === "completed"` must treat it as a session-continues path,
  *   not a failure. Harmless on non-orchestrator reports.
+ * - `"awaiting-approval"` — planner-specific NON-terminal status: a
+ *   `mode: "plan-only"` run generated and validated a plan but executed
+ *   nothing, pending sign-off (the plan rides on `result.plan`). Mirrors
+ *   `"awaiting-input"` at the plan boundary. Harmless on non-planner
+ *   reports.
  */
 export type ReportStatus =
   | "completed"
   | "failed"
   | "cancelled"
   | "max-iterations"
-  | "awaiting-input";
+  | "awaiting-input"
+  | "awaiting-approval";
 
 /**
  * Universal execution report shared by every primitive. Per-primitive
@@ -128,6 +136,18 @@ export type BaseReport = {
   type: ReportType;
   /** Terminal status of this execution. */
   status: ReportStatus;
+  /**
+   * Terminal error stamped on a `failed` / `cancelled` node so the typed
+   * cause travels WITH the report tree — not only on the result envelope.
+   * Essential for the observe path: an {@link import("../../observe/observer.contract").Observer}
+   * receives `collect(report)` with no envelope, so a failed root would
+   * otherwise expose `status` with no error type/message. Child tool nodes
+   * already carry their error this way (`ToolCall.error`); root primitives
+   * (agent / workflow / supervisor / orchestrator / planner) stamp it here
+   * too. Absent on a `completed` node. Panoptic normalizes it to a JSON-safe
+   * span error during projection — the raw `AIError` never has to serialize.
+   */
+  error?: AIError;
   /** ISO-8601 wall-clock timestamp when execution began. */
   startedAt: string;
   /** ISO-8601 wall-clock timestamp when execution finished. */

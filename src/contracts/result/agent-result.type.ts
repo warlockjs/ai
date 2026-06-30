@@ -6,10 +6,12 @@ import type { AgentReport } from "./execution-report.type";
  *
  * **Canonical destructuring:** `const { data, text, report, usage, error }`.
  *
- * `report.trips` / `report.toolCalls` / `report.duration` hold
- * everything the old top-level fields did — moving them under
- * `report` leaves the root clean for the four things callers reach
- * for constantly (`data`, `text`, `usage`, `error`).
+ * `report.trips` / `report.children` / `report.duration` hold
+ * everything the old top-level fields did — tool dispatches live as
+ * child nodes on `report.children` (filter `type === "tool"`), and
+ * moving these under `report` leaves the root clean for the four
+ * things callers reach for constantly (`data`, `text`, `usage`,
+ * `error`).
  *
  * @example
  * const { data, error, report, usage } = await agent.execute(input);

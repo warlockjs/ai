@@ -8,6 +8,8 @@ import type { RetryConfig } from "../contracts/workflow/retry-config.type";
 import type { StepDefinition } from "../contracts/workflow/step.contract";
 import type { WorkflowContext } from "../contracts/workflow/workflow-context.type";
 import type { WorkflowEventHandlers } from "../contracts/workflow/workflow.contract";
+import { mergeUsage } from "../utils/compute-cost";
+import { withoutRunFrame } from "../utils/run-context";
 import {
   AIError,
   SchemaValidationError,
@@ -152,23 +154,27 @@ export async function executeStep(params: ExecuteStepParams): Promise<MutableSte
       }
 
       if (step.agent) {
+        const agent = step.agent;
         const agentInput = step.input
           ? await step.input(params.buildContext({ state: attemptState }))
           : { prompt: "" };
 
         const { prompt, ...agentOpts } = agentInput;
 
-        const result = await step.agent.execute(prompt, {
-          ...agentOpts,
-          signal,
-        });
+        // Run the step's agent inside a nested frame so observe-all does NOT
+        // also self-route it as a standalone trace — the workflow already
+        // captures it into report.steps (explicit capture, like the supervisor).
+        const result = await withoutRunFrame(() =>
+          agent.execute(prompt, {
+            ...agentOpts,
+            signal,
+          }),
+        );
 
         executionResult = result;
 
         if (result.usage) {
-          params.usage.input += result.usage.input ?? 0;
-          params.usage.output += result.usage.output ?? 0;
-          params.usage.total += result.usage.total ?? 0;
+          mergeUsage(params.usage, result.usage);
         }
 
         if (result.error) throw result.error;
@@ -367,13 +373,27 @@ async function runParallelStep(params: ParallelParams): Promise<MutableStepSnaps
         usage: params.usage,
       });
 
-      Object.assign(sharedState, snap.state);
       return { child, snap };
     }),
   );
 
+  // Merge each child's resulting state into the shared parent state in
+  // DECLARATION order — not completion order. Every child cloned the
+  // same initial `sharedState` synchronously at dispatch, so the merge
+  // here is the only thing that decides conflicting keys; `Promise.all`
+  // preserves input order in `results`, so a key written by multiple
+  // children deterministically resolves to the last-declared child's
+  // value regardless of which settled first (C3). An optional
+  // `mergeState` reducer overrides this per key for advanced workflows.
   for (const { child, snap } of results) {
     childSnapshots[child.name] = finalizeSnapshot(snap);
+
+    if (step.mergeState) {
+      step.mergeState(sharedState, snap.state, child.name);
+    } else {
+      Object.assign(sharedState, snap.state);
+    }
+
     if (snap.status === "failed" && !firstError && snap.error) {
       firstError = snap.error;
     }

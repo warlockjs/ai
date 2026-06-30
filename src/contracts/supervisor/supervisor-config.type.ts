@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { FlowObserveOption } from "../../observe/resolve-observers";
 import type { SnapshotStore } from "../orchestrator/snapshot-store.contract";
 import type { AgentContract } from "../agent/agent.contract";
 import { Message } from "../conversation-message.type";
@@ -82,6 +83,16 @@ export type SupervisorConfig<
    * independent.
    */
   version?: string;
+
+  /**
+   * INTERNAL — the report-type discriminator stamped on this run's root
+   * report + result envelope. Defaults to `"supervisor"`. `ai.team` sets
+   * `"team"` so its runs are distinguishable on the wire (group/filter as
+   * their own type) while reusing the supervisor engine wholesale. Not
+   * part of the public supervisor surface — plain `ai.supervisor` callers
+   * leave it unset.
+   */
+  reportType?: "supervisor" | "team";
 
   /**
    * Opt-in Standard Schema describing this supervisor's input. Purely
@@ -423,4 +434,24 @@ export type SupervisorConfig<
    * }),
    */
   finalizeArtifacts?: (state: TState, artifacts: TArtifacts) => TState;
+
+  /**
+   * Observability for this supervisor. Additive and gated — when
+   * omitted, the supervisor follows the global observe-all flag (off
+   * unless an observability tool turned it on), so behavior is unchanged
+   * by default.
+   *
+   * - `true` → route this run's completed report to the globally
+   *   registered observers, even when observe-all is off.
+   * - `false` → opt this supervisor out entirely, even when observe-all is on.
+   * - an `Observer` object → a flow-local collector receiving only this
+   *   supervisor's report. Typed as the structural `Observer` so core
+   *   stays panoptic-agnostic; a panoptic flow-local collector can be
+   *   passed directly. Observer errors are swallowed — they never break
+   *   the run.
+   *
+   * `ai.team(...)` forwards its `observe` here verbatim so a team
+   * inherits supervisor observability with no extra wiring.
+   */
+  observe?: FlowObserveOption;
 };

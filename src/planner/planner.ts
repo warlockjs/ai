@@ -105,7 +105,12 @@ function resolvePlanningAgent<TOutput>(
     return config.planner;
   }
 
-  const systemPrompt = buildPlanSystemPrompt(config.capabilities, maxSteps, config.systemPrompt);
+  const systemPrompt = buildPlanSystemPrompt(
+    config.capabilities,
+    maxSteps,
+    config.systemPrompt,
+    config.dag === true,
+  );
 
   return agent({
     name: `${config.name}-planner`,

@@ -1,6 +1,7 @@
 import type { AgentContract } from "./agent.contract";
 import type { AgentExecuteOptions } from "./agent-options.type";
 import type { AgentResult } from "../result/agent-result.type";
+import type { DatasetContract } from "../../eval/dataset.type";
 
 /**
  * Outcome the scorer assigns to a single case. `score` is a normalized
@@ -109,8 +110,12 @@ export type EvalJudge = {
  * resolvable per case or the runner throws at author time.
  */
 export type EvalOptions<TOutput = unknown> = {
-  /** The evaluation cases to run. */
-  cases: EvalCase<TOutput>[];
+  /**
+   * The evaluation cases to run. Either a raw `EvalCase[]` or a
+   * {@link DatasetContract} (from `ai.dataset(...)`) — the runner reads
+   * `.cases` off a dataset.
+   */
+  cases: EvalCase<TOutput>[] | DatasetContract<TOutput>;
   /** Default scorers applied to every case without its own `scorers`. */
   scorers?: EvalScorer<TOutput>[];
   /** LLM-as-judge fallback for cases with no scorers. */
@@ -129,6 +134,36 @@ export type EvalOptions<TOutput = unknown> = {
   onFailure?: (caseResult: EvalCaseResult<TOutput>) => void | Promise<void>;
   /** Execute-options applied to every case (merged under per-case `options`). */
   executeOptions?: AgentExecuteOptions<TOutput>;
+  /**
+   * A prior {@link EvalReport} to diff against. When set, the new report
+   * carries a `regression` block flagging cases whose score dropped more
+   * than `tolerance` below the baseline.
+   */
+  baseline?: EvalReport<TOutput>;
+  /**
+   * Maximum allowed per-case score drop vs baseline before it counts as a
+   * regression. Only consulted when `baseline` is set. Defaults to `0`
+   * (any drop is a regression).
+   */
+  tolerance?: number;
+};
+
+/**
+ * Regression verdict attached to an {@link EvalReport} when `agent.eval`
+ * is called with a `baseline`. Cases are joined by `name`.
+ */
+export type EvalRegression = {
+  /**
+   * Cases whose score fell more than `tolerance` below the baseline,
+   * carrying the before/after scores.
+   */
+  regressed: Array<{ name: string; before: number; after: number }>;
+  /** Case names present in the baseline but absent in the new report. */
+  removed: string[];
+  /** Case names present in the new report but absent in the baseline. */
+  added: string[];
+  /** `true` when `regressed` is empty — no case regressed beyond tolerance. */
+  passed: boolean;
 };
 
 /**
@@ -175,4 +210,9 @@ export type EvalReport<TOutput = unknown> = {
   cases: EvalCaseResult<TOutput>[];
   /** Total wall-clock duration of the whole suite in milliseconds. */
   duration: number;
+  /**
+   * Regression diff vs a baseline. Present only when `agent.eval` was
+   * called with a `baseline`.
+   */
+  regression?: EvalRegression;
 };

@@ -35,6 +35,7 @@ export {
   runResume as runOrchestratorResume,
 } from "./execution";
 export { orchestrator } from "./orchestrator";
+export { inProcessSessionLock, noopSessionLock } from "./session-lock";
 export {
   createOrchestratorStream,
   type OrchestratorStreamController,

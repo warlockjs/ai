@@ -169,3 +169,36 @@ describe("workflow integration — support ticket triage", () => {
     expect(snapshot!.status).toBe("completed");
   });
 });
+
+describe("workflow usage rollup", () => {
+  it("propagates a step's optional usage channels into the workflow total (regression: the rollup dropped cachedTokens / cost)", async () => {
+    const cachingAgent = mockAgent({
+      name: "cacher",
+      responses: [
+        {
+          content: JSON.stringify({ ok: true }),
+          finishReason: "stop",
+          usage: { input: 100, output: 20, total: 120, cachedTokens: 80 },
+        },
+      ],
+    });
+
+    const wf = workflow({
+      name: "rollup-wf",
+      steps: [
+        step({
+          name: "s1",
+          agent: cachingAgent,
+          input: ctx => ({ prompt: String(ctx.input) }),
+        }),
+      ],
+    });
+
+    const result = await wf.execute("go");
+
+    expect(result.usage.total).toBe(120);
+    // Before the shared mergeUsage helper, the step-runner summed only
+    // input/output/total and this channel was silently dropped.
+    expect(result.usage.cachedTokens).toBe(80);
+  });
+});

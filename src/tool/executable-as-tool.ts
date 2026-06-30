@@ -116,8 +116,15 @@ export function executableToTool<TInput, TOutput>(
     name: executable.name,
     description: executable.description ?? `Invoke "${executable.name}" as a tool.`,
     input: executable.inputSchema ?? passthroughSchema<TInput>(),
-    execute: async (input) => {
-      const result = await executable.execute(input);
+    execute: async (input, ctx) => {
+      // Relay the outer run's cancellation signal so a cancelled parent
+      // aborts this nested agent/workflow/supervisor (C2). Omit the
+      // options object entirely when there's no signal so primitives that
+      // treat any second arg as meaningful stay byte-identical.
+      const result = await executable.execute(
+        input,
+        ctx?.signal ? { signal: ctx.signal } : undefined,
+      );
 
       if (result.error) {
         // Surface the inner typed error so the surrounding

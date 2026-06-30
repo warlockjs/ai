@@ -109,7 +109,9 @@ describe("budget — USD cap", () => {
     expect((result.error as BudgetExceededError).unit).toBe("usd");
   });
 
-  it("USD cap silently degrades to tokens-only when model has no pricing entry", async () => {
+  it("warns (does not abort) when a USD cap is set but the running model has no pricing entry", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     const ai = makeAgent(
       [{ content: "no pricing", usage: { input: 1000, output: 1000 } }],
       [
@@ -122,7 +124,13 @@ describe("budget — USD cap", () => {
 
     const result = await ai.execute("hi");
 
+    // Still degrades (no abort) — but the silent fail-open is now surfaced
+    // once, naming the unmatched model, instead of quietly disabling the cap.
     expect(result.error).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain("gpt-test");
+
+    warn.mockRestore();
   });
 });
 

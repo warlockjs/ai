@@ -1,6 +1,6 @@
 ---
 name: run-supervisor
-description: 'Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback, intents as agents / workflows / callbacks, fan-out, evaluate quality loop, ack receptionist, supervisor-level middleware. Triggers: `ai.supervisor`, `ai.router`, `ai.fanOut`, `supervisor.execute`, `supervisor.resume`, `intents`, `router`, `route`, `classifier`, `evaluate`, `ack`, `artifactsSchema`, `middleware`, `END`, `ctx.intents.X.execute`; ''route one input across specialists'', ''multi-intent dispatch'', ''fan-out then evaluate'', ''classifier then router'', ''supervisor middleware'', ''self-consistency / voting''; typical import `import { ai } from "@warlock.js/ai"`. Skip: durable multi-turn sessions — `@warlock.js/ai/run-orchestrator/SKILL.md`; fixed pipelines — `@warlock.js/ai/run-ai-workflow/SKILL.md`; single agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: 'Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback, intents as agents / workflows / callbacks, fan-out, evaluate quality loop, ack receptionist, supervisor-level middleware. A callback that calls agent.execute() directly auto-nests agent → tool under the callback span (ambient RunFrame) with usage / cost rolled up — same for team members and orchestrator turns. Triggers: `ai.supervisor`, `ai.router`, `ai.fanOut`, `supervisor.execute`, `supervisor.resume`, `intents`, `router`, `route`, `classifier`, `evaluate`, `ack`, `artifactsSchema`, `middleware`, `END`, `ctx.intents.X.execute`, `ctx.run`, `RunFrame`, `callback span`, `children`, `parentRunId`, `rootRunId`, `trace nesting`, `sub-agent`; ''route one input across specialists'', ''multi-intent dispatch'', ''fan-out then evaluate'', ''classifier then router'', ''supervisor middleware'', ''self-consistency / voting'', ''why is my callback agent not nested / cost is $0'', ''nest a sub-agent under a callback''; typical import `import { ai } from "@warlock.js/ai"`. Skip: durable multi-turn sessions — `@warlock.js/ai/run-orchestrator/SKILL.md`; fixed pipelines — `@warlock.js/ai/run-ai-workflow/SKILL.md`; single agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
 ---
 
 # `ai.supervisor()` — multi-intent routing
@@ -266,6 +266,25 @@ intents: {
 ```
 
 Cycle protection: per-branch call stack. Re-entry on same intent → `SUPERVISOR_DISPATCH_CYCLE`.
+
+### Sub-agent trace nesting — `agent.execute()` inside a callback auto-nests
+
+A callback that calls `agent.execute()` (or `team` member / `orchestrator` turn callback) **directly** — not through `ctx.run(agent)` / `ctx.intents.X.execute()` — still nests under its enclosing span. An ambient async-local `RunFrame` lets the agent self-attach to the callback's `children[]`, so the report tree is `callback → agent → tool` with usage / cost **rolled up** (no `$0` lone callback span, no manual id threading):
+
+```ts
+ai.supervisor({
+  intents: {
+    delegate: async (ctx) => {
+      const result = await worker.execute(String(ctx.input)); // direct call — still nested
+      return { reply: result.text };
+    },
+  },
+  route: (ctx) => (ctx.iteration === 0 ? "delegate" : END),
+});
+// report → callback("delegate") → agent("worker") → tool("echo"); usage flows up to the root.
+```
+
+Same behavior across `ai.supervisor`, `ai.team` (member callbacks), and `ai.orchestrator` (turn callbacks) — and `sessionId` propagates onto the captured subtree. `ctx.run(agent)` is captured **exactly once** (the explicit path does not double-count via the ambient frame), and a standalone `agent.execute()` **outside** any callback keeps its own self-root (no frame leakage). This is what an `Observer` / panoptic sees — see [`@warlock.js/ai/observe-ai-flows/SKILL.md`](@warlock.js/ai/observe-ai-flows/SKILL.md).
 
 ## Per-call options
 

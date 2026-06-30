@@ -5,10 +5,57 @@ import type {
   PersonaContract,
   SystemPromptBlockContract,
   SystemPromptContract,
+  SystemPromptMergeOptions,
+  SystemPromptMeta,
 } from "../contracts/system-prompt.contract";
 import { InvalidRequestError } from "../errors";
+import { defaultPromptsManager, promptKey } from "../prompts/prompts-manager";
+import type {
+  PromptValidationResult,
+  PromptsValidateOptions,
+} from "../prompts/prompts-manager.type";
 import { Instruction } from "./instruction";
 import { Persona } from "./persona";
+
+/**
+ * Monotonic source of the internal, non-registry display id every
+ * `SystemPrompt` carries. Anonymous (unnamed) prompts have nothing else to
+ * identify them by; this id never feeds the registry and is never derived from
+ * the wall clock, so it stays stable and order-deterministic across a run.
+ */
+let displayIdCounter = 0;
+
+/**
+ * Narrow an arbitrary value to a `SystemPromptContract` — true when it exposes
+ * the builder surface (`blocks` array + a callable `resolve`). Used by the
+ * registry-aware `merge` overload to tell a folded contract from a raw block
+ * or a registry name string, robustly across duplicate package copies.
+ */
+function isSystemPromptContract(
+  value: unknown,
+): value is SystemPromptContract {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as { blocks?: unknown }).blocks) &&
+    typeof (value as { resolve?: unknown }).resolve === "function"
+  );
+}
+
+/**
+ * Build the deterministic provenance label for a prompt — `name@version` when
+ * it is registered, otherwise its internal display id. No random suffixes, so
+ * the same source always yields the same `composedFrom` entry.
+ */
+function provenanceLabel(prompt: SystemPromptContract): string {
+  const meta = prompt.meta();
+
+  if (meta?.name) {
+    return promptKey(meta.name, meta.version ?? "1");
+  }
+
+  return prompt instanceof SystemPrompt ? prompt.id : "anonymous";
+}
 
 /**
  * Concrete `SystemPromptContract` — an immutable layered prompt builder.
@@ -60,9 +107,46 @@ import { Persona } from "./persona";
  * ]);
  */
 export class SystemPrompt implements SystemPromptContract {
+  /**
+   * Internal, non-registry id for display / provenance. Stable for the life of
+   * the instance; sourced from a monotonic counter, never the wall clock.
+   * Anonymous prompts are identified solely by this id.
+   */
+  public readonly id: string;
+
   public constructor(
     public readonly blocks: readonly SystemPromptBlockContract[] = [],
-  ) {}
+    private readonly metaData?: SystemPromptMeta,
+  ) {
+    this.id = `prompt#${displayIdCounter++}`;
+
+    // Auto-register the moment a builder acquires a name — whether through the
+    // `systemPrompt(input, { name })` factory or a `.meta({ name })` rename.
+    // Forks built by `persona()` / `instruction()` / `merge()` deliberately
+    // drop the name (they pass no meta), so they stay anonymous and never land
+    // in the registry unless explicitly re-named.
+    if (metaData?.name) {
+      defaultPromptsManager().register(this);
+    }
+  }
+
+  /**
+   * Read the current metadata snapshot (no argument) or derive a renamed
+   * builder (with `meta`). The accessor returns `undefined` for an anonymous
+   * prompt; the updater shallow-merges `meta` onto the current metadata and
+   * returns a fresh builder. Naming the result registers it in `ai.prompts`.
+   */
+  public meta(): SystemPromptMeta | undefined;
+  public meta(meta: SystemPromptMeta): SystemPromptContract;
+  public meta(
+    meta?: SystemPromptMeta,
+  ): SystemPromptMeta | undefined | SystemPromptContract {
+    if (meta === undefined) {
+      return this.metaData;
+    }
+
+    return new SystemPrompt(this.blocks, { ...this.metaData, ...meta });
+  }
 
   /**
    * Build a system prompt by reading the file at `path` once, synchronously,
@@ -145,6 +229,109 @@ export class SystemPrompt implements SystemPromptContract {
   }
 
   /**
+   * Fold predefined blocks, another prompt contract, or a registered prompt
+   * name into this builder. Three forms share one method:
+   *
+   * - `merge(...blocks)` — N pre-built `ai.persona()` / `ai.instruction()`
+   *   blocks. A `persona` block sets/replaces the single, leading persona;
+   *   every other block appends in order. `base.merge(reviewer, style, lang)`
+   *   equals `base.persona(reviewer).instruction(style).instruction(lang)`.
+   * - `merge(contract)` — another prompt; its blocks fold in (persona
+   *   replaces, instructions append) and `meta.composedFrom` records the
+   *   provenance of both sides.
+   * - `merge(name, { fromVersion })` — a prompt resolved from `ai.prompts`
+   *   (latest version unless `fromVersion` selects another); throws
+   *   `InvalidRequestError` when the name / version is unregistered.
+   *
+   * Immutable — the original builder is untouched; passing zero blocks returns
+   * an equivalent builder. The folded result is anonymous (no `name`), so it
+   * is never auto-registered even though it carries `composedFrom` provenance.
+   */
+  public merge(
+    ...blocks: readonly SystemPromptBlockContract[]
+  ): SystemPromptContract;
+  public merge(source: SystemPromptContract): SystemPromptContract;
+  public merge(
+    name: string,
+    options?: SystemPromptMergeOptions,
+  ): SystemPromptContract;
+  public merge(
+    first?:
+      | SystemPromptBlockContract
+      | SystemPromptContract
+      | string,
+    // `undefined` is part of the element union so the `merge(name, options?)`
+    // overload's optional trailing `options?` (i.e. `… | undefined`) stays
+    // assignable to this implementation signature.
+    ...rest: readonly (
+      | SystemPromptBlockContract
+      | SystemPromptMergeOptions
+      | undefined
+    )[]
+  ): SystemPromptContract {
+    // Registry-name form: resolve from ai.prompts at the chosen version.
+    if (typeof first === "string") {
+      const options = rest[0] as SystemPromptMergeOptions | undefined;
+      const resolved = defaultPromptsManager().get(first, options?.fromVersion);
+
+      return this.mergeContract(resolved);
+    }
+
+    // Contract form: fold another prompt's blocks + record provenance.
+    if (isSystemPromptContract(first)) {
+      return this.mergeContract(first);
+    }
+
+    // Variadic block form (the original behavior).
+    const all = [
+      ...(first ? [first] : []),
+      ...rest,
+    ] as readonly SystemPromptBlockContract[];
+
+    return this.foldBlocks(this, all);
+  }
+
+  /**
+   * Fold an ordered list of blocks onto a starting prompt: persona blocks
+   * set/replace the single leading persona; every other block appends in
+   * order. The shared core of the variadic-block `merge` and the contract fold.
+   */
+  private foldBlocks(
+    start: SystemPromptContract,
+    blocks: readonly SystemPromptBlockContract[],
+  ): SystemPromptContract {
+    return blocks.reduce<SystemPromptContract>((prompt, block) => {
+      if (block.type === "persona") {
+        return prompt.persona(block as PersonaContract);
+      }
+
+      return new SystemPrompt([...prompt.blocks, block]);
+    }, start);
+  }
+
+  /**
+   * Fold another prompt contract into this one (persona replaces, instructions
+   * append) and stamp the deterministic `composedFrom` provenance — this
+   * prompt's existing provenance (or its own label) followed by the folded
+   * source's label. The result is anonymous so it never auto-registers.
+   */
+  private mergeContract(
+    source: SystemPromptContract,
+  ): SystemPromptContract {
+    const folded = this.foldBlocks(this, source.blocks);
+
+    const baseProvenance =
+      this.metaData?.composedFrom ??
+      (this.metaData?.name ? [provenanceLabel(this)] : []);
+
+    const composedFrom = [...baseProvenance, provenanceLabel(source)];
+
+    // Carry forward only provenance — never the name — so the merged result is
+    // a fresh anonymous prompt (immutable rename = new key; original stays).
+    return new SystemPrompt(folded.blocks, { composedFrom });
+  }
+
+  /**
    * Resolve every block against the placeholder map, join the results with
    * blank-line separators (in insertion order), and trim. Returns an empty
    * string when no blocks are present — callers treat that as "no system
@@ -156,6 +343,19 @@ export class SystemPrompt implements SystemPromptContract {
       .join("\n\n")
       .trim();
   }
+
+  /**
+   * Validate this prompt via the process-wide `ai.prompts` manager — sugar for
+   * `ai.prompts.validate(this, options)`. Runs the deterministic placeholder
+   * check and, when `options.judge` is supplied, the Nova-safe LLM-as-judge
+   * pass. Never throws on a judge failure; `ok` tracks the deterministic
+   * verdict alone.
+   */
+  public validate(
+    options?: PromptsValidateOptions,
+  ): Promise<PromptValidationResult> {
+    return defaultPromptsManager().validate(this, options);
+  }
 }
 
 /**
@@ -164,7 +364,10 @@ export class SystemPrompt implements SystemPromptContract {
  * and the `fromFile` attachment travel together as one public type.
  */
 export interface SystemPromptFactory {
-  (input?: string | ReadonlyArray<SystemPromptBlockContract>): SystemPrompt;
+  (
+    input?: string | ReadonlyArray<SystemPromptBlockContract>,
+    meta?: SystemPromptMeta,
+  ): SystemPrompt;
 
   /**
    * Build a system prompt from a file read once at construction. Delegates
@@ -179,16 +382,17 @@ export interface SystemPromptFactory {
 
 function systemPromptFactory(
   input?: string | ReadonlyArray<SystemPromptBlockContract>,
+  meta?: SystemPromptMeta,
 ): SystemPrompt {
   if (input === undefined) {
-    return new SystemPrompt();
+    return new SystemPrompt([], meta);
   }
 
   if (typeof input === "string") {
-    return new SystemPrompt([new Instruction(input)]);
+    return new SystemPrompt([new Instruction(input)], meta);
   }
 
-  return new SystemPrompt([...input]);
+  return new SystemPrompt([...input], meta);
 }
 
 /**
@@ -203,6 +407,11 @@ function systemPromptFactory(
  * - Single string → seeded with one instruction for quick one-shot prompts
  * - Array of blocks → used verbatim, preserving insertion order
  * - `.fromFile(path)` → seeded from a file read once at construction
+ *
+ * Pass a second `meta` argument to name the prompt — a named prompt
+ * auto-registers in `ai.prompts` under `name@version` (version defaults to the
+ * next integer). Forks (`.persona()`, `.instruction()`, `.merge()`) are
+ * anonymous unless re-named via `.meta({ name })`.
  *
  * @example
  * // Composed builder

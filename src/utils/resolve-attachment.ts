@@ -14,9 +14,10 @@ const REMOTE_URL_PATTERN = /^https?:\/\//i;
  *
  * Resolution rules:
  * - `{ base64, mediaType }` → `{ type: "base64", value, mediaType }`.
- * - `StorageFileShape` (`{ url?, absolutePath? }`) → URL wins over
- *   absolute path. URL becomes `{ type: "url" }`; absolute path
- *   becomes `{ type: "path" }`.
+ * - `StorageFileShape` (`{ url?, absolutePath? }`) → `absolutePath` wins
+ *   over `url` when both are present (prefer the local file over an extra
+ *   remote hop). Absolute path becomes `{ type: "path" }`; url becomes
+ *   `{ type: "url" }`.
  * - String starting with `http://` / `https://` → `{ type: "url" }`.
  * - Any other string → `{ type: "path" }`.
  * - Tagged `{ type: "image" | "text", source }` → recurses into `source`.

@@ -1,5 +1,6 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { AgentExecuteOptions } from "../contracts/agent/agent-options.type";
+import type { AttachmentPolicy } from "../contracts/attachment-policy.type";
 import type { Attachment } from "../contracts/attachment.type";
 import type { ContentPart } from "../contracts/content-part.type";
 import type { Message } from "../contracts/conversation-message.type";
@@ -17,6 +18,28 @@ import type { AgentConfig } from "./agent-config.type";
 export type AgentInputBuildResult = {
   messages: Message[];
   responseSchema?: Record<string, unknown>;
+  /**
+   * The resolved system-prompt text actually sent as the `role: "system"`
+   * message (persona + instructions + any auto-appended structured-output
+   * instruction). Captured for observability; absent when the agent ran
+   * without a system prompt.
+   */
+  systemPrompt?: string;
+  /**
+   * Registry name of the `SystemPromptContract` the agent resolved, read from
+   * its `meta().name`. Present only when the agent ran against a *named*
+   * prompt (one registered in `ai.prompts`); absent for a raw-string prompt,
+   * an anonymous contract, or no prompt at all. Lets observers attribute a run
+   * to a specific prompt in the registry.
+   */
+  promptName?: string;
+  /**
+   * Registry version label of the named prompt the agent resolved, read from
+   * its `meta().version` (defaulting to `"1"` when the prompt carries a name
+   * but no explicit version, mirroring the registry's default). Present only
+   * alongside {@link AgentInputBuildResult.promptName}.
+   */
+  promptVersion?: string;
 };
 
 /**
@@ -56,11 +79,25 @@ export async function buildAgentInputMessages<TOutput>(params: {
 
   const systemPrompt = options?.systemPrompt ?? config.systemPrompt;
   let systemContent = "";
+  let promptName: string | undefined;
+  let promptVersion: string | undefined;
 
   if (typeof systemPrompt === "string") {
     systemContent = systemPrompt;
   } else if (systemPrompt) {
     systemContent = systemPrompt.resolve(placeholders);
+
+    // Capture prompt-version linkage from the contract's metadata: a *named*
+    // prompt (one addressable in `ai.prompts`) stamps `promptName@version`
+    // onto the run's report so observers can group runs by the exact prompt
+    // version that produced them. Anonymous prompts carry no name and are
+    // left unlinked.
+    const meta = systemPrompt.meta();
+
+    if (meta?.name) {
+      promptName = meta.name;
+      promptVersion = meta.version ?? "1";
+    }
   }
 
   const { responseSchema, instruction } = resolveStructuredOutput({
@@ -86,13 +123,22 @@ export async function buildAgentInputMessages<TOutput>(params: {
   const userContent = await buildUserMessageContent({
     input,
     attachments: options?.attachments,
+    attachmentPolicy: options?.attachmentPolicy ?? config.attachmentPolicy,
     modelName: config.model.name,
     modelSupportsVision: Boolean(config.model.capabilities?.vision),
+    modelSupportsPdf: Boolean(config.model.capabilities?.pdf),
+    modelSupportsAudio: Boolean(config.model.capabilities?.audio),
   });
 
   messages.push({ role: "user", content: userContent });
 
-  return { messages, responseSchema };
+  return {
+    messages,
+    responseSchema,
+    systemPrompt: systemContent || undefined,
+    promptName,
+    promptVersion,
+  };
 }
 
 /**
@@ -104,29 +150,54 @@ export async function buildAgentInputMessages<TOutput>(params: {
 async function buildUserMessageContent(params: {
   input: string;
   attachments?: Attachment[];
+  attachmentPolicy?: AttachmentPolicy;
   modelName: string;
   modelSupportsVision: boolean;
+  modelSupportsPdf: boolean;
+  modelSupportsAudio: boolean;
 }): Promise<string | ContentPart[]> {
-  const { input, attachments, modelName, modelSupportsVision } = params;
+  const {
+    input,
+    attachments,
+    attachmentPolicy,
+    modelName,
+    modelSupportsVision,
+    modelSupportsPdf,
+    modelSupportsAudio,
+  } = params;
 
   if (!attachments || attachments.length === 0) {
     return input;
   }
 
   const parts: ContentPart[] = await Promise.all(
-    attachments.map((attachment) => prepareAttachmentPart(attachment)),
+    attachments.map((attachment) => prepareAttachmentPart(attachment, attachmentPolicy)),
   );
 
-  const hasImage = parts.some((part) => part.type === "image");
+  // Capability gate per modality (A2) — reject an attachment the model
+  // can't consume here, with a clear message, rather than failing opaquely
+  // at the provider.
+  assertModality(parts, "image", modelSupportsVision, "vision", modelName);
+  assertModality(parts, "pdf", modelSupportsPdf, "pdf", modelName);
+  assertModality(parts, "audio", modelSupportsAudio, "audio", modelName);
 
-  if (hasImage && !modelSupportsVision) {
+  return [{ type: "text", text: input }, ...parts];
+}
+
+/** Throw when a modality is present but the model doesn't declare it. */
+function assertModality(
+  parts: ContentPart[],
+  partType: ContentPart["type"],
+  supported: boolean,
+  capability: string,
+  modelName: string,
+): void {
+  if (!supported && parts.some((part) => part.type === partType)) {
     throw new InvalidRequestError(
-      `Model "${modelName}" does not declare vision capability — image attachments are not supported`,
+      `Model "${modelName}" does not declare ${capability} capability — ${partType} attachments are not supported`,
       { context: { modelName } },
     );
   }
-
-  return [{ type: "text", text: input }, ...parts];
 }
 
 /**

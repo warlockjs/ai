@@ -22,8 +22,9 @@ export type StorageFileShape = {
  *
  * - `string` — local file path or remote URL (auto-detected via the
  *   `https?://` prefix).
- * - `StorageFileShape` — a `@warlock.js/core` storage file; URL wins
- *   over path when both are present.
+ * - `StorageFileShape` — a `@warlock.js/core` storage file; `absolutePath`
+ *   wins over `url` when both are present (prefer the local file the app
+ *   already has over an extra remote hop).
  * - `{ base64, mediaType }` — raw inline bytes with an explicit IANA
  *   media type, useful for in-memory data that never touched disk.
  */
@@ -38,12 +39,14 @@ export type AttachmentSource =
  * Two forms:
  *
  * - **Tagged form** (preferred for non-image types and for explicit
- *   intent): `{ type: "image" | "text", source }`.
+ *   intent): `{ type: "image" | "text" | "pdf" | "audio", source }`.
  * - **Shorthand string / StorageFileShape**: the agent infers the
- *   media kind from the file extension. Recognized image extensions:
- *   `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`. Recognized text
- *   extension: `.txt`. Anything else throws — silent inference for
- *   ambiguous inputs causes silent bugs.
+ *   media kind from the file extension. Recognized: image
+ *   (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`), text (`.txt`), pdf
+ *   (`.pdf`), audio (`.mp3`, `.wav`, `.m4a`, `.ogg`, `.weba`). Anything
+ *   else throws — silent inference for ambiguous inputs causes silent
+ *   bugs. The model must declare the matching capability
+ *   (`vision` / `pdf` / `audio`) or the agent rejects the attachment.
  *
  * @example
  * // Shorthand — extension-inferred image
@@ -70,7 +73,9 @@ export type Attachment =
   | string
   | StorageFileShape
   | { type: "image"; source: AttachmentSource }
-  | { type: "text"; source: AttachmentSource };
+  | { type: "text"; source: AttachmentSource }
+  | { type: "pdf"; source: AttachmentSource }
+  | { type: "audio"; source: AttachmentSource };
 
 /**
  * A normalized attachment after source resolution — a tagged value the

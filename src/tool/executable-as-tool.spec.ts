@@ -119,6 +119,42 @@ describe("executableToTool", () => {
 
     expect(() => executableToTool(fake as never)).toThrow(AgentExecutionError);
   });
+
+  it("relays the invoke ctx signal into the inner executable's execute options (C2)", async () => {
+    const controller = new AbortController();
+    let received: { signal?: AbortSignal } | undefined;
+
+    const fake = {
+      name: "capturer",
+      execute: async (_input: unknown, options?: unknown) => {
+        received = options as { signal?: AbortSignal };
+        return { data: "ok", usage: { input: 0, output: 0, total: 0 }, report: {} as never };
+      },
+    };
+
+    await executableToTool(fake as never).invoke(
+      { topic: "x" },
+      { artifacts: {}, signal: controller.signal },
+    );
+
+    expect(received?.signal).toBe(controller.signal);
+  });
+
+  it("omits the execute options object entirely when no signal is threaded (C2)", async () => {
+    let received: unknown = "untouched";
+
+    const fake = {
+      name: "capturer",
+      execute: async (_input: unknown, options?: unknown) => {
+        received = options;
+        return { data: "ok", usage: { input: 0, output: 0, total: 0 }, report: {} as never };
+      },
+    };
+
+    await executableToTool(fake as never).invoke({ topic: "x" }, { artifacts: {} });
+
+    expect(received).toBeUndefined();
+  });
 });
 
 describe("normalizeAgentTools", () => {
@@ -236,6 +272,44 @@ describe("auto-adapt in tools: [] (no .asTool())", () => {
 
     expect(result.error).toBeUndefined();
     expect(result.usage.total).toBeGreaterThanOrEqual(0);
+  });
+
+  it("an outer agent threads its run signal into a nested executable tool (C2)", async () => {
+    const controller = new AbortController();
+    let received: { signal?: AbortSignal } | undefined;
+
+    const fakeExecutable = {
+      name: "capturer",
+      description: "captures the options it receives",
+      execute: async (_input: unknown, options?: unknown) => {
+        received = options as { signal?: AbortSignal };
+        return {
+          data: { ok: true },
+          usage: { input: 0, output: 0, total: 0 },
+          report: {
+            runId: "r1",
+            rootRunId: "r1",
+            name: "capturer",
+            type: "workflow" as const,
+            status: "completed" as const,
+            startedAt: new Date().toISOString(),
+            endedAt: new Date().toISOString(),
+            duration: 0,
+            usage: { input: 0, output: 0, total: 0 },
+            children: [],
+          },
+        };
+      },
+    };
+
+    const caller = callerAgent("capturer", { topic: "x" }, [fakeExecutable as never]);
+
+    await caller.execute("go", { signal: controller.signal });
+
+    // The outer agent's run signal reached the nested executable's
+    // execute() options — a cancellation of the parent now aborts the
+    // child instead of letting it outlive the cancellation.
+    expect(received?.signal).toBe(controller.signal);
   });
 
   it("surfaces an inner workflow failure as a failed tool call", async () => {

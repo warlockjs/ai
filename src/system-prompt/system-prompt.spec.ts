@@ -372,3 +372,101 @@ describe("systemPrompt.persona() — replace-in-place behavior", () => {
     expect(prompt.resolve()).toBe("You are Alex.\n\nBe concise.");
   });
 });
+
+describe("systemPrompt.merge()", () => {
+  it("merges N predefined blocks in one call", () => {
+    const prompt = systemPrompt().merge(
+      persona("You are Alex."),
+      instruction("Be concise."),
+      instruction("Cite sources."),
+    );
+
+    expect(prompt.resolve()).toBe(
+      "You are Alex.\n\nBe concise.\n\nCite sources.",
+    );
+  });
+
+  it("is equivalent to chaining persona()/instruction()", () => {
+    const reviewer = persona("You review code.");
+    const style = instruction("Be terse.");
+    const lang = instruction("Reply in {{language|English}}.");
+
+    const merged = systemPrompt().merge(reviewer, style, lang);
+    const chained = systemPrompt()
+      .persona(reviewer)
+      .instruction(style)
+      .instruction(lang);
+
+    expect(merged.resolve({ language: "Arabic" })).toBe(
+      chained.resolve({ language: "Arabic" }),
+    );
+  });
+
+  it("folds a persona to the front even when passed after instructions", () => {
+    const prompt = systemPrompt().merge(
+      instruction("Be concise."),
+      persona("You are Alex."),
+    );
+
+    expect(prompt.resolve()).toBe("You are Alex.\n\nBe concise.");
+  });
+
+  it("appends every non-persona block in order", () => {
+    const prompt = systemPrompt().merge(
+      instruction("One."),
+      instruction("Two."),
+      instruction("Three."),
+    );
+
+    expect(prompt.resolve()).toBe("One.\n\nTwo.\n\nThree.");
+  });
+
+  it("merges onto an existing builder, replacing its persona in place", () => {
+    const base = systemPrompt().persona("Old.").instruction("Keep me.");
+    const merged = base.merge(persona("New."), instruction("Added."));
+
+    expect(merged.resolve()).toBe("New.\n\nKeep me.\n\nAdded.");
+  });
+
+  it("keeps only the last persona when several are merged", () => {
+    const prompt = systemPrompt().merge(persona("First."), persona("Second."));
+
+    expect(prompt.resolve()).toBe("Second.");
+  });
+
+  it("resolves placeholders across merged blocks", () => {
+    const prompt = systemPrompt().merge(
+      persona("You are {{name}}."),
+      instruction("Reply in {{language|English}}."),
+    );
+
+    expect(prompt.resolve({ name: "Alex", language: "Arabic" })).toBe(
+      "You are Alex.\n\nReply in Arabic.",
+    );
+  });
+
+  it("returns an equivalent builder when given no blocks", () => {
+    const base = systemPrompt()
+      .persona("You are Alex.")
+      .instruction("Be concise.");
+
+    expect(base.merge().resolve()).toBe(base.resolve());
+  });
+
+  it("is immutable — the original builder is untouched", () => {
+    const base = systemPrompt().persona("Base.");
+    const merged = base.merge(instruction("Extra."));
+
+    expect(base.resolve()).toBe("Base.");
+    expect(merged.resolve()).toBe("Base.\n\nExtra.");
+  });
+
+  it("reuses the same pre-built blocks across prompts", () => {
+    const lang = instruction("Reply in {{language|English}}.");
+    const a = systemPrompt().merge(persona("A."), lang);
+    const b = systemPrompt().merge(persona("B."), lang);
+
+    expect(a.resolve({ language: "English" })).toBe("A.\n\nReply in English.");
+    expect(b.resolve({ language: "Arabic" })).toBe("B.\n\nReply in Arabic.");
+  });
+});

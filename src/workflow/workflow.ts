@@ -1,5 +1,6 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { WorkflowEventMap } from "../contracts/events/event-map.type";
+import type { ExecutionReport } from "../contracts/result/execution-report.type";
 import type { WorkflowResult } from "../contracts/result/workflow-result.type";
 import type {
   WorkflowDefinition,
@@ -10,6 +11,7 @@ import type {
   WorkflowRunOptions,
 } from "../contracts/workflow/workflow.contract";
 import { WorkflowError } from "../errors";
+import { notifyObservers } from "../observe/resolve-observers";
 import type { ToolContract } from "../tool/tool";
 import { asTool } from "./as-tool";
 import { WorkflowEmitter } from "./emitter";
@@ -33,7 +35,7 @@ export function workflow<
   const signature = computeSignature(definition);
   const emitter = new WorkflowEmitter(definition.on);
 
-  function execute(
+  async function execute(
     inputOrOptions: TInput | WorkflowExecuteOptions<TInput, TContext>,
     maybeOptions?: WorkflowRunOptions<TContext>,
   ): Promise<WorkflowResult<TOutput>> {
@@ -42,7 +44,7 @@ export function workflow<
       maybeOptions,
     );
     const runId = options?.runId ?? generateRunId();
-    return runWorkflow<TOutput>({
+    const result = await runWorkflow<TOutput>({
       definition,
       signature,
       emitter,
@@ -53,6 +55,16 @@ export function workflow<
       executionHandlers: options?.on,
       sessionId: options?.sessionId,
     });
+
+    // Route the finished report to any resolved observers (F1/F3).
+    // Gated by `definition.observe` + the global observe-all flag;
+    // observer errors are swallowed inside `notifyObservers`. Bridge the
+    // pre-existing `WorkflowReport = Omit<BaseReport, "type">` drift (the
+    // report carries `type: "workflow"` at runtime — engine sets it) so
+    // this call site adds no new type error beyond the documented baseline.
+    await notifyObservers(definition.observe, result.report as unknown as ExecutionReport);
+
+    return result;
   }
 
   async function resume(
@@ -66,7 +78,7 @@ export function workflow<
       options,
     });
 
-    return runWorkflow<TOutput>({
+    const result = await runWorkflow<TOutput>({
       definition,
       signature,
       emitter,
@@ -78,6 +90,10 @@ export function workflow<
       sessionId: options?.sessionId,
       resumeFrom: snapshot,
     });
+
+    await notifyObservers(definition.observe, result.report as unknown as ExecutionReport);
+
+    return result;
   }
 
   const instance: WorkflowInstance<TInput, TOutput, TState, TContext> = {

@@ -7,6 +7,7 @@ import type {
   AgentExecuteOptions,
   AgentResult,
   BaseReport,
+  CapturedMessage,
   CompleteEvent,
   FinishReason,
   LLMTrip,
@@ -21,6 +22,7 @@ import type {
   StreamEventBody,
   StreamingToolGuardConfig,
   ToolCall,
+  ToolContext,
   ToolEventMeta,
   Usage,
   UsageEvent,
@@ -37,17 +39,23 @@ import type { AgentContract as AgentContractType } from "../contracts/agent/agen
 import type { EvalOptions, EvalReport } from "../contracts/agent/eval.type";
 import { runEval } from "../eval/eval-runner";
 import { runPipeline } from "../middleware";
+import { notifyObservers } from "../observe/resolve-observers";
+import { skills } from "../skills";
+import type { SkillsContract } from "../skills/contracts/skills.contract";
 import { normalizeAgentTools } from "../tool/executable-as-tool";
 import type { ToolContract, ToolInvokeResult } from "../tool/tool";
 import {
-  accumulateCost,
+  captureChildReport,
   computeCost,
+  extractJsonLenient,
   extractJsonPayload,
   generateRunId,
+  mergeUsage,
   safeJsonParse,
   stampReportLineage,
 } from "../utils";
 import type { AgentConfig } from "./agent-config.type";
+import { JUDGE_DEFAULT_REPAIR_ATTEMPTS, type JudgeConfig } from "./judge-config.type";
 import { buildAgentInputMessages } from "./agent-input-builder";
 import { logAgentEvent } from "./agent-log-event";
 import { createAgentStream, type StreamController } from "./agent-stream";
@@ -63,9 +71,29 @@ const LOG_MODULE = "ai.agent";
  * entry has been adapted to a `ToolContract`, so `Execution` works
  * against this narrowed shape and never has to re-discriminate.
  */
-type ResolvedAgentConfig<TOutput> = Omit<AgentConfig<TOutput>, "tools"> & {
+type ResolvedAgentConfig<TOutput> = Omit<AgentConfig<TOutput>, "tools" | "skills"> & {
   tools?: ToolContract<unknown, unknown>[];
+  /**
+   * The skills library resolved once at factory time from the public
+   * `skills` option (a {@link SkillsContract} or a raw `SkillsConfig`).
+   * `undefined` when the agent has no skills attached — the execute path
+   * then behaves byte-for-byte as today.
+   */
+  skillsLib?: SkillsContract;
 };
+
+/**
+ * Duck-type a value as a {@link SkillsContract} (vs a raw `SkillsConfig`).
+ * A contract exposes the agent-facing methods; a config is a plain spec.
+ * Checking `catalogPrompt` is sufficient to discriminate the two shapes.
+ */
+function isSkillsContract(value: unknown): value is SkillsContract {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as SkillsContract).catalogPrompt === "function"
+  );
+}
 
 /**
  * Detect abort-flavored errors surfaced by SDK HTTP layers — the
@@ -160,6 +188,24 @@ function validateMiddleware(middleware: ReadonlyArray<unknown> | undefined): voi
 }
 
 /**
+ * Normalize the public `judge` flag (`boolean | JudgeConfig | undefined`)
+ * into a resolved {@link JudgeConfig} or `undefined` when the preset is
+ * off. `true` ⇒ all defaults (`{}`); a partial config fills missing fields
+ * from the defaults; `false` / absent ⇒ `undefined` (judge mode off).
+ */
+function resolveJudgeConfig(judge: boolean | JudgeConfig | undefined): JudgeConfig | undefined {
+  if (!judge) {
+    return undefined;
+  }
+
+  const base = judge === true ? {} : judge;
+
+  return {
+    repairAttempts: base.repairAttempts ?? JUDGE_DEFAULT_REPAIR_ATTEMPTS,
+  };
+}
+
+/**
  * Creates an executable AI agent from the given configuration.
  *
  * The agent runs a bounded trip loop: each trip calls the model, dispatches
@@ -217,7 +263,23 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
   const name = isAnonymous
     ? synthesizeAgentName({ ...config, tools })
     : (config.name as string);
-  const resolvedConfig: ResolvedAgentConfig<TOutput> = { ...config, name, tools };
+
+  // Resolve the `skills` option to a `SkillsContract` ONCE, here, so every
+  // `execute()` / `stream()` call reuses the same library (and its
+  // `review`-gated saveSkill exposure). A raw `SkillsConfig` is handed to
+  // `skills()`; an already-built contract passes through. Absent ⇒ no skills.
+  const skillsLib = config.skills
+    ? isSkillsContract(config.skills)
+      ? config.skills
+      : skills(config.skills)
+    : undefined;
+
+  const resolvedConfig: ResolvedAgentConfig<TOutput> = {
+    ...config,
+    name,
+    tools,
+    skillsLib,
+  };
 
   // Instance-level handlers registered via `.on()`. Stored here
   // (factory-scope) so every `execute()` / `stream()` call on this
@@ -303,6 +365,55 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
 }
 
 /**
+ * Config for the `ai.agent.judge(...)` helper — every `AgentConfig` field
+ * except `judge` itself (the helper sets it). Callers tune resilience by
+ * passing a {@link JudgeConfig} as the second argument instead.
+ */
+export type JudgeAgentConfig<TOutput = unknown> = Omit<AgentConfig<TOutput>, "judge">;
+
+/**
+ * Build a judge-safe agent — sugar for `agent({ ...config, judge })`.
+ *
+ * Use this for LLM-as-judge graders and verdict classifiers running on
+ * models that may emit corrupted structured output (e.g. the Amazon Nova
+ * family). The returned agent parses verdicts leniently (tolerates fenced
+ * ` ```json ` blocks + surrounding prose), auto-enables a couple of repair
+ * re-asks, and never throws on a parse miss — surfacing `result.error` with
+ * `result.data` left undefined so a flaky judge degrades gracefully.
+ *
+ * See {@link AgentConfig.judge} for the full behavior + the resilience-over-
+ * strictness trade-off.
+ *
+ * @param config - Any agent config (model, system prompt, output schema, …).
+ * @param judge - Optional fine-tuning ({@link JudgeConfig}); defaults to `true`.
+ *
+ * @example
+ * const grader = ai.agent.judge({
+ *   model: nova.model({ name: "amazon.nova-pro-v1:0" }),
+ *   systemPrompt: "Grade the answer. Respond with JSON only.",
+ *   output: verdictSchema,
+ * });
+ *
+ * const result = await grader.execute(prompt);
+ * if (result.error) {
+ *   // graceful default — the judge couldn't produce a clean verdict
+ * }
+ */
+function judgeAgent<TOutput = unknown>(
+  config: JudgeAgentConfig<TOutput>,
+  judge: JudgeConfig | boolean = true,
+): AgentContract<TOutput> {
+  return agent<TOutput>({ ...config, judge });
+}
+
+// Attach the judge helper to the `agent` factory so it surfaces as
+// `ai.agent.judge(...)` (the `Ai` namespace exposes `agent` as
+// `typeof agent`, which now carries this property). Done as a typed
+// property assignment rather than `Object.assign` so the generic
+// signature is preserved for callers.
+agent.judge = judgeAgent;
+
+/**
  * Name → handler-set map shared between the `agent()` factory and its
  * per-call `Execution`. Each `.on()` registration mutates this map;
  * every `Execution` reads from the same reference so additions and
@@ -357,19 +468,52 @@ class Execution<TOutput> {
   private readonly toolCalls: ToolCall[] = [];
   private readonly usage: Usage = { input: 0, output: 0, total: 0 };
   private readonly messages: Message[] = [];
+  /** Resolved system-prompt text sent to the model, captured for the report. */
+  private systemPrompt?: string;
+  /**
+   * Registry name of the named `SystemPromptContract` this run resolved, when
+   * the prompt carried a `meta.name`. Stamped onto the report so observers can
+   * attribute the run to a specific registered prompt. Absent for raw-string,
+   * anonymous-contract, or absent prompts.
+   */
+  private promptName?: string;
+  /** Registry version label paired with {@link Execution.promptName}. */
+  private promptVersion?: string;
   private readonly maxTrips: number;
   private readonly startedAt = new Date();
   private readonly start = performance.now();
   private readonly runId = generateRunId("agent");
   private readonly logger: Logger = log;
+  /**
+   * Event names whose handler already threw once this run — so the
+   * isolate-but-surface warning for a broken handler fires at most once
+   * per event type, never spamming the log on a hot event (token
+   * deltas, tool calls). See {@link surfaceHandlerError} (C5).
+   */
+  private readonly warnedHandlerEvents = new Set<string>();
   private readonly middleware: ReadonlyArray<
     NonNullable<AgentConfig<TOutput>["middleware"]>[number]
   >;
   private readonly middlewareState: MiddlewareState = new Map();
+  /**
+   * The agent's own tools plus this run's skill tools (`loadSkill`, and
+   * `saveSkill` when a review gate is configured). Built once per execution
+   * because `loadSkillTool` closes over a per-run counter enforcing
+   * `maxLoadsPerRun` — one tool instance per run = one budget per run. When
+   * no skills library is attached this is just `config.tools`.
+   */
+  private readonly effectiveTools: ToolContract<unknown, unknown>[];
 
   private error?: AIError;
   private data?: TOutput;
   private responseSchema?: Record<string, unknown>;
+  /**
+   * Resolved judge-safe preset for this run, or `undefined` when the
+   * `judge` flag is off. When set, output parsing is lenient (tolerates
+   * fenced blocks + surrounding prose) and repair auto-defaults to the
+   * configured attempt count.
+   */
+  private readonly judgeConfig?: JudgeConfig;
 
   public constructor(
     private readonly config: ResolvedAgentConfig<TOutput>,
@@ -380,6 +524,19 @@ class Execution<TOutput> {
   ) {
     this.maxTrips = config.maxTrips ?? 10;
     this.middleware = config.middleware ?? [];
+    this.judgeConfig = resolveJudgeConfig(config.judge);
+
+    // Build this run's skill tools once with this run's id so the
+    // per-run `maxLoadsPerRun` counter (closed over inside `loadSkillTool`)
+    // is scoped to exactly this execution. `tools(runId)` already returns
+    // `loadSkill` always and `saveSkill` only when a review gate is wired,
+    // so no special-casing is needed here. `normalizeAgentTools` is a
+    // passthrough for already-built `ToolContract`s — called for uniformity.
+    const skillTools = config.skillsLib
+      ? normalizeAgentTools(config.skillsLib.tools(this.runId)) ?? []
+      : [];
+
+    this.effectiveTools = [...(config.tools ?? []), ...skillTools];
   }
 
   /**
@@ -447,6 +604,22 @@ class Execution<TOutput> {
     // interfere with the result returned to the caller.
     await this.fireCompleteHook(result);
 
+    // Route the finished report to any resolved observers (F1/F3).
+    // Gated by `config.observe` + the global observe-all flag; a no-op
+    // when nothing resolves. Observer errors are swallowed inside
+    // `notifyObservers`, so they never break the run — mirroring the
+    // onUsage / onComplete hook policy.
+    await notifyObservers(this.config.observe, result.report);
+
+    // Auto-nest into the enclosing orchestration run when this agent
+    // executed inside a supervisor/orchestrator/team intent callback
+    // (an ambient `RunFrame` is installed). Captures this report onto
+    // the callback's `children[]` and relinks its lineage — so an
+    // `agent.execute(...)` called directly inside a `run()` callback
+    // shows up nested with its tools, instead of being lost as a
+    // separate top-level execution. No-op for standalone runs.
+    captureChildReport(result.report);
+
     this.streamController?.end(result);
 
     return result;
@@ -470,7 +643,7 @@ class Execution<TOutput> {
 
       const parseOutcome = await this.parseOutput();
 
-      if (parseOutcome === "failed" && this.options?.repair) {
+      if (parseOutcome === "failed" && this.resolveRepairAttempts() > 0) {
         await this.runRepairLoop();
       }
     } catch (thrown) {
@@ -489,13 +662,78 @@ class Execution<TOutput> {
    * to the model. Runs exactly once per execution.
    */
   private async buildInitialMessages(): Promise<void> {
-    const { messages, responseSchema } = await buildAgentInputMessages({
-      config: this.config,
-      input: this.input,
-      options: this.options,
-    });
+    const { messages, responseSchema, systemPrompt, promptName, promptVersion } =
+      await buildAgentInputMessages({
+        config: this.config,
+        input: this.input,
+        options: this.options,
+      });
     this.messages.push(...messages);
     this.responseSchema = responseSchema;
+    this.systemPrompt = systemPrompt;
+    this.promptName = promptName;
+    this.promptVersion = promptVersion;
+
+    await this.injectSkills();
+  }
+
+  /**
+   * Prepend the skills library's contribution to the system prompt — the
+   * always-injected metadata catalog first, then (only under `inject`) the
+   * preloaded skill bodies, then the developer's resolved system prompt.
+   * Never replaces the developer prompt.
+   *
+   * No-op when no skills library is attached. `catalogPrompt` returns `""`
+   * when nothing is in scope and `preload` returns `[]` when `inject` is
+   * omitted (the default), so the prepend is a no-op in those cases too.
+   *
+   * Awaited inside `buildInitialMessages`, which runs inside `runCore`'s
+   * try/catch — a source/embedder failure funnels into `this.error` like
+   * any other build failure, no new error handling needed.
+   */
+  private async injectSkills(): Promise<void> {
+    const lib = this.config.skillsLib;
+
+    if (!lib) {
+      return;
+    }
+
+    const catalogBlock = await lib.catalogPrompt(this.input);
+    const preloaded = await lib.preload(this.input);
+
+    const blocks: string[] = [];
+
+    if (catalogBlock) {
+      blocks.push(catalogBlock);
+    }
+
+    for (const record of preloaded) {
+      if (record.body) {
+        blocks.push(record.body);
+      }
+    }
+
+    if (blocks.length === 0) {
+      return;
+    }
+
+    const prefix = blocks.join("\n\n");
+
+    // Merge in front of the developer's resolved system prompt (captured in
+    // `this.systemPrompt` and mirrored as the leading `role: "system"`
+    // message). When the agent had no system prompt, the skills prefix
+    // becomes the system message.
+    const merged = this.systemPrompt ? `${prefix}\n\n${this.systemPrompt}` : prefix;
+
+    this.systemPrompt = merged;
+
+    const firstMessage = this.messages[0];
+
+    if (firstMessage?.role === "system") {
+      firstMessage.content = merged;
+    } else {
+      this.messages.unshift({ role: "system", content: merged });
+    }
   }
 
   /**
@@ -582,13 +820,10 @@ class Execution<TOutput> {
       response.usage.cost = computeCost(response.usage, this.config.model.pricing);
     }
 
-    this.usage.input += response.usage.input;
-    this.usage.output += response.usage.output;
-    this.usage.total += response.usage.total;
-    if (response.usage.cachedTokens !== undefined) {
-      this.usage.cachedTokens = (this.usage.cachedTokens ?? 0) + response.usage.cachedTokens;
-    }
-    this.usage.cost = accumulateCost(this.usage.cost, response.usage.cost);
+    // Roll the trip into the agent total via the shared all-channel merge
+    // (was missing reasoningTokens / cacheWriteTokens). `response.usage.cost`
+    // is computed just above, so the cost lane merges identically.
+    mergeUsage(this.usage, response.usage);
 
     // Fire the `onUsage` hook with a flat, pre-packaged payload so
     // cost-ledger code receives stable identity (runId, model+provider)
@@ -647,7 +882,7 @@ class Execution<TOutput> {
     // in v1 — silent-composite mechanics are deferred per plan
     // 2026-05-07-silent-tools.md (Q4). They behave as feedback.
     const allSilent = response.toolCalls!.every((request) => {
-      const registered = this.config.tools?.find((tool) => tool.name === request.name);
+      const registered = this.effectiveTools.find((tool) => tool.name === request.name);
       return registered?.mode === "silent";
     });
 
@@ -689,7 +924,7 @@ class Execution<TOutput> {
   private async getModelResponse(tripIndex: number): Promise<ModelResponse> {
     const callOptions = {
       ...this.config.modelOptions,
-      tools: this.config.tools ?? [],
+      tools: this.effectiveTools,
       ...(this.responseSchema ? { responseSchema: this.responseSchema } : {}),
       ...(this.options?.signal ? { signal: this.options.signal } : {}),
     };
@@ -707,7 +942,7 @@ class Execution<TOutput> {
     const guardConfig = this.resolveStreamingToolGuard();
     const guard = guardConfig
       ? new JsonStreamGuard({
-          tools: (this.config.tools ?? []) as ReadonlyArray<ToolContract<unknown, unknown>>,
+          tools: this.effectiveTools as ReadonlyArray<ToolContract<unknown, unknown>>,
           maxBufferBytes: guardConfig.maxBufferBytes,
           onSafeDelta: (delta) => {
             content += delta;
@@ -818,7 +1053,7 @@ class Execution<TOutput> {
     toolCallRequest: ModelToolCallRequest,
     tripIndex: number,
   ): Promise<ToolCall> {
-    const registeredTool = this.config.tools?.find((tool) => tool.name === toolCallRequest.name);
+    const registeredTool = this.effectiveTools.find((tool) => tool.name === toolCallRequest.name);
 
     if (!registeredTool) {
       const error = new AgentExecutionError(`Tool not registered: ${toolCallRequest.name}`, {
@@ -895,6 +1130,21 @@ class Execution<TOutput> {
       request: toolCallRequest,
     };
 
+    // Thread the run's cancellation signal into the ctx handed to the
+    // tool's `invoke`, so composite tools (asTool-wrapped agent/workflow/
+    // supervisor) abort their nested run when the outer agent is cancelled
+    // (C2). The caller's `toolCtx` (artifacts bag, etc.) is preserved — we
+    // only add/override `signal`. With no signal configured we pass
+    // `toolCtx` through unchanged so behavior stays byte-identical.
+    const runSignal = this.options?.signal;
+    const dispatchToolCtx: ToolContext | undefined = runSignal
+      ? {
+          artifacts: this.options?.toolCtx?.artifacts ?? {},
+          ...this.options?.toolCtx,
+          signal: runSignal,
+        }
+      : this.options?.toolCtx;
+
     let invokeResult: ToolInvokeResult<unknown>;
 
     try {
@@ -902,7 +1152,7 @@ class Execution<TOutput> {
         this.middleware,
         "tool",
         toolContext,
-        () => registeredTool.invoke(toolCallRequest.input, this.options?.toolCtx),
+        () => registeredTool.invoke(toolCallRequest.input, dispatchToolCtx),
         this.logger,
       )) as ToolInvokeResult<unknown>;
     } catch (thrown) {
@@ -968,10 +1218,9 @@ class Execution<TOutput> {
     // Roll child usage into the agent's accumulator. Leaf tools
     // contribute zero; `asTool`-wrapped composites contribute the
     // full cost of the inner agent/workflow/supervisor run.
-    this.usage.input += invokeResult.usage.input;
-    this.usage.output += invokeResult.usage.output;
-    this.usage.total += invokeResult.usage.total;
-    this.usage.cost = accumulateCost(this.usage.cost, invokeResult.usage.cost);
+    // All-channel merge so an asTool-wrapped composite that used prompt-cache
+    // or reasoning tokens carries those counts into the parent total too.
+    mergeUsage(this.usage, invokeResult.usage);
 
     this.messages.push({
       role: "tool",
@@ -1006,6 +1255,13 @@ class Execution<TOutput> {
    * - `"failed"` — schema present, output text either failed JSON.parse
    *   or failed `~standard.validate`. Repairable via `runRepairLoop`.
    * - `"success"` — parsed and validated; `this.data` populated.
+   *
+   * Under the judge-safe preset (`judge: true`) the JSON extraction is
+   * lenient — it tolerates fenced ` ```json ` blocks plus leading /
+   * trailing prose by slicing the first balanced object / array out of the
+   * response. Never throws regardless of preset: a parse / validation miss
+   * sets `this.error` and returns `"failed"`, leaving `this.data`
+   * undefined for the graceful-default path.
    */
   private async parseOutput(): Promise<"success" | "failed" | "skipped"> {
     const schema = this.options?.output ?? this.config.output;
@@ -1021,7 +1277,12 @@ class Execution<TOutput> {
       return "skipped";
     }
 
-    const payload = extractJsonPayload(text);
+    // Under the judge-safe preset, parse leniently: tolerate fenced blocks
+    // AND surrounding prose by slicing the first balanced JSON object /
+    // array out of the response. Normal agents keep the strict
+    // `extractJsonPayload` (fence-only) so genuine malformations still fail
+    // loudly rather than being papered over.
+    const payload = this.judgeConfig ? extractJsonLenient(text) : extractJsonPayload(text);
     const sentinel = Symbol("parse-failed");
     const parsed = safeJsonParse<unknown>(payload, sentinel);
 
@@ -1047,8 +1308,29 @@ class Execution<TOutput> {
   }
 
   /**
+   * Resolve how many repair re-asks this run should perform after a parse
+   * failure. Per-call `options.repair` wins when explicitly set (preserving
+   * the existing surface). Otherwise the judge-safe preset supplies its
+   * default attempt count — so `judge: true` enables repair without the
+   * caller also having to pass `repair`. Returns `0` when neither applies,
+   * which leaves the historical "no repair unless asked" behavior intact.
+   */
+  private resolveRepairAttempts(): number {
+    if (this.options?.repair) {
+      return this.options.repair.maxAttempts ?? 1;
+    }
+
+    if (this.judgeConfig) {
+      return this.judgeConfig.repairAttempts ?? JUDGE_DEFAULT_REPAIR_ATTEMPTS;
+    }
+
+    return 0;
+  }
+
+  /**
    * Opt-in self-repair loop for `output` schema failures. Triggered only
-   * when `options.repair` is set and `parseOutput()` returned `"failed"`.
+   * when repair attempts remain (`resolveRepairAttempts() > 0`) and
+   * `parseOutput()` returned `"failed"`.
    *
    * Each attempt:
    * 1. Pushes the bad assistant response into `this.messages` (so the
@@ -1063,7 +1345,7 @@ class Execution<TOutput> {
    * outcome (success or last failure) is what surfaces to the caller.
    */
   private async runRepairLoop(): Promise<void> {
-    const maxAttempts = this.options?.repair?.maxAttempts ?? 1;
+    const maxAttempts = this.resolveRepairAttempts();
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (this.trips.length >= this.maxTrips) {
@@ -1140,6 +1422,11 @@ class Execution<TOutput> {
       version: this.config.version,
       type: "agent" as const,
       status,
+      // Stamp the terminal error onto the report so the observe path — which
+      // sees only the report, never the result envelope — surfaces WHY a
+      // failed/cancelled run ended. Spread conditionally so a completed run
+      // stays byte-for-byte as before.
+      ...(this.error ? { error: this.error } : {}),
       startedAt: this.startedAt.toISOString(),
       endedAt: endedAt.toISOString(),
       duration: performance.now() - this.start,
@@ -1150,6 +1437,22 @@ class Execution<TOutput> {
         provider: this.config.model.provider,
       },
       trips: this.trips,
+      systemPrompt: this.systemPrompt,
+      // Prompt-version linkage. When the agent resolved a *named* prompt (one
+      // registered in `ai.prompts`), stamp its `name` / `version` so observers
+      // (e.g. Panoptic) can group/filter runs by the exact prompt version that
+      // produced them. Spread conditionally so unnamed / raw-string prompts
+      // leave the report byte-for-byte as before.
+      ...(this.promptName
+        ? { promptName: this.promptName, promptVersion: this.promptVersion }
+        : {}),
+      // Opt-in full-history capture (F2). When `captureMessages` is set,
+      // normalize the real assembled turn array (assistant turns with
+      // toolCalls + tool-result turns) onto the report. Off ⇒ field
+      // absent, so the report is byte-for-byte as before.
+      ...(this.config.captureMessages
+        ? { messages: this.captureMessages() }
+        : {}),
     };
 
     // Stamp lineage on the assembled tree exactly once per run.
@@ -1169,6 +1472,36 @@ class Execution<TOutput> {
       usage: this.usage,
       error: this.error,
     };
+  }
+
+  /**
+   * Normalize the accumulated runtime `Message[]` into the JSON-safe
+   * {@link CapturedMessage}[] persisted on `AgentReport.messages` (F2).
+   * Flattens `ContentPart[]` content to a string, and forwards
+   * `toolCalls` (assistant turns) / `toolCallId` (tool-result turns)
+   * only when present so the captured shape stays lean. Called only when
+   * `captureMessages` is enabled.
+   */
+  private captureMessages(): CapturedMessage[] {
+    return this.messages.map((message) => {
+      const captured: CapturedMessage = {
+        role: message.role,
+        content:
+          typeof message.content === "string"
+            ? message.content
+            : JSON.stringify(message.content),
+      };
+
+      if (message.toolCalls !== undefined) {
+        captured.toolCalls = message.toolCalls;
+      }
+
+      if (message.toolCallId !== undefined) {
+        captured.toolCallId = message.toolCallId;
+      }
+
+      return captured;
+    });
   }
 
   /**
@@ -1238,24 +1571,26 @@ class Execution<TOutput> {
 
     this.logEvent(event, fullPayload);
 
+    const onError = (error: unknown) => this.surfaceHandlerError(event, error);
+
     const factoryHandler = this.config.on?.[event] as AgentEventHandler<K> | undefined;
 
     if (factoryHandler) {
-      safeCall(factoryHandler, fullPayload);
+      safeCall(factoryHandler, fullPayload, onError);
     }
 
     const bucket = this.instanceHandlers?.get(event);
 
     if (bucket) {
       for (const handler of bucket) {
-        safeCall(handler as AgentEventHandler<K>, fullPayload);
+        safeCall(handler as AgentEventHandler<K>, fullPayload, onError);
       }
     }
 
     const perCallHandler = this.options?.on?.[event] as AgentEventHandler<K> | undefined;
 
     if (perCallHandler) {
-      safeCall(perCallHandler, fullPayload);
+      safeCall(perCallHandler, fullPayload, onError);
     }
 
     if (this.streamController) {
@@ -1269,6 +1604,25 @@ class Execution<TOutput> {
         });
       }
     }
+  }
+
+  /**
+   * Surface an isolated event-handler failure (C5). A throwing user
+   * handler never crashes the agent — that isolation is preserved — but
+   * total silence is the wrong default: a broken `on` handler would
+   * otherwise disappear from production with no signal. Routed to the
+   * structured logger (matching the `onUsage` / `onComplete` policy) and
+   * warned at most once per event type so a hot event can't spam the log.
+   */
+  private surfaceHandlerError(event: keyof AgentEventMap, error: unknown): void {
+    if (this.warnedHandlerEvents.has(event as string)) return;
+    this.warnedHandlerEvents.add(event as string);
+
+    this.logger.warn(LOG_MODULE, "event.handler.error", "an event handler threw and was isolated", {
+      runId: this.runId,
+      event: event as string,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   /**
@@ -1411,21 +1765,28 @@ function stableStringify(value: unknown): string {
 
 /**
  * Invoke a user-supplied event handler without letting exceptions
- * escape the agent. Thrown errors are swallowed — structured logging
- * attaches here in Phase 0.5 so operators still see the failure.
+ * escape the agent. A throw is isolated (it never crashes the agent)
+ * but no longer silent: the optional `onError` surfaces it — the agent
+ * routes it to its structured logger, matching the swallow-and-log
+ * policy of the `onUsage` / `onComplete` hooks (C5).
  */
-function safeCall<T>(handler: (payload: T) => void, payload: T): void {
+function safeCall<T>(
+  handler: (payload: T) => void,
+  payload: T,
+  onError?: (error: unknown) => void,
+): void {
   try {
     handler(payload);
-  } catch {
-    // Intentionally swallowed — user handlers never crash the agent.
+  } catch (error) {
+    onError?.(error);
   }
 }
 
 /**
  * Resolve a tool's `action` declaration into a plain string for
  * inclusion in `ToolEventMeta`. Static strings pass through;
- * function-shaped actions are invoked with the validated input.
+ * function-shaped actions are invoked with the model's raw,
+ * pre-validation input (before `execute`'s schema validation runs).
  *
  * Defensive: if the user's callback throws, swallow and return
  * `undefined` rather than crashing the agent — UI strings are not

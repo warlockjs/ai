@@ -429,6 +429,11 @@ export async function runWorkflow<TOutput>(
     workflowName: definition.name,
     signature,
     status,
+    // Stamp the terminal error onto the report so it travels with the tree
+    // (observe path has no result envelope to fall back on). A failed `run`
+    // step's cause lives in `steps[name].error`, but the workflow-level
+    // error is what a consumer reads off the root span. Absent on success.
+    ...(error ? { error } : {}),
     startedAt,
     endedAt,
     duration,

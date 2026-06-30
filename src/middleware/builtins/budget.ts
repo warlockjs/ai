@@ -269,6 +269,10 @@ export function budget(options: BudgetOptions): AgentMiddleware {
   const hasContractCostCap = typeof contract?.maxCostUSD === "number";
   const hasContractLatencyCap = typeof contract?.maxLatencyMs === "number";
   const contractNeedsCost = hasCostCap || hasContractCostCap;
+  // Warn once per model when a cost cap is configured but the running model
+  // has no pricing entry — without this the USD cap silently never enforces
+  // (costUSD stays 0), a fail-open the JSDoc on `maxCostUSD` documents.
+  const warnedUnpricedModels = new Set<string>();
 
   return {
     name,
@@ -294,14 +298,24 @@ export function budget(options: BudgetOptions): AgentMiddleware {
 
         counters.tokens += response.usage.total;
 
-        if (contractNeedsCost && options.pricing) {
-          const pricing = options.pricing[context.model.name];
+        if (contractNeedsCost) {
+          const pricing = options.pricing?.[context.model.name];
 
           if (pricing) {
             const tripCost =
               (response.usage.input / 1000) * pricing.inputPer1K +
               (response.usage.output / 1000) * pricing.outputPer1K;
             counters.costUSD += tripCost;
+          } else if (!warnedUnpricedModels.has(context.model.name)) {
+            // A cost cap is set but no pricing matched the running model, so
+            // costUSD can never grow and the USD cap silently never fires.
+            // Surface the fail-open once per model instead of swallowing it.
+            warnedUnpricedModels.add(context.model.name);
+            console.warn(
+              `ai.middleware.budget("${name}"): a USD cost cap is set but no pricing entry ` +
+                `matches the running model "${context.model.name}" — the cap cannot be enforced ` +
+                `for it. Add a pricing entry for "${context.model.name}" to options.pricing.`,
+            );
           }
         }
 

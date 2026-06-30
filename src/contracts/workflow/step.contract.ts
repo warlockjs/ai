@@ -192,13 +192,39 @@ export type StepDefinition<
   retry?: RetryConfig | false;
 
   /**
-   * Parallel children — run concurrently, share `ctx.state`
-   * (last-write-wins). Mutually exclusive with `run` and `agent`.
-   * The parent's snapshot is atomic: written only after every child
-   * settles. Children are addressable at both `ctx.steps.<child>` and
-   * `ctx.steps.<parent>.steps.<child>`.
+   * Parallel children — run concurrently, each starting from a snapshot
+   * of the parent `ctx.state`. After every child settles, their
+   * resulting states are merged back into the parent in **declaration
+   * order** (the order children appear in this array), so a key written
+   * by more than one child deterministically resolves to the
+   * **last-declared** child's value — regardless of which child finished
+   * first. Supply {@link mergeState} to customize conflict resolution
+   * (e.g. sum counters, concat arrays). Mutually exclusive with `run`
+   * and `agent`. The parent's snapshot is atomic: written only after
+   * every child settles. Children are addressable at both
+   * `ctx.steps.<child>` and `ctx.steps.<parent>.steps.<child>`.
    */
   parallel?: StepDefinition<TInput, TState, TContext>[];
+
+  /**
+   * Conflict resolver for {@link parallel} children that write the same
+   * `ctx.state` keys. Called once per child, in **declaration order**,
+   * with the accumulator (the parent state being built up), that child's
+   * resolved state, and the child's name. Mutate `acc` in place.
+   *
+   * Omit it to keep the deterministic default (last-declared child wins
+   * per key — a plain `Object.assign` in declaration order). Supply it
+   * for advanced merges:
+   *
+   * ```ts
+   * mergeState: (acc, childState) => {
+   *   acc.total = (acc.total ?? 0) + (childState.total ?? 0); // sum
+   * }
+   * ```
+   *
+   * Only consulted for parallel steps; ignored otherwise.
+   */
+  mergeState?: (acc: TState, childState: TState, childName: string) => void;
 
   /**
    * Per-step event handlers — fires alongside the workflow-level

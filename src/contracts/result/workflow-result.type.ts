@@ -13,7 +13,9 @@ import type { StepSnapshot } from "./step-result.type";
  * structure — one entry per defined step — while `children` gives
  * the cross-cutting tree view shared with other primitives.
  */
-export type WorkflowReport = Omit<BaseReport, "type"> & {
+export type WorkflowReport = BaseReport & {
+  /** Discriminator narrowed to the workflow primitive. */
+  type: "workflow";
   workflowName: string;
   /** Structural fingerprint — same value exposed on the workflow instance. */
   signature: string;

@@ -32,6 +32,24 @@
   },
   "peerDependencies": {
     "@warlock.js/cache": "*",
-    "@warlock.js/logger": "*"
+    "@warlock.js/logger": "*",
+    "langfuse": "*",
+    "openai": "*",
+    "pg": "*",
+    "redis": "*"
+  },
+  "peerDependenciesMeta": {
+    "langfuse": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "redis": {
+      "optional": true
+    }
   }
 }

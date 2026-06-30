@@ -2,7 +2,10 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { AgentContract } from "../contracts/agent/agent.contract";
 import type { PlannerCapability } from "../contracts/planner/planner-capability.type";
 import type { PlannerConfig } from "../contracts/planner/planner-config.type";
-import type { PlannerExecuteOptions } from "../contracts/planner/planner-execute-options.type";
+import type {
+  PlannerExecuteOptions,
+  PlannerStepDirective,
+} from "../contracts/planner/planner-execute-options.type";
 import type { PlannerPlan, PlannerStep } from "../contracts/planner/planner-plan.type";
 import type {
   PlannerReport,
@@ -18,9 +21,13 @@ import { PlannerCancelledError } from "../errors/planner-cancelled-error";
 import { PlannerFailedError } from "../errors/planner-failed-error";
 import { PlannerPlanInvalidError } from "../errors/planner-plan-invalid-error";
 import { SchemaValidationError } from "../errors/schema-validation-error";
+import { notifyObservers } from "../observe/resolve-observers";
 import { accumulateCost } from "../utils/compute-cost";
 import { generateRunId } from "../utils/generate-run-id";
+import { captureChildReport, withoutRunFrame } from "../utils/run-context";
 import { stampReportLineage } from "../utils/stamp-report-lineage";
+import type { DagNode, PlannerDag } from "./dag-scheduler";
+import { buildDag, readyNodes, sinkNodes } from "./dag-scheduler";
 import { planSchema } from "./plan-schema";
 
 /**
@@ -70,6 +77,12 @@ export class PlannerRun<TOutput> {
   private error?: AIError;
   private cancelledAt?: string;
 
+  /** Set when `mode: "plan-only"` short-circuited before execution. */
+  private awaitingApproval = false;
+
+  /** How many times the plan has been regenerated mid-run (≤ maxReplans). */
+  private replanCount = 0;
+
   public constructor(private readonly args: PlannerRunArgs<TOutput>) {
     this.runId = args.options?.runId ?? generateRunId("planner");
   }
@@ -81,19 +94,58 @@ export class PlannerRun<TOutput> {
    * `report.status`.
    */
   public async run(): Promise<PlannerResult<TOutput>> {
+    const result = await this.runPlan();
+
+    // Route the planner's OWN report — the planning trip plus every
+    // capability step already nest under it via `absorb`, so this single
+    // call surfaces the whole tree as one trace. Mirrors agent/workflow:
+    // `notifyObservers` self-routes a root run under observe-all (skipped
+    // when nested, via the run-frame gate), then `captureChildReport`
+    // auto-nests the planner under any enclosing orchestration run. Without
+    // this, observe-all would only ever see the sub-agents as standalone
+    // fragments — the planner itself never appeared.
+    await notifyObservers(this.args.config.observe, result.report);
+    captureChildReport(result.report);
+
+    return result;
+  }
+
+  /**
+   * Drive the planner lifecycle and return the built result WITHOUT
+   * routing it — `run()` owns observer routing + auto-nesting so the
+   * unified tree is emitted exactly once.
+   */
+  private async runPlan(): Promise<PlannerResult<TOutput>> {
     try {
       if (this.isAborted()) {
         this.markCancelled();
         return this.buildResult();
       }
 
-      const plan = await this.generatePlan();
+      // Approval fork — an `approvedPlan` skips generation entirely; it is
+      // still validated against the live capabilities so a stale plan
+      // surfaces a typed PlannerPlanInvalidError rather than mis-dispatching.
+      const plan = this.args.options?.approvedPlan ?? (await this.generatePlan());
 
       if (this.error || !plan) {
         return this.buildResult();
       }
 
+      this.assertPlanValid(plan);
+
+      if (this.error) {
+        return this.buildResult();
+      }
+
       this.plan = plan;
+
+      // Plan-only mode — surface the validated plan for sign-off and execute
+      // NOTHING. `approvedPlan` overrides this (execute the supplied plan),
+      // mirroring the documented "approvedPlan wins" precedence.
+      if (this.args.options?.mode === "plan-only" && !this.args.options?.approvedPlan) {
+        this.awaitingApproval = true;
+        return this.buildResult();
+      }
 
       await this.executePlan(plan);
 
@@ -111,16 +163,26 @@ export class PlannerRun<TOutput> {
    * agent's per-call `output`, so the model is steered to reference only
    * real capabilities. The planning trip's usage + report roll into the
    * planner's totals regardless of outcome.
+   *
+   * `feedback` is set only on a RE-plan: the regenerated request is
+   * seeded with the executed-step digest plus the caller's feedback so
+   * the planner revises the remaining work rather than starting cold.
    */
-  private async generatePlan(): Promise<PlannerPlan | undefined> {
+  private async generatePlan(feedback?: string): Promise<PlannerPlan | undefined> {
     const schema = planSchema([...this.args.capabilities.keys()], this.args.maxSteps);
 
-    const result = await this.args.planningAgent.execute(this.buildPlanPrompt(), {
-      output: schema as StandardSchemaV1<unknown>,
-      placeholders: this.args.options?.placeholders,
-      signal: this.args.options?.signal,
-      sessionId: this.args.options?.sessionId,
-    });
+    // `withoutRunFrame` suppresses the planning trip's own self-routing:
+    // `absorb` already folds its report into `this.children`, so without
+    // this the trip would ALSO route as a standalone top-level trace under
+    // observe-all. The planner routes the unified tree once, in `run()`.
+    const result = await withoutRunFrame(() =>
+      this.args.planningAgent.execute(this.buildPlanPrompt(feedback), {
+        output: schema as StandardSchemaV1<unknown>,
+        placeholders: this.args.options?.placeholders,
+        signal: this.args.options?.signal,
+        sessionId: this.args.options?.sessionId,
+      }),
+    );
 
     this.absorb(result.usage, result.report);
 
@@ -151,13 +213,9 @@ export class PlannerRun<TOutput> {
       return undefined;
     }
 
-    const unknownStep = plan.steps.find((step) => !this.args.capabilities.has(step.capability));
+    this.assertPlanValid(plan);
 
-    if (unknownStep) {
-      this.error = new PlannerPlanInvalidError(
-        `ai.planner("${this.args.config.name}"): plan references unknown capability "${unknownStep.capability}"`,
-        { context: { runId: this.runId, capability: unknownStep.capability } },
-      );
+    if (this.error) {
       return undefined;
     }
 
@@ -165,40 +223,240 @@ export class PlannerRun<TOutput> {
   }
 
   /**
-   * Phase 2 — execute the plan's steps strictly in order, threading each
-   * completed step's output into the next step's input context. Stops at
-   * the first step failure (its `error` becomes the run error) or when
-   * the abort signal fires between steps. Steps beyond `maxSteps` are
-   * recorded as `skipped` without running.
+   * Shared plan-validity guard — used both for a freshly generated plan
+   * and for a caller-supplied `approvedPlan`. Sets `this.error` to a
+   * typed {@link PlannerPlanInvalidError} when the plan is empty or names
+   * an unknown capability; a stale `approvedPlan` thus fails the same way
+   * a hallucinated capability does, never silently mis-dispatching.
+   */
+  private assertPlanValid(plan: PlannerPlan): void {
+    if (!Array.isArray(plan.steps) || plan.steps.length === 0) {
+      this.error = new PlannerPlanInvalidError(
+        `ai.planner("${this.args.config.name}"): the planner produced no usable plan`,
+        { context: { runId: this.runId } },
+      );
+      return;
+    }
+
+    const unknownStep = plan.steps.find((step) => !this.args.capabilities.has(step.capability));
+
+    if (unknownStep) {
+      this.error = new PlannerPlanInvalidError(
+        `ai.planner("${this.args.config.name}"): plan references unknown capability "${unknownStep.capability}"`,
+        { context: { runId: this.runId, capability: unknownStep.capability } },
+      );
+    }
+  }
+
+  /**
+   * Phase 2 — execute the plan. Branches on `config.dag`: the default is
+   * the strict array-order sequential loop (byte-for-byte today's
+   * behavior when neither `onStep` nor `replan` is configured); `dag:
+   * true` schedules independent `dependsOn` branches in parallel.
    */
   private async executePlan(plan: PlannerPlan): Promise<void> {
-    const previousOutputs: string[] = [];
+    if (this.args.config.dag) {
+      return this.executeDag(plan);
+    }
 
-    for (let index = 0; index < plan.steps.length; index++) {
-      const step = plan.steps[index] as PlannerStep;
+    return this.executeSequential(plan);
+  }
+
+  /**
+   * Sequential executor — the original strict array-order loop, threading
+   * each completed step's output into the next step's input context.
+   * Stops at the first step failure or when the abort signal fires
+   * between steps; steps beyond `maxSteps` are recorded `skipped`.
+   *
+   * **Additive hooks (inert by default).** After each step settles it
+   * fires the `onStep` directive hook; an `abort` directive stops the run
+   * like a failure, and a `replan` directive (or, when `config.replan` is
+   * set, an unhandled failure) regenerates the REMAINING plan instead of
+   * aborting. With no `onStep` and no `replan`, the behavior is identical
+   * to before.
+   */
+  private async executeSequential(plan: PlannerPlan): Promise<void> {
+    const previousOutputs: string[] = [];
+    let steps = plan.steps;
+    let index = 0;
+
+    while (index < steps.length) {
+      const step = steps[index] as PlannerStep;
 
       if (index >= this.args.maxSteps) {
         this.recordSkipped(index, step);
+        index++;
         continue;
       }
 
       if (this.isAborted()) {
         this.markCancelled();
         this.recordSkipped(index, step);
+        index++;
         continue;
       }
 
       const completed = await this.executeStep(index, step, previousOutputs);
 
-      if (!completed) {
-        // Step failed — record the remaining steps as skipped so the
-        // report still describes the whole intended plan, then stop.
-        for (let rest = index + 1; rest < plan.steps.length; rest++) {
-          this.recordSkipped(rest, plan.steps[rest] as PlannerStep);
+      const snapshot = this.snapshotFor(index);
+      const directive = snapshot
+        ? await this.resolveDirective(snapshot, plan, completed)
+        : undefined;
+
+      if (directive?.type === "replan") {
+        const remaining = await this.regeneratePlan(directive.feedback);
+
+        if (this.error || !remaining) {
+          this.skipRest(steps, index + 1);
+          return;
         }
+
+        // Replace the remaining tail with the regenerated plan and restart
+        // the cursor against it (executed steps already recorded stay put).
+        // Each new step gets the executed-so-far digest as its context.
+        steps = remaining.steps;
+        index = 0;
+        previousOutputs.length = 0;
+        previousOutputs.push(...this.executedDigest());
+        continue;
+      }
+
+      if (directive?.type === "abort") {
+        // The hook (or an unhandled failure) asked to stop — record the
+        // remaining steps as skipped so the report still describes the
+        // whole intended plan, then stop.
+        this.skipRest(steps, index + 1);
         return;
       }
+
+      index++;
     }
+  }
+
+  /**
+   * DAG executor — schedule independent `dependsOn` branches in parallel.
+   *
+   * Builds the DAG (cycle / unknown-id → `PlannerPlanInvalidError`),
+   * then repeatedly computes the ready set (steps whose deps all
+   * completed), dispatches up to `maxConcurrency` of them with
+   * `Promise.all`, and feeds each step ONLY its dependencies' outputs. A
+   * failed step blocks just its descendants (recorded `skipped`);
+   * independent branches still settle. With an `output` schema set, the
+   * final `data` is the topological SINK's output (multiple sinks → a
+   * convergence error).
+   */
+  private async executeDag(plan: PlannerPlan): Promise<void> {
+    const dag = buildDag(plan.steps, this.args.config.name);
+    const maxConcurrency = Math.max(1, this.args.config.maxConcurrency ?? 4);
+
+    const completed = new Set<string>();
+    const done = new Set<string>();
+    const outputs = new Map<string, string>();
+    const rawOutputs = new Map<string, unknown>();
+    let executedCount = 0;
+
+    while (done.size < dag.nodes.length) {
+      if (this.isAborted()) {
+        this.markCancelled();
+        this.skipDagRest(dag, done);
+        return;
+      }
+
+      const ready = readyNodes(dag, completed, done);
+
+      if (ready.length === 0) {
+        // No node can advance — every remaining node transitively depends
+        // on a failed/skipped ancestor. Record them skipped and stop.
+        this.skipDagRest(dag, done);
+        return;
+      }
+
+      const batch = ready.slice(0, maxConcurrency);
+
+      const settled = await Promise.all(
+        batch.map(async (node) => {
+          // `maxSteps` truncation applies to the count of DISPATCHED steps.
+          if (executedCount >= this.args.maxSteps) {
+            this.recordSkipped(node.index, node.step);
+            return { node, ran: false, completed: false };
+          }
+
+          executedCount++;
+          // Feed this step ONLY its dependencies' output digests — the DAG
+          // fix for the sequential loop's "all prior outputs into every
+          // step" behavior. `executeStep` pushes into the array it is
+          // given, so a fresh array per node keeps branches isolated.
+          const previousOutputs = node.dependencies.map(
+            (dependency) => outputs.get(dependency) as string,
+          );
+          const stepCompleted = await this.executeStep(
+            node.index,
+            node.step,
+            previousOutputs,
+          );
+
+          if (stepCompleted) {
+            // Read the raw output off the snapshot (NOT shared `this.data`,
+            // which races under Promise.all) for both the dependent digest
+            // and the eventual sink output.
+            const rawOutput = this.snapshotFor(node.index)?.output;
+            rawOutputs.set(node.id, rawOutput);
+            outputs.set(node.id, this.stringifyOutput(node.step.capability, rawOutput));
+          }
+
+          return { node, ran: true, completed: stepCompleted };
+        }),
+      );
+
+      for (const entry of settled) {
+        done.add(entry.node.id);
+
+        if (entry.completed) {
+          completed.add(entry.node.id);
+        }
+      }
+
+      // Fire the per-step hook for each settled step (in dispatch order).
+      let replanFeedback: string | undefined;
+      let shouldAbort = false;
+
+      for (const entry of settled) {
+        if (!entry.ran) {
+          continue;
+        }
+
+        const snapshot = this.snapshotFor(entry.node.index);
+        const directive = snapshot
+          ? await this.resolveDirective(snapshot, plan, entry.completed)
+          : undefined;
+
+        if (directive?.type === "replan") {
+          replanFeedback = directive.feedback;
+        } else if (directive?.type === "abort") {
+          shouldAbort = true;
+        }
+      }
+
+      if (shouldAbort) {
+        this.skipDagRest(dag, done);
+        return;
+      }
+
+      if (replanFeedback !== undefined) {
+        const remaining = await this.regeneratePlan(replanFeedback);
+
+        if (this.error || !remaining) {
+          this.skipDagRest(dag, done);
+          return;
+        }
+
+        // Re-plan in DAG mode regenerates the remaining work as a fresh
+        // (sequential) plan and runs it through the DAG scheduler again.
+        return this.executeDag(remaining);
+      }
+    }
+
+    this.finalizeDagOutput(dag, completed, rawOutputs);
   }
 
   /**
@@ -216,10 +474,15 @@ export class PlannerRun<TOutput> {
     const startedAt = new Date().toISOString();
     const input = this.composeStepInput(step, previousOutputs);
 
-    const result = await capability.executable.execute(input, {
-      signal: this.args.options?.signal,
-      sessionId: this.args.options?.sessionId,
-    });
+    // `withoutRunFrame` keeps each capability step nested under the planner
+    // only — `absorb` folds its report into `this.children`, so suppressing
+    // its self-route prevents a duplicate standalone trace under observe-all.
+    const result = await withoutRunFrame(() =>
+      capability.executable.execute(input, {
+        signal: this.args.options?.signal,
+        sessionId: this.args.options?.sessionId,
+      }),
+    );
 
     const childReport = "report" in result ? (result.report as BaseReport) : undefined;
     this.absorb(result.usage, childReport);
@@ -249,6 +512,149 @@ export class PlannerRun<TOutput> {
     this.data = output as TOutput;
 
     return true;
+  }
+
+  /**
+   * Resolve the steering directive for a just-settled step, shared by the
+   * sequential and DAG executors. Fires the user's `onStep` hook, then
+   * normalizes the result against the `replan` budget:
+   *
+   * - explicit `replan` directive — honored only when `config.replan` is
+   *   set and the budget remains; otherwise downgraded to `continue`.
+   * - explicit `abort` — honored.
+   * - failed step with no overriding directive — auto-`replan` when
+   *   `config.replan` is set and the budget remains (feedback = the step
+   *   error message), else `abort` (today's abort-on-first-failure).
+   *
+   * Returns `undefined` when the run should simply continue. A returned
+   * `replan` directive has ALREADY consumed one unit of the replan budget.
+   */
+  private async resolveDirective(
+    snapshot: PlannerStepSnapshot,
+    plan: PlannerPlan,
+    completed: boolean,
+  ): Promise<PlannerStepDirective | undefined> {
+    const hook = this.args.options?.onStep;
+    const userDirective = hook ? await hook(snapshot, plan) : undefined;
+
+    if (userDirective?.type === "replan") {
+      if (this.canReplan()) {
+        this.replanCount++;
+        return userDirective;
+      }
+
+      // Replan requested but unavailable (no config or budget spent) — fall
+      // through to the failure/continue defaults below.
+    } else if (userDirective?.type === "abort") {
+      return { type: "abort" };
+    } else if (userDirective?.type === "continue") {
+      return undefined;
+    }
+
+    if (!completed) {
+      if (this.canReplan()) {
+        this.replanCount++;
+        return { type: "replan", feedback: snapshot.error?.message ?? "step failed" };
+      }
+
+      return { type: "abort" };
+    }
+
+    return undefined;
+  }
+
+  /** Whether a re-plan is configured and the budget has room. */
+  private canReplan(): boolean {
+    const replan = this.args.config.replan;
+
+    return replan !== undefined && this.replanCount < replan.maxReplans;
+  }
+
+  /**
+   * Re-ask the planning agent for a plan over the REMAINING work — a
+   * second `generatePlan()` seeded with the executed-step digest plus the
+   * caller's feedback. Reuses the exact `generatePlan` plumbing (same
+   * schema, same `PlannerPlanInvalidError` handling), so a regenerated
+   * plan that is empty or names an unknown capability fails identically.
+   * The failed step's error is cleared so the regenerated plan runs
+   * cleanly; a fresh failure (or exhausted budget) re-sets it.
+   */
+  private async regeneratePlan(feedback: string): Promise<PlannerPlan | undefined> {
+    this.error = undefined;
+    return this.generatePlan(feedback);
+  }
+
+  /**
+   * The executed-so-far digest — one context line per completed step, in
+   * execution order. Seeds the regenerated plan's first step so it builds
+   * on what already ran.
+   */
+  private executedDigest(): string[] {
+    return this.executedSteps
+      .filter((snapshot) => snapshot.status === "completed")
+      .map((snapshot) => this.stringifyOutput(snapshot.step.capability, snapshot.output));
+  }
+
+  /** The last-pushed snapshot for a given step index, if any. */
+  private snapshotFor(index: number): PlannerStepSnapshot | undefined {
+    for (let position = this.executedSteps.length - 1; position >= 0; position--) {
+      const snapshot = this.executedSteps[position] as PlannerStepSnapshot;
+
+      if (snapshot.index === index) {
+        return snapshot;
+      }
+    }
+
+    return undefined;
+  }
+
+  /** Record every step from `from` onward (in a flat array plan) as skipped. */
+  private skipRest(steps: PlannerStep[], from: number): void {
+    for (let rest = from; rest < steps.length; rest++) {
+      this.recordSkipped(rest, steps[rest] as PlannerStep);
+    }
+  }
+
+  /** Record every not-yet-`done` DAG node as skipped, in plan order. */
+  private skipDagRest(dag: PlannerDag, done: ReadonlySet<string>): void {
+    for (const node of dag.nodes) {
+      if (!done.has(node.id)) {
+        this.recordSkipped(node.index, node.step);
+      }
+    }
+  }
+
+  /**
+   * Set `this.data` from the DAG's topological sink for a configured
+   * `output` schema. "Last completed step" is meaningless under
+   * parallelism, so the sink (the step nothing depends on) is the
+   * unambiguous final output. Multiple sinks while an `output` schema is
+   * set is a convergence error — a typed `PlannerPlanInvalidError`.
+   */
+  private finalizeDagOutput(
+    dag: PlannerDag,
+    completed: ReadonlySet<string>,
+    rawOutputs: Map<string, unknown>,
+  ): void {
+    const schema = this.args.options?.output ?? this.args.config.output;
+
+    if (!schema || this.error) {
+      return;
+    }
+
+    const sinks = sinkNodes(dag).filter((node) => completed.has(node.id));
+
+    if (sinks.length > 1) {
+      this.error = new PlannerPlanInvalidError(
+        `ai.planner("${this.args.config.name}"): DAG has multiple sinks but an \`output\` schema is set — the plan must converge to a single final step`,
+        { context: { runId: this.runId, sinks: sinks.map((node) => node.id) } },
+      );
+      this.data = undefined;
+      return;
+    }
+
+    const sink = sinks[0] as DagNode | undefined;
+    this.data = (sink ? rawOutputs.get(sink.id) : undefined) as TOutput | undefined;
   }
 
   /**
@@ -311,6 +717,10 @@ export class PlannerRun<TOutput> {
       version: this.args.config.version,
       type: "planner",
       status,
+      // Stamp the terminal error so the observe path surfaces it on the
+      // planner span (no result envelope reaches an observer). Absent on
+      // a completed run.
+      ...(this.error ? { error: this.error } : {}),
       startedAt: this.startedAt,
       endedAt: new Date().toISOString(),
       duration: performance.now() - this.startPerf,
@@ -328,21 +738,35 @@ export class PlannerRun<TOutput> {
       sessionId: this.args.options?.sessionId,
     });
 
-    return {
+    const result: PlannerResult<TOutput> = {
       type: "planner",
       data: this.error ? undefined : this.data,
       error: this.error,
       usage: this.usage,
       report,
     };
+
+    // Plan-only mode surfaces the validated plan WITHOUT execution so the
+    // caller can sign off and re-run with `approvedPlan`.
+    if (this.awaitingApproval) {
+      result.plan = this.plan;
+    }
+
+    return result;
   }
 
   /**
-   * Resolve the terminal status from the accumulated outcome. Cancelled
-   * wins over failed (an abort that also produced a step error still
-   * reads as cancelled); failed wins over completed.
+   * Resolve the terminal status from the accumulated outcome.
+   * `awaiting-approval` (plan-only short-circuit) wins over everything —
+   * nothing executed, so neither cancellation nor error applies.
+   * Otherwise cancelled wins over failed (an abort that also produced a
+   * step error still reads as cancelled); failed wins over completed.
    */
   private resolveStatus(): PlannerReport["status"] {
+    if (this.awaitingApproval) {
+      return "awaiting-approval";
+    }
+
     if (this.cancelledAt !== undefined) {
       return "cancelled";
     }
@@ -354,9 +778,31 @@ export class PlannerRun<TOutput> {
     return "completed";
   }
 
-  /** Build the prompt handed to the planning agent — the user's goal. */
-  private buildPlanPrompt(): string {
-    return this.args.goal;
+  /**
+   * Build the prompt handed to the planning agent. On the first pass this
+   * is just the user's goal (byte-for-byte unchanged). On a RE-plan it
+   * prepends the executed-step digest and the steering feedback so the
+   * planner revises the remaining work.
+   */
+  private buildPlanPrompt(feedback?: string): string {
+    if (feedback === undefined) {
+      return this.args.goal;
+    }
+
+    const digest = this.executedDigest();
+    const sections: string[] = [`Goal: ${this.args.goal}`, ""];
+
+    if (digest.length > 0) {
+      sections.push("Steps already completed:", ...digest, "");
+    }
+
+    sections.push(
+      `Feedback requiring a revised plan: ${feedback}`,
+      "",
+      "Produce a plan for the REMAINING work only.",
+    );
+
+    return sections.join("\n");
   }
 
   /**

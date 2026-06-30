@@ -28,7 +28,7 @@ ai.orchestrator() →  durable session — state/history/resume    [shipped]
 
 Each primitive is an escape hatch to the next level of complexity. Users start low, graduate upward only when needed. Every primitive returns the same result envelope — canonical destructure `{ data, error, usage, report }` (the shared `BaseResult` guarantees `usage` + optional `error`; each primitive adds `data` + `report`). Workflows, supervisors, and orchestrators expose `.asTool()` so an agent can call them inside its tool loop; raw executables also auto-adapt when dropped into an agent's `tools: []`. Compose freely.
 
-Beyond the ladder: `ai.planner()` (LLM-generated plans), `ai.memory()` (working + semantic + episodic + procedural recall), `ai.batch()` / `ai.fallbackModel()` / `ai.router()` / `ai.fanOut()` (DX helpers), `agent.eval()` (scoring), and the `ai.checkpoint.*` / `ai.snapshot.*` orchestrator stores.
+Beyond the ladder: `ai.planner()` (LLM-generated plans), `ai.memory()` (working + semantic recall), `ai.batch()` / `ai.fallbackModel()` / `ai.router()` / `ai.fanOut()` (DX helpers), `agent.eval()` (scoring), and the `ai.checkpoint.*` / `ai.snapshot.*` orchestrator stores.
 
 ## Foundations
 
@@ -66,14 +66,14 @@ console.log(text, usage.total, report.duration);
 
 | If the task is about… | Load |
 | --- | --- |
-| `ai.agent({...})` — single-LLM-turn primitive, structured output, streaming, attachments | [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) |
+| `ai.agent({...})` — single-LLM-turn primitive, structured output, streaming, attachments, `spawnSubAgent` | [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) |
 | `ai.tool({...})` — typed validated functions the model can call | [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) |
 | `ai.systemPrompt()` / `ai.persona()` / `ai.instruction()` — composable prompts with placeholders | [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) |
 | `ai.workflow({...})` — durable resumable pipelines with steps, routing, retry | [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) |
 | `ai.supervisor({...})` — multi-intent routing, fan-out, evaluate loops | [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) |
 | `ai.orchestrator({...})` — durable stateful sessions, drift, compaction, resume | [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md) |
 | `ai.planner({...})` — LLM-generated plans over registered capabilities | [`@warlock.js/ai/run-planner/SKILL.md`](@warlock.js/ai/run-planner/SKILL.md) |
-| `ai.memory({...})` — working + semantic + episodic + procedural recall for agents / sessions | [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md) |
+| `ai.memory({...})` — working + semantic recall for agents / sessions | [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md) |
 | `ai.checkpoint.*` / `ai.snapshot.*` — orchestrator session + run stores | [`@warlock.js/ai/manage-ai-stores/SKILL.md`](@warlock.js/ai/manage-ai-stores/SKILL.md) |
 | DX helpers — `batch` / `fallbackModel` / `eval` + matchers / SLO contracts / `fromFile` | [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md) |
 | `sdk.embedder({...})` — text-to-vector for RAG tools, vector ingest | [`@warlock.js/ai/embed-text/SKILL.md`](@warlock.js/ai/embed-text/SKILL.md) |
@@ -156,8 +156,8 @@ A drop-in `ModelContract` that wraps an ordered list and advances to the next mo
 
 ```ts
 const model = ai.fallbackModel([
-  ai.openai.model({ name: "gpt-4o" }),
-  ai.anthropic.model({ name: "claude-3-5-sonnet" }),
+  openai.model({ name: "gpt-4o" }),
+  anthropic.model({ name: "claude-3-5-sonnet" }),
 ]);
 
 const agent = ai.agent({ model });   // hand it anywhere a model goes
@@ -298,6 +298,144 @@ const concierge = ai.agent({
 - [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) — `fallbackModel` wraps these adapters; cost-truth tokens
 
 
+## approve-tool-calls  `@warlock.js/ai/approve-tool-calls/SKILL.md`
+
+---
+name: approve-tool-calls
+description: 'Gate an agent''s tool calls behind a human with `ai.human.approval(options)` (the `tool.before` approval-gate middleware) — ships in @warlock.js/ai core. Triggers: `ai.human.approval`, `humanApproval`, `HumanApprovalOptions`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalHandler`, `InterruptPolicy`, `evaluatePolicy`, `ApprovalRejectedError`, `policy: { type: "allowlist" | "denylist" | "predicate" }`, decision `{ type: "approve" | "reject" | "edit" }`; ''human in the loop'', ''approve a tool call before it runs'', ''ask a human before the agent sends/charges/deletes'', ''pause before a dangerous tool'', ''let an operator edit the tool args'', ''reject a tool call with a reason the model can self-correct from''. Typical import `import { ai } from "@warlock.js/ai"`. Skip: persisting the request and resuming hours later out-of-process — `@warlock.js/ai/durable-resume/SKILL.md`; the agent/middleware/tool primitives themselves — `@warlock.js/ai`.'
+---
+
+# Approve tool calls — the human-in-the-loop gate
+
+`ai.human.approval(options)` returns an `AgentMiddleware` with **one** hook — `tool.before` — that pauses *before a specific tool call* and routes it to a human. The human can **approve** (run the real tool unchanged), **reject** (the model sees a typed error and self-corrects), or **edit** (run the tool with replaced args). Every call the policy doesn't gate passes through untouched.
+
+`ai.human.*` ships natively on the shared `ai` object from `@warlock.js/ai` core — no extra import or registration step. The named `humanApproval` export is the same factory.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+const support = ai.agent({
+  model: openai.model({ name: "gpt-4o" }),
+  tools: [refundCustomer, lookupOrder],
+  middleware: [
+    ai.human.approval({
+      policy: { type: "allowlist", tools: ["refundCustomer"], tags: () => ["money"] },
+      // SSE / CLI handler resolves when the operator rules:
+      handler: async (req) => ui.prompt(req), // → { type: "approve" } | { type: "reject", reason } | { type: "edit", args }
+    }),
+  ],
+});
+
+await support.execute("Refund order #4821"); // pauses at refundCustomer, awaits the operator
+```
+
+## The three decisions
+
+A handler turns an `ApprovalRequest` into an `ApprovalDecision` — a union discriminated by `type` (never `kind`):
+
+| `decision.type` | Effect | What the model sees next |
+|---|---|---|
+| `"approve"` | The real tool runs with the model's original args. | The tool's normal result. |
+| `"reject"` | Short-circuits an `ApprovalRejectedError` carrying `reason`. | `{ error }` on the next trip — it can self-correct. |
+| `"edit"` | The reviewer's `args` replace the model's; the real tool then runs. | The tool's result for the edited args. |
+
+```ts
+type ApprovalDecision =
+  | { type: "approve" }
+  | { type: "reject"; reason: string }
+  | { type: "edit"; args: unknown; reason?: string };
+```
+
+An `edit` still goes through the tool's own Standard-Schema validation — if the replaced args don't fit the schema, the tool surfaces a validation error on `result.error` and the model self-corrects. No special-casing.
+
+## The interrupt policy — which calls need a human
+
+`policy` decides *which* tool calls are gated. It's a union keyed on `type`:
+
+| `policy.type` | Gates a call when… | Tags |
+|---|---|---|
+| `"allowlist"` | the tool name **is** in `tools`. | optional `tags(toolName)` callback |
+| `"denylist"` | the tool name is **not** in `tools` (gate everything else). | optional `tags(toolName)` callback |
+| `"predicate"` | `requiresApproval(ctx)` returns a truthy value. | a returned `string[]` doubles as the tags |
+
+```ts
+// Allowlist — only refunds need sign-off:
+{ type: "allowlist", tools: ["refundCustomer"], tags: () => ["money"] }
+
+// Denylist — everything except read-only lookups needs sign-off:
+{ type: "denylist", tools: ["lookupOrder", "searchCatalog"] }
+
+// Predicate — args-aware: only large refunds, tagged for the reviewer UI:
+{
+  type: "predicate",
+  requiresApproval: (ctx) =>
+    ctx.toolName === "refundCustomer" && (ctx.args as { amount: number }).amount > 100
+      ? ["money", "high-value"]
+      : false,
+}
+```
+
+The predicate sees a read-only `PolicyContext` — `toolName`, `toolDescription`, `args` (the model's exact input), `agentName`, `tripIndex`, `sessionId`. Return `false` (or an empty array) to skip approval; `true` or a non-empty `string[]` to require it. The `string[]` becomes `request.context.tags`, surfaced verbatim to the reviewer so a UI can group or prioritize.
+
+Compose with `forTool(names, mw)` from `@warlock.js/ai` for static, name-based scoping and let `policy` be the dynamic, args-aware layer on top.
+
+`evaluatePolicy(policy, context)` is the exported, pure core if you want to reuse the gate decision outside the middleware (it never throws, does no IO, and returns `{ requiresApproval, tags? }`).
+
+## The request a reviewer rules on
+
+For a gated call the middleware builds an `ApprovalRequest` and hands it to your `handler`:
+
+```ts
+interface ApprovalRequest {
+  interruptId: string;          // stable id; durable mode keys the store on it
+  toolName: string;
+  toolDescription?: string;
+  args: unknown;                // the model's exact args
+  context: {
+    agentName: string;
+    tripIndex: number;
+    sessionId?: string;
+    originalInput?: string;     // the run's prompt (used by durable re-run)
+    tags?: string[];            // from the policy match
+  };
+  requestedAt: string;          // ISO-8601
+}
+```
+
+The handler runs in one of two modes that share this one signature:
+
+- **interactive** — return the decision (or a promise of it); the hook `await`s it in-process. The whole agent run stays on the stack — no store needed. This skill.
+- **durable** — persist the request and `throw` to suspend, resuming from another process later. See [`durable-resume/SKILL.md`](@warlock.js/ai/durable-resume/SKILL.md).
+
+## It never throws out of the pipeline
+
+The middleware is a harness, not a detector — every outcome (skip, approve, reject, edit) returns normally. A `reject` does **not** throw out of `execute()`: it short-circuits a failed `ToolInvokeResult` carrying an `ApprovalRejectedError`, so the error rides `result.error` like every other `AIError` and `agent.execute()` still never throws.
+
+```ts
+const result = await support.execute("Refund order #4821");
+
+if (result.error instanceof ApprovalRejectedError) {
+  logAudit(`${result.error.toolName} rejected: ${result.error.reason}`);
+}
+```
+
+Only a *handler bug* — a non-sentinel throw from your handler — propagates, and even then the agent dispatch funnels it onto `result.error` rather than crashing the run. The gate never swallows a bug into a silent approval.
+
+## Edge cases
+
+- **Duplicate middleware name.** Middleware names are validated unique per agent. The default name is `"human-approval"`, so two approval middlewares on one agent need distinct `name`s.
+- **Silent tools.** A `silent`-mode tool's result isn't fed back to the model, but approval still runs (we gate *before* dispatch). A `reject` on a silent tool writes a tool message that's harmless but unread.
+- **Abort during an interactive await.** `ctx.signal` is in scope; honor it in a long-running handler so a cancelled run rejects rather than hanging.
+
+## See also
+
+- [`@warlock.js/ai/durable-resume/SKILL.md`](@warlock.js/ai/durable-resume/SKILL.md) — persist the request, resume out-of-process hours later via `ai.human.resume(...)` and the `InterruptStore`.
+- `@warlock.js/ai` — the `ai.agent(...)`, `AgentMiddleware`, `tool.before`, and `ToolInvokeResult` primitives this gate wraps.
+
+
 ## attach-ai-middleware  `@warlock.js/ai/attach-ai-middleware/SKILL.md`
 
 ---
@@ -307,7 +445,7 @@ description: 'Wire agent middleware — ai.middleware.budget (token / USD caps +
 
 # Middleware — agent-level pipeline
 
-Cross-cutting concerns wrapped around an agent run at three granularities: `execute`, `trip`, `tool`. One middleware = one object. Ships with `budget`, `guardrail`, and `semanticCache` built-ins.
+Cross-cutting concerns wrapped around an agent run at three agent-level granularities (`execute`, `trip`, `tool`), plus a `supervisor` level that wraps a whole supervisor run (see below). One middleware = one object. Ships with `budget`, `guardrail`, and `semanticCache` built-ins.
 
 ## Install order at a glance
 
@@ -705,6 +843,246 @@ Workflow errors surface as `ToolExecutionError` with `cause` pointing at the ori
 - [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) — `workflow.asTool()` composition
 
 
+## detect-and-redact-pii  `@warlock.js/ai/detect-and-redact-pii/SKILL.md`
+
+---
+name: detect-and-redact-pii
+description: 'Detect and redact PII (and run model-graded moderation) with @warlock.js/ai-guard detectors — `ai.guardrail.pii(...)` and the optional `ai.guardrail.moderation(...)` peer. Triggers: `ai.guardrail.pii`, `piiDetector`, `PiiDetectorOptions`, `PiiCategory`, `mask`, `{label}`, `dictionary`, `onMatch`, `ai.guardrail.moderation`, `openAiModeration`, `OpenAiModerationOptions`, `blockOn`, `omni-moderation-latest`; ''redact PII from model output'', ''mask SSN / credit card / email / phone / IP'', ''stop PII leaking into a tool call'', ''scrub sensitive data'', ''add OpenAI moderation'', ''block violent / self-harm content''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail.pii` / `.moderation`) or `import { pii, moderation } from "@warlock.js/ai-guard"`. Skip: composing the guard / wiring it into an agent — `@warlock.js/ai-guard/guard-input-output/SKILL.md`; routing a block to a human — `@warlock.js/ai-guard/escalate-block-to-human/SKILL.md`.'
+---
+
+# Detect and redact PII (and moderate)
+
+`ai.guardrail.pii(...)` is a **zero-dependency** detector — regex + exact-string matching, no runtime peer. Pass it into any phase array of `ai.guardrail({ ... })`.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-guard";
+
+const policy = ai.guardrail({
+  output: [ai.guardrail.pii({ onMatch: "redact", mask: "[REDACTED:{label}]" })],
+});
+```
+
+## Categories — `detect`
+
+Scans for these `PiiCategory` values; `detect` narrows the set (default: all). Each pattern is **linear** (anchored, no nested quantifiers) — safe against catastrophic backtracking.
+
+| Category | Matches |
+|---|---|
+| `ssn` | US Social Security numbers |
+| `email` | email addresses |
+| `phone` | phone numbers |
+| `credit-card` | credit-card numbers |
+| `ipv4` | IPv4 addresses |
+
+```ts
+ai.guardrail.pii({ detect: ["ssn", "credit-card"] }); // scan only these two
+```
+
+Add `dictionary` for extra exact-string terms (internal codenames, customer IDs) treated as PII alongside the built-in regexes:
+
+```ts
+ai.guardrail.pii({ dictionary: ["PROJECT-ORION", "ACME-INTERNAL"] });
+```
+
+## Action — `onMatch`
+
+`onMatch` is `"redact" | "block" | "flag"`, default **`"redact"`**:
+
+- **`redact`** — replace each match with the `mask` and continue (output phase only — see below).
+- **`block`** — reject the trip / tool call with a `GuardrailViolationError`.
+- **`flag`** — allow but record the matches into `ctx.state` for a downstream observer.
+
+## The `mask` template
+
+On `redact`, each match is replaced by `mask`. The `{label}` token is substituted with the matched category, so a redacted SSN becomes `[REDACTED:ssn]`:
+
+```ts
+ai.guardrail.pii({ onMatch: "redact", mask: "[REDACTED:{label}]" });
+// "My SSN is 123-45-6789" -> "My SSN is [REDACTED:ssn]"
+```
+
+Omit `mask` to use the default fixed placeholder.
+
+## Where redaction actually applies
+
+Redaction only rewrites-and-continues where the pipeline seam supports it:
+
+- **Output (`output: [...]`)** — works. `trip.after` returns a replacement `ModelResponse` with the scrubbed `content`. This is the primary PII-redaction use case.
+- **Input (`input: [...]`)** — a `redact` verdict **downgrades to `block`**. The core `trip.before` hook can only short-circuit, not rewrite-and-continue, so the un-redacted prompt can't be threaded back.
+- **Tool (`tool: [...]`)** — a `redact` verdict **downgrades to `block`** (`reason: "tool-arg-redaction-unsupported"`), because silently rewriting tool arguments changes the call's side-effects.
+
+So: **redact on output, block on input/tool.**
+
+```ts
+const policy = ai.guardrail({
+  output: [ai.guardrail.pii({ onMatch: "redact", mask: "[REDACTED:{label}]" })], // scrub the answer
+  tool: [ai.guardrail.pii({ onMatch: "block" })],                                // refuse to leak into tools
+  toolNames: ["send_email"],
+});
+```
+
+## Optional moderation peer — `ai.guardrail.moderation`
+
+For model-graded content (violence, self-harm, hate) beyond regex, the optional `moderation` detector calls OpenAI's moderation endpoint. The `openai` SDK is an **optional lazy peer** — importing `@warlock.js/ai-guard` never forces it to resolve; the detector throws a curated install string on first `check()` when the peer is absent (mirrors ai-panoptic's lazy Langfuse exporter).
+
+```ts
+const policy = ai.guardrail({
+  output: [
+    ai.guardrail.moderation({ blockOn: ["violence", "self-harm"] }),
+  ],
+});
+```
+
+- `blockOn` — categories that escalate to `block`; every other flagged category produces a `flag`. Omit to `flag` on any category.
+- `model` — defaults to `"omni-moderation-latest"`.
+- `apiKey` — defaults to `OPENAI_API_KEY`.
+- `client` — pass a pre-built OpenAI-compatible client to bypass the lazy import entirely (the bring-your-own-client / test escape hatch).
+
+Install the peer only when you use this detector:
+
+```bash
+npm install openai
+```
+
+## See also
+
+- [`@warlock.js/ai-guard/guard-input-output/SKILL.md`](@warlock.js/ai-guard/guard-input-output/SKILL.md) — composing the guard, the verdict model, phases, and `toolNames` scoping.
+- [`@warlock.js/ai-guard/escalate-block-to-human/SKILL.md`](@warlock.js/ai-guard/escalate-block-to-human/SKILL.md) — escalating a hard `block` to a human-review surface.
+
+
+## durable-resume  `@warlock.js/ai/durable-resume/SKILL.md`
+
+---
+name: durable-resume
+description: 'Persist a gated tool call and resume it from another process hours later — ships in @warlock.js/ai core: `ai.human.resume(interruptId, decision, options)`, the `InterruptStore` (`ai.human.interrupt.{memory,pg,redis}()`), `PendingInterrupt`, and the `InterruptSuspendedError` suspend sentinel. Triggers: `ai.human.resume`, `resume(interruptId, decision)`, `InterruptStore`, `ai.human.interrupt.memory`, `ai.human.interrupt.pg`, `ai.human.interrupt.redis`, `interruptMemory`, `interruptPg`, `interruptRedis`, `PendingInterrupt`, `InterruptSuspendedError`, `ResumeOptions`, `ResumeResult`, `PgClientLike`, `RedisClientLike`; ''approve hours later from a webhook'', ''persist the approval request and resume in another process'', ''durable human-in-the-loop'', ''store the interrupt in Postgres/Redis'', ''re-run the agent turn once the human approves''. Typical import `import { ai, InterruptSuspendedError } from "@warlock.js/ai"`. Skip: the in-process await gate and the policy/decision shapes — `@warlock.js/ai/approve-tool-calls/SKILL.md`.'
+---
+
+# Durable resume — persist the interrupt, approve from another process
+
+Interactive approval `await`s the operator in-process. **Durable** approval is for when the reviewer rules out-of-band — a Slack button, a webhook, hours later, in a different process. The flow: the handler **persists** the request to an `InterruptStore` and **throws** `InterruptSuspendedError` to suspend the run; the caller surfaces the `interruptId`; later, `ai.human.resume(interruptId, decision, { store })` applies the ruling.
+
+> **v1 durable resume re-runs the turn** with the decision pre-seeded — it does **not** rehydrate an in-flight supervisor mid-call (that's the deferred v2 lift). Re-running is idempotent because the prompt and the seeded decision fully determine the gated call's outcome.
+
+## Process A — suspend and surface the id
+
+```ts
+import { ai, InterruptSuspendedError } from "@warlock.js/ai";
+
+const store = ai.human.interrupt.memory(); // swap for pg / redis in production
+
+const agent = ai.agent({
+  model,
+  tools: [deleteAccount],
+  middleware: [
+    ai.human.approval({
+      policy: { type: "predicate", requiresApproval: (c) => c.toolName === "deleteAccount" },
+      store,
+      handler: async (req) => {
+        // 1. persist the pending interrupt
+        await store.save({
+          interruptId: req.interruptId,
+          request: req,
+          status: "pending",
+          savedAt: new Date().toISOString(),
+        });
+        // 2. notify the reviewer out-of-band
+        await slack.postApproval(req);
+        // 3. suspend the run — the middleware recognizes its OWN sentinel
+        throw new InterruptSuspendedError("Awaiting human approval", {
+          interruptId: req.interruptId,
+        });
+      },
+    }),
+  ],
+});
+
+const result = await agent.execute("Delete account #88");
+
+// execute() never throws — the suspend rides result.error:
+if (result.error instanceof InterruptSuspendedError) {
+  return { status: "awaiting-approval", interruptId: result.error.interruptId };
+}
+```
+
+The middleware catches the **sentinel** (`instanceof InterruptSuspendedError`) and short-circuits a failed `ToolInvokeResult` carrying it, so `error.interruptId` is on `result.error`. Hand that id to the reviewer.
+
+## Process B — resume hours later
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+// Re-run the turn with the decision pre-seeded:
+const outcome = await ai.human.resume(
+  interruptId,
+  { type: "edit", args: { confirm: true } },
+  { store, agent },
+);
+
+if (outcome.type === "applied" && outcome.result) {
+  console.log(outcome.result.text); // the re-run completed with the ruling applied
+}
+```
+
+`ai.human.resume(interruptId, decision, options)` loads the `PendingInterrupt`, validates the decision shape, deletes the record, and — when an `agent` is supplied — re-executes the original prompt with the decision **pre-seeded** so the gated tool call resolves to the ruling instead of pausing again. The prompt comes from `request.context.originalInput`; pass `options.input` to override (e.g. to append the reviewer's note), and `options.executeOptions` to forward history / output schema / signal to the re-run.
+
+### Two resume shapes
+
+| Shape | Pass | Behavior |
+|---|---|---|
+| **re-run** | `{ store, agent }` | Loads, deletes, re-executes the turn; `ResultResult.result` carries the `AgentResult`. |
+| **apply-only** | `{ store }` (no `agent`) | Loads, validates, deletes; returns `{ type: "applied", decision }` for a caller-owned re-drive (custom transport). No turn re-run. |
+
+### Idempotent by construction
+
+```ts
+type ResumeResult =
+  | { type: "applied"; interruptId: string; decision: ApprovalDecision; result?: AgentResult }
+  | { type: "already-resolved"; interruptId: string };
+```
+
+A second resume of an already-resolved (deleted) or never-raised interrupt returns `{ type: "already-resolved" }` — it never double-applies the decision or re-runs the turn. The record is deleted **before** the re-run, so even a re-run that itself raises a fresh interrupt can't collide with the one being resolved. A malformed decision (`reject` with no `reason`, `edit` with no `args`, an unknown `type`) throws a `TypeError` loudly rather than silently mis-driving the re-run.
+
+## The `InterruptStore`
+
+`ai.human.interrupt.{memory,pg,redis}()` build the store. The contract mirrors `@warlock.js/ai`'s `CheckpointStore` / `SnapshotStore` — `save` / `load` / `delete` / optional `list(prefix?)` / `schema()` — so a consumer already running an orchestrator can reuse the **same** pool for the interrupt table.
+
+| Factory | Backing | Deps |
+|---|---|---|
+| `ai.human.interrupt.memory()` | process-local `Map` | none — zero runtime deps |
+| `ai.human.interrupt.pg(options)` | one Postgres row per interrupt, keyed by `interrupt_id` | lazily imports the optional `pg` peer |
+| `ai.human.interrupt.redis(options)` | one namespaced JSON value + a self-maintained id index | lazily imports the optional `redis` peer |
+
+```ts
+// Memory — dev / tests / single-process:
+const store = ai.human.interrupt.memory();
+
+// Postgres — pass a live pool (core never imports pg in that case):
+import { Pool } from "pg";
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const store = ai.human.interrupt.pg({ client: pool });
+// Once, via your migration tool — the framework never auto-migrates:
+// await pool.query(store.schema());
+
+// …or let the store build its own pool (lazily import("pg")):
+const store = ai.human.interrupt.pg({ connectionString: process.env.DATABASE_URL });
+
+// Redis — pass a connected client, or a url:
+const store = ai.human.interrupt.redis({ url: process.env.REDIS_URL });
+```
+
+### Optional peers are lazy
+
+`pg` and `redis` are **optional** peer dependencies — neither is a hard dependency. The driver is imported only inside the store that needs it, and only when you pass a `connectionString` / `url` (passing a live `client` imports nothing). If the driver is absent, a **curated install string** surfaces on first use, never a raw module-resolution stack trace at import — so a memory-only consumer always loads cleanly. `PgClientLike` / `RedisClientLike` are structural interfaces, so any compatible pool/client satisfies them.
+
+`schema()` returns the reference DDL for the Postgres store (run it through your migration tool once) and an empty string for memory / redis, so callers treat `schema()` uniformly across drivers.
+
+## See also
+
+- [`@warlock.js/ai/approve-tool-calls/SKILL.md`](@warlock.js/ai/approve-tool-calls/SKILL.md) — the gate itself: the interrupt policy, the approve / reject / edit decision union, and the interactive (in-process await) handler.
+- `@warlock.js/ai` — the `CheckpointStore` / `SnapshotStore` the `InterruptStore` mirrors, and the `ai.agent(...)` re-run target.
+
+
 ## embed-text  `@warlock.js/ai/embed-text/SKILL.md`
 
 ---
@@ -812,6 +1190,337 @@ No built-in vector store. Bring your own (pgvector / Qdrant / Pinecone / Chroma 
 - [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md) — performance guidance on vector storage
 - [`@warlock.js/cache/use-cache-similarity/SKILL.md`](@warlock.js/cache/use-cache-similarity/SKILL.md) — cache as a vector store
 - [`@warlock.js/cascade/search-by-vector/SKILL.md`](@warlock.js/cascade/search-by-vector/SKILL.md) — cascade `similarTo` query method
+
+
+## escalate-block-to-human  `@warlock.js/ai/escalate-block-to-human/SKILL.md`
+
+---
+name: escalate-block-to-human
+description: 'Route a hard guardrail block to a human-review surface with @warlock.js/ai-guard — the `escalation.onBlock` seam and an `escalate: true` verdict. Triggers: `escalation`, `onBlock`, `GuardrailEscalation`, `GuardrailBlockEvent`, `escalate: true`, `{ type: "block", escalate: true }`, ''escalate a block to a human'', ''human review queue for guardrail'', ''page an operator on a guardrail block'', ''human-in-the-loop guardrail'', ''compose a block with a review surface'', ''custom detector that escalates''; typical import `import "@warlock.js/ai-guard"` then `ai.guardrail({ escalation: { onBlock } })`. Skip: composing the guard / phases / verdict model — `@warlock.js/ai-guard/guard-input-output/SKILL.md`; PII/moderation detectors — `@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md`; durable suspend/resume human-step machinery (deferred) — not in this package.'
+---
+
+# Escalate a block to a human
+
+A `block` verdict can carry `escalate: true`. When it does, the guard `await`s your `escalation.onBlock(...)` handler **before** throwing the `GuardrailViolationError` — the seam to a human-review queue, an operator page, or any out-of-band approval surface.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-guard";
+
+const policy = ai.guardrail({
+  output: [ai.guardrail.moderation({ blockOn: ["self-harm"] })],
+  escalation: {
+    async onBlock(event) {
+      await reviewQueue.enqueue({
+        phase: event.phase,   // "input" | "output" | "tool"
+        reason: event.reason, // the detector's human-readable reason
+      });
+    },
+  },
+});
+
+const agent = ai.agent({ model, middleware: [policy] });
+```
+
+## When `onBlock` fires
+
+`onBlock` fires **only** for a verdict of `{ type: "block", escalate: true }` — not for an ordinary `block`, and never for `allow` / `redact` / `flag`. It is **awaited before** the `GuardrailViolationError` is thrown, so your handler runs to completion (enqueue succeeds, the page is sent) before the error surfaces on `result.error`. The run still aborts: escalation is a *signal*, not a recovery — `execute()` returns with `result.error` populated as usual.
+
+## The `GuardrailBlockEvent` payload
+
+`onBlock(event)` receives:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `phase` | `"input" \| "output" \| "tool"` | where the block fired |
+| `reason` | `string` | the detector's human-readable reason |
+| `matches` | `readonly GuardrailMatch[] \| undefined` | what tripped the rule (rule id, span, label), when reported |
+| `ctx` | `MiddlewareTripContext` | the live trip context — `state`, `messages`, `agent`, `model`, `signal` |
+
+`ctx` lets the handler enrich the review item with run context (session id from `ctx.state`, the offending messages, etc.).
+
+## Producing an escalating verdict
+
+The built-in detectors return ordinary `block` verdicts (no `escalate`). To escalate, author a tiny custom `GuardrailDetector` that sets `escalate: true` on its `block`:
+
+```ts
+import type { GuardrailDetector } from "@warlock.js/ai-guard";
+
+const wirePolicy: GuardrailDetector = {
+  name: "wire-transfer",
+  check(text) {
+    if (/wire \$?\d{5,}/i.test(text)) {
+      return {
+        type: "block",
+        reason: "large wire transfer requires human approval",
+        escalate: true, // <- routes through escalation.onBlock
+        matches: [{ rule: "wire-transfer.large", label: "wire" }],
+      };
+    }
+
+    return { type: "allow" };
+  },
+};
+
+const policy = ai.guardrail({
+  tool: [wirePolicy],
+  toolNames: ["initiate_transfer"],
+  escalation: { async onBlock(e) { await approvals.request(e); } },
+});
+```
+
+A `check()` may be sync or async (async = call an external service); the guard awaits either.
+
+## A plain callback by design
+
+`escalation.onBlock` is a **plain callback** — `ai-guard` takes **no** dependency on the deferred durable human-step machinery (suspend/resume). The callback is the decoupling seam: inside it you wire your own review queue, and (where your stack supports it) a `workflow.resume(...)` loop. This package only emits the *signal*; it does not own durable suspension. When the typed human-step handoff ships, `onBlock` upgrades to it without a breaking change here.
+
+## See also
+
+- [`@warlock.js/ai-guard/guard-input-output/SKILL.md`](@warlock.js/ai-guard/guard-input-output/SKILL.md) — composing the guard, the phases, the verdict model, and how a `block` surfaces on `result.error`.
+- [`@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md`](@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md) — the `pii` detector and the optional `moderation` peer that commonly drives an escalation.
+
+
+## eval-datasets-and-ci  `@warlock.js/ai/eval-datasets-and-ci/SKILL.md`
+
+---
+name: eval-datasets-and-ci
+description: 'Datasets + regression-gated eval CI with ai.dataset({...}) feeding agent.eval({cases,baseline,tolerance}). Covers the immutable filterable/shardable dataset (cases / fromFile JSONL), DatasetEntry tags, EvalReport.regression (regressed/added/removed/passed) against a baseline, and the ai.eval reporters toJUnit / toJSON / fromJSON for CI artifacts + committed baselines. Triggers: `ai.dataset`, `DatasetContract`, `DatasetEntry`, `DatasetOptions`, `dataset.filter`, `dataset.shard`, `fromFile`, `agent.eval`, `EvalOptions`, `EvalReport`, `EvalCaseResult`, `EvalRegression`, `baseline`, `tolerance`, `ai.eval.toJUnit`, `ai.eval.toJSON`, `ai.eval.fromJSON`, `diff`, JSONL; ''eval dataset from a JSONL file'', ''shard an eval suite across CI jobs'', ''fail CI on an eval regression'', ''emit a JUnit report'', ''snapshot an eval baseline''; typical import `import { ai } from "@warlock.js/ai"`. Skip: the scorers + LLM-as-judge + Vitest matchers themselves — `@warlock.js/ai/ai-dx-helpers/SKILL.md` (registerAiMatchers / ai.eval.exact|contains|predicate|judge); record/replay of model calls for deterministic tests — `@warlock.js/ai/record-replay-llm/SKILL.md`; competing libs `promptfoo`, `braintrust`.'
+---
+
+# `ai.dataset()` + `agent.eval()` regression CI
+
+Turn a corpus of cases into a regression-gated CI signal. `ai.dataset(...)` wraps cases into an immutable, filterable, shardable collection; `agent.eval({ cases, baseline, tolerance })` runs them, scores them, and diffs against a prior report; the `ai.eval.*` reporters serialize the result for CI ingestion and tomorrow's baseline.
+
+> This skill is the **dataset + CI** layer. The scorers, LLM-as-judge config, and Vitest matchers live in [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md); `agent.eval`'s core scoring loop is in [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md).
+
+## `ai.dataset()` — immutable, filterable, shardable
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+const ds = ai.dataset({
+  name: "support",
+  cases: [{ name: "greeting", input: "hi", expected: "Hello" }], // inline entries
+  fromFile: "./eval/support.jsonl",  // JSONL read ONCE, synchronously, at construction
+});
+
+ds.name;   // "support"
+ds.cases;  // DatasetEntry[] (inline first, then file entries appended)
+```
+
+- A `DatasetEntry` is an `EvalCase` plus optional `tags?: string[]` for filtering / sharding.
+- **`fromFile`** reads a JSONL file (one JSON object per line; blank lines skipped) synchronously at construction — mirroring `SystemPrompt.fromFile`. A malformed line throws an **`InvalidRequestError` naming the 1-based line number**; a missing/unreadable path throws too. `cases` and `fromFile` combine (file entries append after inline).
+
+### `filter` / `shard` — derive new datasets
+
+```ts
+const smoke = ds.filter((entry) => entry.tags?.includes("smoke"));
+const shard = ds.shard(0, 4); // first of four parallel CI shards
+```
+
+Both return a **fresh dataset sharing nothing mutable**. `shard(index, total)` is deterministic round-robin by position: every entry lands in exactly one shard, so the union of all `total` shards reproduces the full list with no gaps or overlaps. `shard` validates its args (positive integer `total`, `index` in `[0, total)`) and throws `InvalidRequestError` otherwise.
+
+## `agent.eval({ cases })` — accepts a dataset directly
+
+```ts
+const report = await myAgent.eval({
+  cases: ds,                       // a DatasetContract OR a raw EvalCase[]
+  scorers: [ai.eval.contains()],
+});
+
+expect(report.passed).toBe(true); // true only when EVERY case passed
+```
+
+The runner reads `.cases` off a dataset. Full `EvalReport`: `{ agentName, total, passedCount, failedCount, passRate, meanScore, passed, cases, duration, regression? }`. Each `EvalCaseResult` carries the case, the full `AgentResult`, every scorer's `scores`, the mean `score`, `passed`, and `duration`.
+
+## Regression gating — `baseline` + `tolerance`
+
+```ts
+import { readFile, writeFile } from "node:fs/promises";
+
+const baseline = ai.eval.fromJSON(await readFile("./eval/baseline.json", "utf8"));
+
+const report = await myAgent.eval({
+  cases: ds,
+  scorers: [ai.eval.exact()],
+  baseline,         // a prior EvalReport to diff against
+  tolerance: 0.05,  // max allowed per-case score DROP before it regresses. default 0 (any drop)
+});
+
+if (report.regression && !report.regression.passed) {
+  console.error("Regressed:", report.regression.regressed); // [{ name, before, after }]
+  process.exit(1);
+}
+```
+
+When `baseline` is set the report carries a `regression` block (`EvalRegression`), joining cases by `name`:
+
+- **`regressed`** — `[{ name, before, after }]` for cases whose new score fell more than `tolerance` below baseline.
+- **`added`** / **`removed`** — case names present in only one report. Adding or dropping a case **never fails the gate by itself**.
+- **`passed`** — `true` when `regressed` is empty.
+
+The pure `diff(report, baseline, tolerance)` function (exported as `diff`) is the same logic, decoupled from the runner — depends only on the two reports and the tolerance, mutates neither.
+
+## CI reporters — `ai.eval.toJUnit` / `toJSON` / `fromJSON`
+
+Pure functions over a finished `EvalReport`:
+
+```ts
+// JUnit-XML artifact for CI ingestion — one <testsuite> (the agent), one <testcase> per case,
+// a <failure> on each non-passing case (joined scorer reasons), times in SECONDS.
+await writeFile("./report.junit.xml", ai.eval.toJUnit(report));
+
+// Round-trippable snapshot — today's report becomes tomorrow's baseline.
+await writeFile("./eval/baseline.json", ai.eval.toJSON(report));
+const restored = ai.eval.fromJSON(await readFile("./eval/baseline.json", "utf8"));
+```
+
+`toJSON`/`fromJSON` preserve `result` payloads, per-case `scores`, timings, and any attached `regression` block, so a parsed report drives regression diffing exactly as the in-memory one. `toJUnit` hand-emits XML (no `xml` dependency) and entity-escapes every dynamic value.
+
+## Typical CI shard job
+
+```ts
+const shard = ai.dataset({ name: "support", fromFile: "./eval/support.jsonl" })
+  .shard(Number(process.env.SHARD_INDEX), Number(process.env.SHARD_TOTAL));
+
+const report = await agent.eval({
+  cases: shard,
+  scorers: [ai.eval.contains()],
+  baseline: ai.eval.fromJSON(await readFile("./eval/baseline.json", "utf8")),
+  tolerance: 0.05,
+});
+
+await writeFile(`./out/report-${process.env.SHARD_INDEX}.junit.xml`, ai.eval.toJUnit(report));
+if (report.regression && !report.regression.passed) process.exit(1);
+```
+
+## See also
+
+- [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md) — `ai.eval.{exact,contains,predicate,judge}` scorers + Vitest matchers
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `agent.eval` scoring loop, `EvalCase` / `EvalJudge`
+- [`@warlock.js/ai/record-replay-llm/SKILL.md`](@warlock.js/ai/record-replay-llm/SKILL.md) — `ai.vcr` for deterministic, offline eval runs
+
+
+## guard-input-output  `@warlock.js/ai/guard-input-output/SKILL.md`
+
+---
+name: guard-input-output
+description: 'Build the composed guardrail middleware with @warlock.js/ai-guard and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail`) or `import { guard } from "@warlock.js/ai-guard"`. Skip: PII detection/redaction specifically — `@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md`; routing a block to a human — `@warlock.js/ai-guard/escalate-block-to-human/SKILL.md`; the core middleware pipeline / hook contract — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+---
+
+# Guard agent input, output, and tool args
+
+`ai.guardrail(...)` is a **middleware factory**. It produces one `AgentMiddleware` that runs your detectors at three hook points and maps each verdict onto the agent pipeline's existing throw / return / record mechanics. Importing the package registers the verb (and its attached detector factories) on the shared `ai` namespace:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-guard"; // registers ai.guardrail + ai.guardrail.pii/.topic/.injection/.moderation
+
+const policy = ai.guardrail({
+  name: "compliance",
+  input: [ai.guardrail.injection({ onMatch: "block" })],
+  output: [ai.guardrail.topic({ deny: [/medical advice/i, "diagnosis"], onMatch: "block" })],
+});
+
+const agent = ai.agent({ model, middleware: [policy] });
+```
+
+A named-export form is available for callers who prefer not to rely on the augmented namespace:
+
+```ts
+import { guard, topic, injection } from "@warlock.js/ai-guard";
+const policy = guard({ input: [injection({ onMatch: "block" })] });
+```
+
+## The three phases
+
+| Phase | Hook | Inspected text | Set with |
+|---|---|---|---|
+| **input** | `trip.before` | the outbound prompt (`extractUserText(ctx.messages)`) | `input: [...]` |
+| **output** | `trip.after` | `response.content` | `output: [...]` |
+| **tool** | `tool.before` | `JSON.stringify(toolArgs)` | `tool: [...]` |
+
+Each phase array runs its detectors in **registration order**; the first non-`allow` verdict decides the action for that phase (short-circuit). A phase you don't configure is inert — a guard with no detectors is a no-op middleware.
+
+## The verdict model
+
+A detector inspects text and returns a `GuardrailVerdict`, discriminated by `type` (never `kind`):
+
+| `type` | Effect |
+|---|---|
+| `allow` | Pass to the next detector. |
+| `redact` | Rewrite the inspected text and continue — **output phase only** (see limitation below). |
+| `block` | Short-circuit with the existing `GuardrailViolationError`. |
+| `flag` | Pass, but append a `FlagRecord` into `ctx.state` under `<name>.flags` for a downstream observer (panoptic, the caller). |
+
+`agent.execute()` **never throws** — a `block` surfaces on `result.error` as a `GuardrailViolationError`, exactly like every other `AIError`. Branch on it after the run:
+
+```ts
+const result = await agent.execute(userInput);
+
+if (result.error instanceof ai.errors.GuardrailViolationError) {
+  // result.error.phase is "input" | "output" | "tool"
+  // result.error.reason / result.error.guardrail carry the detail
+}
+```
+
+## Built-in detectors
+
+Three zero-dependency detectors ship (a fourth, `moderation`, is an optional `openai` peer — see [`detect-and-redact-pii/SKILL.md`](@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md)):
+
+- **`ai.guardrail.injection(options?)`** — jailbreak / prompt-injection marker phrases. Extra `markers` (string | RegExp); `onMatch` defaults to `"flag"`, callers commonly use `"block"` on input.
+- **`ai.guardrail.topic(options)`** — `deny` (string substring | RegExp) and/or `allow` (allow-list miss triggers `onMatch`). `onMatch` is `"block" | "flag"`, default `"block"`.
+- **`ai.guardrail.pii(options?)`** — PII regex + dictionary (its own skill).
+
+```ts
+const policy = ai.guardrail({
+  input: [
+    ai.guardrail.injection({ onMatch: "block", markers: ["ignore previous instructions"] }),
+    ai.guardrail.topic({ deny: ["competitor-name"], onMatch: "block" }),
+  ],
+});
+```
+
+## Scope tool detectors to specific tools
+
+`tool` detectors fire on **every** tool call by default. Set `toolNames` to scope them — the whole middleware is wrapped with the core `forTool(toolNames, mw)` helper so the `tool` hooks fire only for those names; `input` / `output` (`trip`) hooks are unaffected:
+
+```ts
+const policy = ai.guardrail({
+  tool: [ai.guardrail.pii({ onMatch: "block" })], // stop PII reaching the tool
+  toolNames: ["send_email", "post_webhook"],      // ...only for these tools
+});
+
+const agent = ai.agent({ model, tools: [sendEmail, postWebhook, lookup], middleware: [policy] });
+// `lookup` runs unguarded; `send_email` / `post_webhook` block on PII in their args.
+```
+
+A `block` from `tool.before` aborts that tool dispatch and surfaces on `result.error` with `phase: "tool"` — the agent run itself still never crashes.
+
+## Install order
+
+A guard is a normal `AgentMiddleware`; registration order is execution order (`before` top-down, `after` bottom-up). The canonical order is `[cache, budget, guardrail, observability]`. A `semanticCache` that short-circuits `trip.before` runs *before* the guard — a cached response then skips the **output** detectors, so place the guard before the cache if you don't trust cached contents.
+
+## Input-redaction limitation (v1)
+
+The core `trip.before` hook can only **short-circuit** (return a `ModelResponse`); it cannot rewrite the outbound prompt and continue. So:
+
+- **Input detectors are `block` / `flag` only.** A `redact` verdict on an input detector is treated as a `block` rather than silently passing an un-redacted prompt.
+- **Output redaction works** — `trip.after` returns a replacement `ModelResponse` with the rewritten `content`.
+- **Tool-arg `redact` is also withheld** — it downgrades to a `block` (`reason: "tool-arg-redaction-unsupported"`), because silently rewriting tool arguments changes the call's side-effects unpredictably.
+
+Lifting the input limitation needs a small, non-breaking core affordance and is deferred.
+
+## Failure isolation
+
+A detector's `check()` **rejecting** is an infrastructure fault, not a content violation — it is recorded as a `flag` (`<detector>.error`) into `ctx.state` and the fold **continues** (fail-open). A moderation-API outage degrades to missing annotation, never a failed agent run.
+
+## See also
+
+- [`@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md`](@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md) — the `pii` detector (detect/redact/block), the `mask` template, and the optional `moderation` peer.
+- [`@warlock.js/ai-guard/escalate-block-to-human/SKILL.md`](@warlock.js/ai-guard/escalate-block-to-human/SKILL.md) — routing a `block` to a human-review surface via `escalation.onBlock`.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent, the middleware pipeline, and the `GuardrailViolationError` on `result.error`.
 
 
 ## handle-ai-errors  `@warlock.js/ai/handle-ai-errors/SKILL.md`
@@ -1302,6 +2011,294 @@ A bare `ai.supervisor()` / `ai.workflow()` uses a `snapshotStore` for `resume(ru
 - [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `OrchestratorDriftError` / `OrchestratorConfigError`
 
 
+## manage-prompts  `@warlock.js/ai/manage-prompts/SKILL.md`
+
+---
+name: manage-prompts
+description: 'Unified prompt registry — ai.prompts: one process-wide store of named, versioned systemPrompt(...) builders keyed by name@version. Register by giving a prompt a meta.name (auto-registers), resolve by get(name) / resolve(name, versionOrTag, placeholders) / the inline name@selector form, bulk-register with define(name, versions), pin tags with tag(name, tag, version), compare with diff(name, from, to), round-trip with export() / import(snapshot), and quality-check with a unified validate(target, options) (deterministic missing-placeholder check + optional Nova-safe LLM-as-judge with verdict caching). Compose registered prompts into new ones with systemPrompt().merge(name, { fromVersion }) — provenance recorded in meta.composedFrom. ai.prompt is now a thin FACADE over ai.prompts (BREAKING vs the old standalone registry). Triggers: `ai.prompts`, `ai.prompt`, `PromptsManagerContract`, `PromptsManagerEntry`, `SystemPromptContract`, `SystemPromptMeta`, `SystemPromptMergeOptions`, `PromptsValidateOptions`, `PromptValidationResult`, `PromptValidateTarget`, `PromptTemplateVersion`, `PromptDiff`, `ExportedRegistry`, `defaultPromptsManager`, `prompts()`, `promptKey`, `meta`, `name`, `version`, `composedFrom`, `fromVersion`, `register`, `create`, `get`, `has`, `list`, `versions`, `resolve`, `define`, `tag`, `validate`, `diff`, `export`, `import`, `merge`, `judge`, `judgeCache`; ''register a prompt by name'', ''resolve a prompt by name@version or tag'', ''pin a production tag to a prompt version'', ''diff two prompt versions'', ''export / import the prompt registry'', ''validate a prompt for missing placeholders'', ''merge a registered prompt into another''; typical import `import { ai } from "@warlock.js/ai"`. Skip: composing a single prompt from persona + instruction blocks (the builder itself) — `@warlock.js/ai/write-system-prompt/SKILL.md`; runtime loadable skill bodies — `@warlock.js/ai/use-runtime-skills/SKILL.md`; eval scoring of agent outputs — `@warlock.js/ai/eval-datasets-and-ci/SKILL.md`; competing libs `langfuse` (direct), `promptfoo`.'
+---
+
+# `ai.prompts` — the unified prompt registry
+
+`ai.prompts` is ONE process-wide registry of named, versioned `systemPrompt(...)` builders keyed by `name@version`. A `systemPrompt(input, { name })` (or any `.meta({ name })` rename) auto-registers here; `ai.prompts.get(name)` / `.resolve(name)` read them back; `systemPrompt().merge(name)` folds a registered prompt into a new one. There is exactly **one storage shape** behind the whole prompt surface — a `SystemPromptContract` keyed by `name@version` — and `ai.prompt(...)` is now a thin facade over it (see the migration note below).
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+// Register: any named systemPrompt auto-registers in ai.prompts.
+ai.systemPrompt("You are support for {{product}}.", { name: "support" });
+
+// Resolve back — latest version, or a version / pinned tag.
+ai.prompts.get("support");                 // → the SystemPromptContract
+ai.prompts.resolve("support", undefined, { product: "Warlock" }); // → final string
+```
+
+`ai.prompts` is the process-wide default (`defaultPromptsManager()`). For an **isolated** registry (parallel test suites, multi-tenant apps) call the `prompts()` factory — same `PromptsManagerContract`, its own store, no global side effects.
+
+## Identity — `SystemPromptMeta` (`meta.name` / `version` / `description` / `required` / `composedFrom`)
+
+A prompt's identity rides on its `meta`. Read it with the no-argument accessor; update it immutably with the one-argument form:
+
+```ts
+const base = ai.systemPrompt("You are support.", {
+  name: "support",
+  version: "1",
+  description: "Tier-1 support persona.",
+  required: ["product"],
+});
+
+base.meta();                          // → { name: "support", version: "1", description, required }
+const v2 = base.meta({ version: "2" }); // new builder, shallow-merged meta; original untouched
+```
+
+- **`name`** — when present, the prompt auto-registers in `ai.prompts` under `name@version`. Anonymous prompts (no `name`) are never registered.
+- **`version`** — free-form label (`"1"`, `"2025-draft"`). Defaults to the **next integer** for that name when omitted.
+- **`description`** — human-readable purpose (carried through `export`).
+- **`required`** — placeholder keys callers must supply; `validate()` reads them.
+- **`composedFrom`** — deterministic source labels a prompt was merged from (e.g. `["base@2", "global@1"]`). No random suffixes — the same merge always yields the same labels.
+
+## Register / resolve — `register` / `get` / `resolve` / `has` / `list` / `versions`
+
+```ts
+const registry = ai.prompts;              // or prompts() for an isolated one
+
+registry.register(ai.systemPrompt("You are support.", { name: "support" }));
+registry.versions("support");             // ["1"] — version derived as next integer
+
+registry.get("support");                  // latest SystemPromptContract
+registry.get("support@1");                // inline name@selector
+registry.resolve("support", "1", { product: "Warlock" }); // pick version + render in one call
+
+registry.has("support");                  // boolean
+registry.list();                          // every registered name, first-seen order
+```
+
+- **Version selection** — `get(name)` / `resolve(name)` return the **latest** by insertion order; pass a version label, a pinned tag, or fold it into the first arg as `name@selector` (`get("support@1")`, `resolve("support@production")`).
+- **Duplicates** — re-registering the same `name@version` throws `InvalidRequestError` **unless** the content is byte-identical (idempotent re-registration is a no-op).
+- **Unknown name / version / tag** → `InvalidRequestError`.
+- `register()` throws if the prompt has no `meta.name`.
+
+## `create()` — build + register in one entry point
+
+`ai.prompts.create(input?, meta?)` is a documented alias of `ai.systemPrompt(...)` — identical input forms (no arg → empty builder; a string → one instruction; an array of blocks → verbatim). Pass `meta.name` to auto-register, so authoring and lookup read side-by-side:
+
+```ts
+ai.prompts.create("You are support for {{product}}.", { name: "support" });
+ai.prompts.resolve("support", undefined, { product: "Warlock" });
+```
+
+## `define()` — bulk-register many versions
+
+```ts
+ai.prompts.define("agent", [
+  { version: "1", template: "You are v1." },
+  { version: "2", template: [ai.persona("You are Alex."), ai.instruction("Be concise.")] },
+]);
+```
+
+A `PromptTemplateVersion`'s `template` is a raw string (wrapped into one instruction block) or an explicit ordered block list (verbatim). Versions register **oldest-first** in array order; the same duplicate / idempotency rule applies per `name@version`. Returns the manager for chaining.
+
+## `tag()` — pin a moving label to a version
+
+```ts
+ai.prompts.tag("agent", "production", "2");   // pin "production" → version 2
+
+ai.prompts.get("agent", "production");        // resolves through the tag
+ai.prompts.resolve("agent", "production");
+ai.prompts.get("agent@production");           // inline form
+```
+
+Re-pinning an existing tag moves it. An unknown name / version throws `InvalidRequestError`. Tags survive `export` / `import`.
+
+## `validate()` — unified deterministic + optional LLM-judge
+
+```ts
+const report = await ai.prompts.validate("support", {
+  placeholders: { product: "Warlock" }, // values you intend to supply
+  declare: ["language"],                  // extra keys to treat as known
+  judge: judgeModel,                      // optional — turns on the LLM-as-judge pass
+});
+
+report.ok;       // true iff no required placeholder is missing (DETERMINISTIC verdict alone)
+report.missing;  // placeholder keys referenced with no default, unsupplied, undeclared
+report.score;    // 0..1 — present ONLY when a judge ran and produced a usable verdict
+report.issues;   // advisory judge reasons / a degrade note — present only when a judge was supplied
+```
+
+- **Always** runs the deterministic check: every `{{key}}` with no inline default that is neither supplied (`placeholders`), declared (`declare`), nor in the prompt's `meta.required` lands in `missing`; `ok` is `true` iff `missing` is empty.
+- **`judge`** adds a **Nova-safe** LLM-as-judge quality pass — it **never throws** and degrades to an `issues` note (leaving `score` undefined) on failure, so a flaky judge can **never flip `ok`**.
+- **`target`** is a registered name (or `name@selector`), a `SystemPromptContract` instance, or a raw prompt string.
+- **`judgeCache`** (per-call or via the `prompts({ judgeCache })` factory option) memoizes judge verdicts by a content hash of the resolved body + the judge model id — a structural `{ get, set }` subset of `@warlock.js/cache`'s `CacheDriver`, so the cache package stays a strictly **optional** peer.
+
+`systemPrompt().validate(options?)` is the per-builder sugar — `ai.prompts.validate(this, options)` under the hood, same result shape.
+
+## `diff()` — block-level version diff
+
+```ts
+const diff = ai.prompts.diff("agent", "1", "2");
+
+diff.identical;  // true when both versions have identical blocks in identical order
+diff.added;      // blocks in `to` not at the same position in `from`
+diff.removed;    // blocks in `from` not at the same position in `to`
+diff.changed;    // [{ from, to }] — same position, type/text changed
+```
+
+Blocks are matched **positionally**. Unknown name / version → `InvalidRequestError`.
+
+## `export()` / `import()` — portable JSON round-trip
+
+```ts
+const snapshot = ai.prompts.export();   // ExportedRegistry — every name, version, pinned tag, description/required
+otherRegistry.import(snapshot);          // rehydrate (same duplicate / idempotency rule; tags restored)
+```
+
+Each version flattens to `{ type, text }` blocks so the registry round-trips without live builder instances — commit a snapshot, ship it, restore it elsewhere.
+
+## Compose registered prompts — `systemPrompt().merge(name, { fromVersion })`
+
+`merge` folds another prompt's blocks into a new builder (persona **replaces**, instructions **append**) and records `meta.composedFrom`:
+
+```ts
+ai.systemPrompt("Always answer in {{language|English}}.", { name: "global", version: "1" });
+
+const supportPrompt = ai.systemPrompt("You are support for {{product}}.")
+  .merge("global", { fromVersion: "1" });  // fold the registered prompt by name
+
+supportPrompt.meta()?.composedFrom;        // ["…", "global@1"] — deterministic provenance
+```
+
+`merge` accepts three source forms: a pre-built block, another `SystemPromptContract`, or a **registered name** resolved from `ai.prompts` (latest version unless `options.fromVersion` selects another — an unknown name / version throws `InvalidRequestError`).
+
+## `ai.prompt(...)` — now a thin facade (⚠ breaking vs the old registry)
+
+`ai.prompt` has **two** call forms, both backed by the unified manager — there is no longer a separate prompt store:
+
+```ts
+// (a) Resolve a globally-registered prompt from ai.prompts by name.
+ai.systemPrompt("You are support.", { name: "support" });
+const sp = ai.prompt("support");          // → SystemPromptContract (latest)
+const v1 = ai.prompt("support", "1");     // → a specific version / pinned tag
+
+// (b) Build an ISOLATED legacy-shaped registry (PromptRegistryContract).
+const reg = ai.prompt({
+  prompts: [{ name: "summarizer", versions: [{ version: "1", template: "Summarize: {{text}}" }] }],
+});
+const resolved = reg.resolve("summarizer", { placeholders: { text } });
+resolved.toSystemPrompt();                 // drop-in for ai.agent({ systemPrompt })
+```
+
+**⚠ Migration.** Before unification, `ai.prompt(...)` only built a standalone, self-contained registry with its **own private** storage. It now:
+
+1. Adds the **string overload** `ai.prompt(name, versionOrTag?)` → resolves from the shared `ai.prompts` manager. (New capability — `ai.prompt("x")` used to be a type error.)
+2. Backs the **options form** (`ai.prompt({ ... })` → `PromptRegistryContract`) by an internal `PromptsManagerContract`, so its storage shape and validation primitives are now the unified ones. The legacy method surface (`register` / `add` / `versions` / `resolve` / `validate` / `sync` + the `{ score, notes }` report shape) is **unchanged**, and each `ai.prompt({ ... })` call still returns its **own isolated** registry — no shared global state.
+
+If you only ever called `ai.prompt({ ... })` and used the returned registry, **no code change is needed**. The new behavior is additive: prefer `ai.prompts` (the unified manager) for new code; reach for `ai.prompt({ ... })` only when you want the legacy `ResolvedPrompt` / `toSystemPrompt()` ergonomics or the optional Langfuse sync. The legacy facade's reference — `register` / `add` / `resolve(name, { version, placeholders })` / `validate` (`{ score, notes }`) / `sync()` (lazy `langfuse` peer) — is documented inline in `src/prompt/prompt.ts`.
+
+## See also
+
+- [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — the `systemPrompt()` / `persona()` / `instruction()` builder, `.meta()`, and `merge()` this registry stores and composes
+- [`@warlock.js/ai/eval-datasets-and-ci/SKILL.md`](@warlock.js/ai/eval-datasets-and-ci/SKILL.md) — the eval `judge` scorer `validate()`'s LLM pass reuses
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — wiring a resolved prompt into an agent, plus the judge-safe agent preset (`ai.agent.judge`)
+
+
+## observe-ai-flows  `@warlock.js/ai/observe-ai-flows/SKILL.md`
+
+---
+name: observe-ai-flows
+description: 'The core Observer seam — a generic, tool-agnostic observability hook every flow routes its completed ExecutionReport through. Covers the per-flow `observe?: boolean | Observer` option on ai.agent / workflow / supervisor / team, the global registry (registerObserver / getObservers / setObserveAll / isObserveAll / clearObservers), resolveObservers / notifyObservers resolution, the opt-in AgentConfig.captureMessages → AgentReport.messages full-history capture, the onConfigApplied dependency-inversion seam, and that @warlock.js/ai-panoptic is the batteries-included Observer. Triggers: `Observer`, `observe`, `registerObserver`, `getObservers`, `setObserveAll`, `isObserveAll`, `clearObservers`, `resolveObservers`, `notifyObservers`, `FlowObserveOption`, `ExecutionReport`, `captureMessages`, `AgentReport.messages`, `CapturedMessage`, `onConfigApplied`, `observeAll`; ''observe an agent run'', ''send finished reports to a collector'', ''capture the full message history'', ''observe every flow by default'', ''wire panoptic / tracing''; typical import `import { ai, registerObserver } from "@warlock.js/ai"`. Skip: structured logging of events — `@warlock.js/ai/log-ai-calls/SKILL.md`; reading the report tree shape (trips / children) — `@warlock.js/ai/run-ai-agent/SKILL.md`; per-call cost / usage rollup — `@warlock.js/ai/handle-ai-errors/SKILL.md`. The batteries-included Observer is the `@warlock.js/ai-panoptic` package.'
+---
+
+# The `Observer` seam — generic, tool-agnostic observability
+
+Core defines a structural `Observer` and a tiny registry; it never imports any observability package (panoptic, OTel, Langfuse, …). A flow that resolves to "observed" hands its completed `ExecutionReport` to every registered observer. An observability tool **implements `Observer` and registers itself**, so `observe: true` / observe-all route reports without coupling core to the tool — the dependency inversion that keeps the two sides decoupled.
+
+```ts
+export interface Observer {
+  collect(report: ExecutionReport): void | Promise<void>;
+}
+```
+
+`collect` may be sync or async — the flow awaits it. A throw is **swallowed** by the flow (never breaks the run), mirroring the existing `onUsage` / `onComplete` hooks.
+
+## Per-flow `observe` option
+
+`observe?: boolean | Observer` (`FlowObserveOption`) is accepted on **`ai.agent`, `ai.workflow`, `ai.supervisor`, and `ai.team`** (a team forwards it verbatim to the supervisor it desugars into):
+
+```ts
+const collector: Observer = { collect(report) { exporter.send(report); } };
+
+ai.agent({ model, observe: true });       // → the globally registered observers, even if observe-all is off
+ai.agent({ model, observe: false });      // → opt out entirely, even when observe-all is on
+ai.agent({ model, observe: collector });  // → a flow-LOCAL collector; only this flow's report, only to it
+ai.agent({ model });                      // → undefined: follow the global observe-all flag
+```
+
+Resolution (`resolveObservers(observe)`):
+
+- `false` → `[]` (opted out).
+- `true` → the globally registered observers.
+- an `Observer` object → just that one (flow-local; the global observers are skipped).
+- `undefined` → the global observers when observe-all is on, otherwise `[]`.
+
+`notifyObservers(observe, report)` routes a completed report to each resolved observer, awaiting each `collect` (so async exporters finish before the flow returns) and swallowing any throw. The object form is typed as the structural `Observer` (NOT a panoptic-specific type), so a panoptic flow-local collector — which implements `Observer` — can be passed directly.
+
+## The global registry
+
+```ts
+import {
+  registerObserver, getObservers, setObserveAll, isObserveAll, clearObservers,
+} from "@warlock.js/ai";
+
+registerObserver(collector);  // an observability tool registers ONE collector when its config is applied
+getObservers();               // read-only snapshot of the registered observers (do not mutate)
+
+setObserveAll(true);          // "observe every flow by default" — flows without their own `observe` get observed
+isObserveAll();               // read the flag (default false — opt-in observability)
+
+clearObservers();             // test-only: reset observers + the observe-all flag for spec isolation
+```
+
+`observeAll` defaults to `false` (opt-in). A flow that never sets `observe` is observed **only** when observe-all is on; individual flows still opt out with `observe: false`.
+
+## Full-history capture — `captureMessages` → `AgentReport.messages`
+
+Off by default. When `ai.agent({ captureMessages: true })` is set, the agent normalizes the real assembled turn array onto `AgentReport.messages` as a `CapturedMessage[]`:
+
+```ts
+const { report } = await ai.agent({ model, tools, captureMessages: true }).execute("Go");
+report.messages; // CapturedMessage[] — every role (system/user/assistant/tool), every trip
+```
+
+A `CapturedMessage` is a JSON-safe projection: `{ role, content, toolCalls?, toolCallId? }` — `content` is always a string (tool results stringified), assistant turns that triggered tools carry `toolCalls`, tool-result turns carry the `toolCallId` they answer. Unlike `trips[].input` (which stubs non-first trips with `"[tool results]"`), this preserves the **real** turn array. Omitted ⇒ the field is **absent** and the report is byte-for-byte as before. Opt-in because messages can be large and sensitive (full prompts, tool inputs/outputs) — and **required for panoptic full-history capture**.
+
+## Callback sub-agents nest in the report tree
+
+The `ExecutionReport` an observer receives reflects **full** lineage: a supervisor / team / orchestrator callback that calls `agent.execute()` directly auto-nests `callback → agent → tool` (via an ambient `RunFrame`), so usage / cost roll up and panoptic renders the sub-agent under its callback instead of as a lone `$0` span. No observer-side change is needed — the tree arrives already nested. A team's root span carries `type: "team"` (a first-class `ReportType`, not `"supervisor"`), so observers can distinguish, group, and label team runs as their own type. See [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md).
+
+## The config seam — `onConfigApplied`
+
+An observability tool reacts to its own augmented config slot without core importing it. Core lets tools attach an opaque slot (e.g. `panoptic?`) via declaration merging on `AIConfig`, then fires registered listeners after each `ai.config(...)` merge:
+
+```ts
+import { onConfigApplied, getAIConfig } from "@warlock.js/ai";
+
+onConfigApplied((config) => applyPanopticConfig(config.panoptic)); // react on every config merge
+applyPanopticConfig(getAIConfig().panoptic);                        // catch a pre-set config
+```
+
+A misbehaving listener's throw is swallowed (same swallow-on-throw discipline as the observer hooks). This mirrors the `Observer` registry's dependency inversion: a tool flips `setObserveAll(true)` and calls `registerObserver(...)` from inside its `onConfigApplied` listener.
+
+## The batteries-included Observer
+
+`@warlock.js/ai-panoptic` is the shipped, full-featured `Observer` — install it, configure it via `ai.config({ panoptic })`, and it registers its collector + (optionally) flips observe-all for you. Core stays dependency-free; this skill documents the seam panoptic plugs into.
+
+## See also
+
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the `AgentReport` / `ExecutionReport` tree (`trips`, `children`) an observer receives
+- [`@warlock.js/ai/log-ai-calls/SKILL.md`](@warlock.js/ai/log-ai-calls/SKILL.md) — event-level structured logging (vs. report-level observation)
+- [`@warlock.js/ai/run-ai-team/SKILL.md`](@warlock.js/ai/run-ai-team/SKILL.md) — a team inherits `observe` through the supervisor it forwards to
+
+
 ## persist-ai-data  `@warlock.js/ai/persist-ai-data/SKILL.md`
 
 ---
@@ -1726,11 +2723,107 @@ If you switch providers mid-project (e.g. OpenAI → Anthropic):
 - [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — adapter error categorization
 
 
+## record-replay-llm  `@warlock.js/ai/record-replay-llm/SKILL.md`
+
+---
+name: record-replay-llm
+description: 'Deterministic, offline LLM tests with ai.vcr(model,{path,mode}) — a record/replay decorator over ANY ModelContract that intercepts only complete()/stream(), delegates name/provider/capabilities/pricing to the inner model, and hashes each request against a JSON cassette on disk. Covers the three modes (record / replay / auto), the cassette format, save(), VcrCassetteMissError, streaming round-trip, hashOptions, and composing below fallbackModel. Triggers: `ai.vcr`, `vcr`, `VcrModel`, `VcrOptions`, `VcrMode`, `Cassette`, `CassetteEntry`, `VcrCassetteMissError`, `hashRequest`, `DEFAULT_HASH_OPTIONS`, `mode`, `path`, `hashOptions`, `save`, `cassette`, record, replay, cassette; ''record LLM responses for tests'', ''replay model calls offline in CI'', ''deterministic agent test without hitting the provider'', ''cassette for model calls''; typical import `import { ai } from "@warlock.js/ai"`. Skip: eval scoring + regression gating — `@warlock.js/ai/eval-datasets-and-ci/SKILL.md`; the Vitest matchers + mockRouter — `@warlock.js/ai/ai-dx-helpers/SKILL.md`; choosing a provider adapter — `@warlock.js/ai/pick-ai-provider/SKILL.md`; competing libs `nock`, `polly.js`.'
+---
+
+# `ai.vcr()` — record / replay any model
+
+`ai.vcr(model, { path, mode })` wraps any `ModelContract` in a record/replay decorator backed by a JSON cassette on disk. It intercepts only `complete()` / `stream()` — the single seam every agent trip funnels through — and delegates `name`, `provider`, `capabilities`, and `pricing` to the inner model untouched, so cost accounting and capability detection are unchanged. Depends only on `ModelContract`, so it works with **any** adapter.
+
+## Shape
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+const live = openai.model({ name: "gpt-4o-mini" });
+
+const model = ai.vcr(live, {
+  path: "./cassettes/support.json",  // cassette file (JSON); read on construct, written on save()
+  mode: "auto",                      // "record" | "replay" | "auto" (default)
+});
+
+const agent = ai.agent({ model, systemPrompt: "..." });
+const result = await agent.execute("hi");
+
+await model.save(); // first run records; later runs replay deterministically
+```
+
+The returned `VcrModel` is a `ModelContract` plus `save(): Promise<void>` and a readonly `cassette` (exposed for assertions).
+
+## Modes — `VcrMode`
+
+- **`record`** — always calls the inner model and appends a cassette entry. Never replays (the in-memory cassette starts empty, so a record run never accidentally replays a stale entry). Use to (re)capture a fresh cassette.
+- **`replay`** — never calls the inner model. A cassette hit returns the stored response / re-yields its chunks / re-throws its error; a **miss throws `VcrCassetteMissError`** — never a silent live call. Use in CI for deterministic, offline tests.
+- **`auto`** (default) — replay on a hit, record on a miss. The friendliest mode for local dev: records once, replays thereafter.
+
+## Request hashing — `hashOptions`
+
+On each call VCR computes a stable hash over `{ messages, picked options }` and looks for a matching `CassetteEntry`. The hashed option fields default to:
+
+```ts
+["temperature", "maxTokens", "responseSchema", "tools", "reasoning"]
+```
+
+(`DEFAULT_HASH_OPTIONS`). `signal` and unknown provider keys are **always excluded**, so an otherwise-identical logical call still matches. `tools` are hashed by name + description + input-schema shape, not object identity. Override `hashOptions` to widen / narrow what counts as "the same request". `hashRequest(messages, options, hashOptions)` is exported for direct use.
+
+## Cassette format
+
+A `Cassette` is `{ version: 1, model, provider, entries: CassetteEntry[] }`. Each `CassetteEntry` is `{ requestHash, request: { messages, options? }, ... }` where **exactly one** of `response` / `chunks` / `error` is populated — mirroring the three outcomes of a model call (non-streaming reply, streamed chunk list, or a thrown provider error). The full `request` is stored verbatim for human readability and so the cassette can be re-hashed if the hashing format ever changes.
+
+## Streaming round-trip
+
+```ts
+for await (const chunk of model.stream(messages)) {
+  // record mode: buffers each chunk into entry.chunks[] while re-emitting
+  // replay mode: re-yields the stored chunks in order (delta / tool-call / done sequence)
+}
+await model.save();
+```
+
+Recorded chunks reproduce the exact `delta` / `tool-call` / `done` sequence on replay; a recorded error is re-thrown.
+
+## `VcrCassetteMissError`
+
+```ts
+import { VcrCassetteMissError } from "@warlock.js/ai";
+
+try {
+  await vcrModel.complete(messages);
+} catch (error) {
+  if (error instanceof VcrCassetteMissError) {
+    console.error("Re-record the cassette:", error.path, error.requestHash);
+  }
+}
+```
+
+Thrown only in `replay` mode on a miss (code `"VCR_CASSETTE_MISS"`). It carries the looked-up `requestHash` and the cassette `path` so a failing CI run names exactly which call was not recorded. Extends `AIError` directly (not `ProviderError`) — a miss is a harness/config failure, not a provider failure. **The whole point:** `replay` never falls back to a live call, which would silently re-introduce non-determinism into a test that asked for the opposite. Re-record by running once in `record` / `auto`.
+
+## `save()` — flush new entries
+
+`save()` writes newly recorded entries to `path`. It is a **no-op when nothing was recorded** (pure replay, or a record/auto run that only hit cached entries), so calling it unconditionally is safe.
+
+## Composition
+
+VCR composes **below** `ai.fallbackModel` and works with any adapter. Wrap the live model in `vcr(...)`, then pass it anywhere a `ModelContract` is accepted (agent, planner, reranker, judge).
+
+## See also
+
+- [`@warlock.js/ai/eval-datasets-and-ci/SKILL.md`](@warlock.js/ai/eval-datasets-and-ci/SKILL.md) — pair a cassette with a dataset for fully offline eval CI
+- [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md) — `ai.mockRouter` + Vitest matchers for the rest of the test surface
+- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) — the adapters whose models VCR wraps
+
+
 ## run-ai-agent  `@warlock.js/ai/run-ai-agent/SKILL.md`
 
 ---
 name: run-ai-agent
-description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, and auto-adapting raw executables in tools:[]. Triggers: `ai.agent`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''put a supervisor in tools'', ''cancel an agent run''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — `@warlock.js/ai/define-ai-tool/SKILL.md`; workflows — `@warlock.js/ai/run-ai-workflow/SKILL.md`; eval matchers / batch / fallback detail — `@warlock.js/ai/ai-dx-helpers/SKILL.md`; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
+description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `ai.agent`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — `@warlock.js/ai/define-ai-tool/SKILL.md`; workflows — `@warlock.js/ai/run-ai-workflow/SKILL.md`; eval matchers / batch / fallback detail — `@warlock.js/ai/ai-dx-helpers/SKILL.md`; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
 ---
 
 # `ai.agent()` — single-turn primitive
@@ -1913,6 +3006,31 @@ await myAgent.execute(input, {
 
 Disabled by default. Each repair attempt counts against `maxTrips`.
 
+## `judge` preset — resilient LLM-as-judge / verdict classifiers
+
+For graders and verdict classifiers running on models that emit **corrupted** structured output — notably the Amazon Nova family, which wraps verdicts in fenced ` ```json ` blocks, prepends prose, or trails commentary — set `judge: true` (or a `JudgeConfig`). It turns on three behaviors at once:
+
+```ts
+const grader = ai.agent.judge({
+  model: nova.model({ name: "amazon.nova-pro-v1:0" }),
+  systemPrompt: "Grade the answer. Respond with JSON only.",
+  output: verdictSchema,
+});
+
+const result = await grader.execute(prompt);
+if (result.error) {
+  // graceful default — the judge couldn't produce a clean verdict
+}
+```
+
+1. **Repair** — a couple of re-ask attempts by default (`repairAttempts`, defaults to `2`; bounded by `maxTrips`) when the verdict fails to parse / validate. The caller's per-call `options.repair` still wins.
+2. **Lenient verdict parsing** — extracts the first balanced JSON object / array (tolerating fenced blocks + surrounding prose) instead of the strict parser.
+3. **Never throws on a parse miss** — even an unparseable verdict yields a well-formed result (`result.error` populated, `result.data` undefined), so a flaky judge degrades instead of crashing the flow.
+
+`ai.agent.judge(config, judge?)` is sugar for `ai.agent({ ...config, judge })`; the bare `ai.agent({ judge: true })` option does the same. `judge: {}` ≡ `judge: true` (every field falls back to its resilient default); `judge: { repairAttempts: 0 }` keeps the lenient parser + never-throw guarantee but disables repair.
+
+**Trade-off — resilience over strictness.** The lenient parse can recover JSON the strict parser would (correctly) reject — leave `judge` **off** for normal structured output, where a hard parse failure is a useful signal. Off by default; omitting it parses strictly and never auto-enables repair, byte-for-byte as before. (This is the same Nova-safe judge the unified prompt `validate()` uses — see [`@warlock.js/ai/manage-prompts/SKILL.md`](@warlock.js/ai/manage-prompts/SKILL.md).)
+
 ## Pattern — image attachments
 
 ```ts
@@ -2016,6 +3134,24 @@ expect(report.passed).toBe(true);   // true only when EVERY case passed
 
 Each case runs through `execute(input)`; scorer precedence is per-case `scorers` → suite `scorers` → synthesized `judge` (throws at author time if a case resolves none). Built-in scorers on `ai.eval.*`: `exact()`, `contains()`, `predicate(fn)`, `judge(config)`. Full coverage — plus the Vitest matchers (`registerAiMatchers` / `toRouteTo` / `toConverge` / `toPassStep` / `toOutputShape`) — in [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md).
 
+## `ai.spawnSubAgent()` — one-shot delegation with a budget
+
+`ai.spawnSubAgent(spec)` is a thin wrapper over this same `ai.agent()`: it builds a fresh agent from the spec, optionally attaches a `budget` middleware, runs the `task` once, and returns the `AgentResult`. Not a sandbox or a separate runtime — a spawn is an ordinary new agent (empty conversation, its own tools/prompt). It is a **general** primitive: usable inside a tool, a workflow or planner step, a supervisor intent, or hand-rolled orchestration — it is NOT planner-specific (the planner engine never calls it).
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+const result = await ai.spawnSubAgent({
+  name: "extract-entities",
+  model,
+  task: "Pull every company name from this article: ...",
+  budget: { maxCostUSD: 0.05 },   // per-task spend cap — aborts when crossed
+  output: companiesSchema,
+});
+```
+
+The one field a bare agent config doesn't surface ergonomically is `budget` (`BudgetOptions` — `maxTokens` / `maxCostUSD`), equivalent to `ai.agent({ middleware: [ai.middleware.budget(...)] })` but promoted to a first-class spec field so a delegated subtask can't overrun its cap (distinct from `maxTrips`, which caps round-trips, not spend). The surface is **narrower** than `agent.execute()`: one-shot, with no `history`, `placeholders`, per-call events, or `repair`. The spawned `report` slots under the caller's `report.children[]`, so cost and traces roll up uniformly. Reach for it when you want a named single-use delegation with a hard spend cap; otherwise just build an `ai.agent()` and call it.
+
 ## When NOT to use this primitive
 
 - Multi-step pipeline with a fixed shape → [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md)
@@ -2026,6 +3162,260 @@ Each case runs through `execute(input)`; scorer precedence is per-case `scorers`
 - [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — tool wiring + schema validation
 - [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — persona / instruction builders
 - [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `AIError` hierarchy
+
+
+## run-ai-rag  `@warlock.js/ai/run-ai-rag/SKILL.md`
+
+---
+name: run-ai-rag
+description: 'Retrieval-augmented generation with ai.rag({...}) — a chunk → embed → vector-store → retrieve → rerank → cite pipeline that reuses ai.embedder + a @warlock.js/cache CacheDriver. Covers index() / retrieve() / clear() / asTool(), chunking strategies (recursive | markdown | sentence | fixed), Citation / RetrievedChunk provenance, and the opt-in rerankers ai.rag.keywordReranker / ai.rag.llmReranker. Triggers: `ai.rag`, `rag.index`, `rag.retrieve`, `rag.clear`, `rag.asTool`, `RagConfig`, `RagDocument`, `RetrieveOptions`, `RetrieveResult`, `RetrievedChunk`, `Citation`, `ChunkOptions`, `ChunkType`, `ai.rag.keywordReranker`, `ai.rag.llmReranker`, `cacheVectorStore`, `VectorStore`, `topK`, `threshold`, `candidates`; ''build a knowledge base'', ''retrieve relevant chunks for a query'', ''cite the source of an answer'', ''chunk markdown for embedding'', ''rerank retrieval results'', ''expose retrieval as a tool''; typical import `import { ai } from "@warlock.js/ai"`. Skip: raw single-string embedding — `@warlock.js/ai/embed-text/SKILL.md`; exact + vector LLM-response cache — `@warlock.js/ai/attach-ai-middleware/SKILL.md` (ai.middleware.semanticCache); tool wiring — `@warlock.js/ai/define-ai-tool/SKILL.md`; competing libs `langchain`, `llamaindex`.'
+---
+
+# `ai.rag()` — chunk → embed → retrieve → rerank → cite
+
+A self-contained retrieval pipeline. It reuses the embedder you already have (`provider.embedder(...)`), a `@warlock.js/cache` vector-capable `CacheDriver` as the store, and the composite-as-tool engine for `asTool()`. Zero new dependencies. `ai.rag` is a native core verb — present the moment `@warlock.js/ai` is imported (no module augmentation, no side-effect import).
+
+## Factory shape
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { MemoryCacheDriver } from "@warlock.js/cache";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+const kb = ai.rag({
+  name: "docs",                                            // default "rag"
+  embedder: openai.embedder({ name: "text-embedding-3-small" }), // REQUIRED
+  store: new MemoryCacheDriver(),                          // or ai.config({ defaultStore })
+  namespace: "ai.rag.docs",                                // default `ai.rag.<name>`
+  chunk: { type: "markdown", size: 800, overlap: 120 },    // index() defaults
+  reranker: ai.rag.keywordReranker(),                      // OFF by default (cosine-only)
+  retrieve: { topK: 4, threshold: 0.5 },                   // default retrieval knobs
+});
+```
+
+Resolution is **loud at construction** (mirrors `ai.memory`):
+
+- `embedder` is **required** — a provider with no embedder must be caught here, not at first `index()`.
+- `store` falls back to `ai.config({ defaultStore })`; if neither resolves, the factory throws.
+
+## Surface — `Rag`
+
+```ts
+interface Rag {
+  readonly name: string;
+  index(docs: RagDocument[], chunk?: ChunkOptions): Promise<{ chunks: number }>;
+  retrieve(query: string, options?: RetrieveOptions): Promise<RetrieveResult>;
+  clear(): Promise<void>;
+  asTool(options?: RagAsToolOptions): ToolContract<{ query: string }, RetrieveResult>;
+}
+```
+
+## `index()` — chunk, embed (batched), store
+
+```ts
+await kb.index([
+  { id: "guide", text: longMarkdown, metadata: { url: "/guide" }, tags: ["frontend"] },
+  { id: "faq", text: faqText },
+]);
+```
+
+A `RagDocument` is `{ id, text, metadata?, tags? }` — **you** load + parse documents to text (loaders are out of scope for v1). Each doc is split into chunks, embedded in sub-batches of 96 texts per `embedMany()` call (so one giant doc never blows the provider's per-request cap), and upserted. Returns the chunk count written. Empty / whitespace-only documents yield zero chunks — nothing is embedded. The per-call `chunk` arg overrides `config.chunk` for that index.
+
+## Chunking — `ChunkOptions`
+
+All sizing is in **characters** (tokenizer-free; the embedder owns token counting). `chunk(text, options)` is also exported standalone.
+
+```ts
+type ChunkType = "recursive" | "sentence" | "fixed" | "markdown";
+
+{
+  type?: ChunkType,          // default "recursive"
+  size?: number,             // target chars per chunk, default 1000
+  overlap?: number,          // chars carried between adjacent chunks, default 200
+  separators?: string[],     // recursive only; default ["\n\n", "\n", ". ", " ", ""]
+}
+```
+
+- **`recursive`** (default) — separator-aware greedy packing, largest unit first.
+- **`markdown`** — heading/section-aware, then recursive within each section.
+- **`sentence`** — packs whole sentences up to `size`.
+- **`fixed`** — back-to-back character windows.
+
+Every chunk records its exact `[start, end)` span in the original text, so a `Citation.span` is precise.
+
+## `retrieve()` — embed query, fetch, rerank, slice, cite
+
+```ts
+const { query, chunks } = await kb.retrieve("how do I configure caching?", {
+  topK: 4,          // returned AFTER reranking. default 5
+  threshold: 0.5,   // cosine floor at the store stage. default 0.5
+  candidates: 16,   // pool fetched before rerank. default topK * 4 (clamped >= topK)
+  tags: ["frontend"], // restrict to chunks whose source had one of these tags
+});
+
+for (const hit of chunks) {
+  console.log(hit.score, hit.text);
+  console.log(hit.citation.sourceId, hit.citation.chunkIndex, hit.citation.span);
+}
+```
+
+`retrieve()` is **return-only** — it never auto-injects into a prompt. The caller formats the cited chunks (or uses `asTool()` for the agent loop). A `RetrievedChunk` carries `{ text, score, citation }`; the `Citation` is `{ sourceId, chunkIndex, span, score, metadata? }`. The reranker is **OFF by default** (cosine ranking only) unless `config.reranker` is set.
+
+## Rerankers — opt-in, on `ai.rag.*`
+
+Both are exposed as namespaced helpers on the factory (`ai.rag.keywordReranker`, `ai.rag.llmReranker`).
+
+```ts
+// Zero-dependency lexical reranker (BM25-lite keyword overlap).
+ai.rag.keywordReranker({ weight: 0.5 }); // weight in [0,1]; 1 = pure keyword, 0 = keep cosine
+
+// Model-backed reranker — one or more model calls per retrieval.
+ai.rag.llmReranker({ model: openai.model({ name: "gpt-4o-mini" }), batchSize: 10 });
+```
+
+- **`keywordReranker`** — blends lexical query-term overlap with the original cosine score by `weight`; ties keep the incoming cosine order. Costs nothing beyond string splits. Reach for it when embedding-only ranking buries a keyword-rich chunk.
+- **`llmReranker`** — asks an LLM to grade each over-fetched candidate `0..1` and sorts by that. Candidates the model fails to score keep their cosine score, so a garbled reply degrades gracefully. Opt in only when precision beats latency/cost. Both implement the `RagReranker` contract, so you can write your own.
+
+## `asTool()` — drop retrieval into an agent's `tools: []`
+
+```ts
+const agent = ai.agent({
+  model: openai.model({ name: "gpt-4o" }),
+  tools: [kb.asTool({ name: "search_docs", retrieve: { topK: 6 } })],
+});
+```
+
+Input is `{ query: string }`; output is the `RetrieveResult`. Default tool name is `retrieve_<rag.name>`; `description` and a per-tool `retrieve` override are optional. Built via the same composite-as-tool engine every other primitive uses.
+
+## `clear()`
+
+```ts
+await kb.clear(); // drops every entry written under this rag's namespace
+```
+
+## Advanced
+
+- `cacheVectorStore(driver)` + the `VectorStore` contract are exported for swapping in a custom store.
+- A stored chunk's namespaced key is `${namespace}.${sourceId}.${chunkIndex}`.
+
+## See also
+
+- [`@warlock.js/ai/embed-text/SKILL.md`](@warlock.js/ai/embed-text/SKILL.md) — the `sdk.embedder` primitive this consumes
+- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — what `asTool()` produces
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — wiring the retrieval tool into an agent
+
+
+## run-ai-team  `@warlock.js/ai/run-ai-team/SKILL.md`
+
+---
+name: run-ai-team
+description: 'Manager-led multi-agent teams with ai.team({...}) — transparent sugar over ai.supervisor that maps a manager → route/router, members → intents, and a gate → evaluate, returning a REAL SupervisorContract (no new loop, no new contract). Covers the built-in gate strings "quality" (review-then-fix) and "verify" (test-then-fix), a custom gate function, role mapping (roles / gateKey), and the verbatim supervisor pass-throughs (goal / output / state / maxIterations / snapshotStore / on / observe). Triggers: `ai.team`, `TeamConfig`, `TeamGate`, `TeamGateFn`, `TeamMemberValue`, `manager`, `members`, `gate`, `roles`, `gateKey`, `buildQualityGate`, `buildVerifyGate`, `SupervisorContract`, `ReportType`; ''build a team of agents'', ''manager that delegates to members'', ''review then fix loop'', ''test then fix loop'', ''quality gate for a multi-agent run'', ''report type team''; typical import `import { ai } from "@warlock.js/ai"`. Skip: routing one input to a fixed roster directly — `@warlock.js/ai/run-supervisor/SKILL.md` (team is sugar over it); durable cross-turn sessions — `@warlock.js/ai/run-orchestrator/SKILL.md`; LLM-generated plans — `@warlock.js/ai/run-planner/SKILL.md`; competing libs `crewai`, `autogen`.'
+---
+
+# `ai.team()` — manager + members + a quality gate
+
+`ai.team(config)` is **thin, transparent sugar over `ai.supervisor`**. It builds a `SupervisorConfig` from the team-shaped config, calls `supervisor(...)`, and returns the **unchanged** `SupervisorContract<TOutput>` — the exact object `ai.supervisor` returns. So `ctx.intents.<member>.execute()`, `.asTool()`, `.resume()`, snapshots, and events all stay intact. `team()` owns no loop of its own.
+
+The mapping:
+
+| team field | becomes supervisor field |
+| --- | --- |
+| `manager` | `route` (deterministic `{ route }`) XOR `router` (an agent / `RouterEntry`) |
+| `members` | `intents` |
+| `gate` | `evaluate` |
+
+Everything else passes through 1:1 — the sole exception is the report/result `type`, which is stamped `"team"` (see [Pass-throughs](#pass-throughs-verbatim-supervisor-semantics)).
+
+## Shape
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { v } from "@warlock.js/seal";
+
+const codeTeam = ai.team({
+  name: "code-team",
+  goal: "Ship a tested module that passes review.",
+  manager: techLeadRouter,                 // an agent / RouterEntry → router; or { route } → deterministic
+  members: { builder, reviewer, fixer },   // role-name → agent | workflow
+  gate: "quality",                         // "quality" | "verify" | (ctx) => EvaluateResult
+  output: v.object({ code: v.string() }),
+  maxIterations: 6,                        // default 10 (supervisor's)
+});
+
+const { data, report } = await codeTeam.execute("Build a debounce<T> utility.");
+```
+
+A `member` is an `AgentContract` or a `WorkflowInstance` (the `TeamMemberValue` union — the autocomplete-friendly common case; callback / full-entry intent shapes still work when forwarded). The keys are both the role names the manager routes to AND the keys `ctx.intents.<role>` exposes (the supervisor escape hatch is preserved).
+
+## The manager — `route` XOR `router`
+
+```ts
+// LLM-driven manager: an agent (or RouterEntry) → becomes SupervisorConfig.router
+manager: techLeadRouter
+
+// Deterministic manager: { route } → becomes SupervisorConfig.route
+manager: { route: (ctx) => (ctx.iteration === 0 ? "builder" : "reviewer") }
+```
+
+Exactly one form is forwarded — mutually exclusive, mirroring the supervisor's own `router` XOR `route` rule. A malformed manager surfaces the existing `SupervisorFailedError` downstream.
+
+## Gates — `"quality"` | `"verify"` | a function
+
+A `gate` string selects a pre-built `evaluate` strategy; both desugar to a concrete `evaluate` callback that leans entirely on the already-shipped `EvaluateResult` semantics (`satisfied` terminates, `reassignTo` re-dispatches the fixer, `feedback` threads forward) — **no new termination or loop code**.
+
+### `gate: "quality"` — review-then-fix
+
+After each iteration's members settle and merge into supervisor `state`, the gate reads `state.approved` (the `gateKey`, default `"approved"`). If truthy → `{ satisfied: true }`; otherwise → `{ reassignTo: "fixer", feedback: String(state.notes ?? "") }`. The reviewer's feedback (`state.notes`) threads into the next iteration.
+
+### `gate: "verify"` — test-then-fix
+
+Identical shape but keyed on the tester's pass/fail slice `state.passed` (default `gateKey`) rather than a subjective score. On failure it re-dispatches the fixer; there is no feedback channel for a pass/fail signal, so none is threaded.
+
+> The named member whose `output` schema writes the gate slice must produce a boolean into `gateKey`.
+
+### A custom gate (full escape hatch)
+
+```ts
+gate: (ctx) => {
+  if (ctx.state.score >= 0.9) return { satisfied: true };
+  return { reassignTo: "fixer", feedback: ctx.state.review };
+}
+```
+
+Supplying a `TeamGateFn` instead of a string opts out of the sugar entirely while keeping the rest of `team()`'s wiring — it forwards straight to `SupervisorConfig.evaluate` with zero wrapping.
+
+## Role mapping — `roles` + `gateKey`
+
+The string gates default to canonical role names. Override when your `members` keys differ:
+
+```ts
+ai.team({
+  name: "qa-team",
+  manager,
+  members: { author, critic, patcher },
+  gate: "quality",
+  roles: { reviewer: "critic", fixer: "patcher" }, // map gate roles → your member keys
+  gateKey: "ok",                                    // state slice the gate reads
+});
+```
+
+**Construction-time validation:** when the gate is a string, the resolved `fixer` (and, for `"quality"`, the `reviewer`) role is checked against `members`. A missing role throws an authoring-style `SupervisorFailedError` (`context: { authoring: true }`) immediately — rather than silently starving until `maxIterations`.
+
+## Pass-throughs (verbatim supervisor semantics)
+
+`goal`, `output`, `state`, `maxIterations`, `snapshotStore`, `on`, `observe`, and `version` are forwarded unchanged. Because the returned object IS a supervisor, observability rides the same generic `Observer` seam every other flow uses (see `observe-ai-flows`), and snapshot resume works exactly as on a bare supervisor.
+
+The one behavioural difference from a bare supervisor: a team stamps **`type: "team"`** on both its report (a first-class `ReportType`, was `"supervisor"`) and its result, so Panoptic and any `Observer` can distinguish, group, filter, and label team runs as their own type rather than folding them into plain supervisor runs. Everything else passes through 1:1.
+
+A member callback that calls `agent.execute()` **directly** still nests `member → agent → tool` under the member span with usage rolled up — the same ambient-`RunFrame` auto-nesting as a bare supervisor. See [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md).
+
+## See also
+
+- [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) — the primitive team desugars into (intents, route/router, evaluate, ctx.intents)
+- [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md) — wrap a team in durable cross-turn session state
+- [`@warlock.js/ai/observe-ai-flows/SKILL.md`](@warlock.js/ai/observe-ai-flows/SKILL.md) — the `observe` seam a team inherits
 
 
 ## run-ai-workflow  `@warlock.js/ai/run-ai-workflow/SKILL.md`
@@ -2346,7 +3736,7 @@ await supportBot.execute(input, {
   state: { tier: "gold" },    // partial patch shallow-merged into loaded state
   context: { userId, db },    // request-scoped, never persisted
   signal: AbortSignal.timeout(60_000),
-  on: { "orchestrator.turn.completed": (e) => log(e) },  // tier-3 per-call handlers
+  on: { "orchestrator.turn.awaiting-input": (e) => log(e) },  // tier-3 per-call handlers
   force: false,               // bypass drift check for this call
 });
 ```
@@ -2361,7 +3751,7 @@ await supportBot.execute(input, {
 6. **persist** — append a checkpoint row for the settled turn, then prune to `keepSnapshots` (`orchestrator.checkpoint.persisted`).
 7. **compaction** — fire the post-turn compaction trigger if configured (`orchestrator.compaction.suggested` / `.applied`).
 
-Terminal events: `orchestrator.turn.completed` / `.failed` / `.cancelled`, plus the non-terminal `orchestrator.turn.awaiting-input`.
+A clean turn ends with `orchestrator.turn.awaiting-input` (the session stays open for the next user turn); `orchestrator.turn.failed` and `orchestrator.turn.cancelled` end error / cancelled turns. (`orchestrator.turn.completed` is defined on the event map, but the v1 lifecycle maps a clean completion to `awaiting-input`, so it isn't emitted on the normal path — subscribe to `awaiting-input` for "turn done".)
 
 ## `OrchestratorResult` — read the report
 
@@ -2379,6 +3769,8 @@ result.compaction;                // CompactionResult when a turn compacted (and
 ```
 
 `report.children[]` carries ONLY the current turn's dispatched primitive reports. Full session history lives on `report.turns[]` — a `children[]` walker will NOT reach prior turns (intentional). Child `supervisor.*` / `agent.*` events bubble up unmodified under their own identity.
+
+A turn callback that calls `agent.execute()` **directly** (not via `ctx.run` / `ctx.intents`) still nests `callback → agent → tool` inside the turn's report tree, with usage rolled up and the session's `sessionId` stamped onto the captured subtree — an ambient `RunFrame` handles the self-attach. See [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md).
 
 **`awaiting-input` is the only non-terminal status across the unified result tree.** Code branching on `status === "completed"` MUST explicitly handle `"awaiting-input"` as a session-continues path, not a failure.
 
@@ -2496,7 +3888,7 @@ await orch.execute(input, { sessionId, history, on: { "orchestrator.drift.checke
 
 ---
 name: run-planner
-description: 'Goal-driven planning with ai.planner({...}) — an LLM GENERATES an ordered execution plan over your registered capabilities (agents / workflows / supervisors / tools), then the planner EXECUTES that plan step-by-step, threading each step output into the next, and returns the unified {data, report, usage, error} envelope with report.type "planner". A plan step may delegate via ai.spawnSubAgent({...}) — a GENERAL one-shot-agent helper (a fresh agent + optional per-task budget), covered fully in `@warlock.js/ai/run-ai-agent/SKILL.md`; it is not planner-specific and the planner engine does not require it. Triggers: `ai.planner`, `planner.execute`, `spawnSubAgent`, `PlannerConfig`, `PlannerCapability`, `PlannerResult`, `PlannerReport`, `PlannerPlan`, `PlannerStep`, `maxSteps`, `report.plan`, `report.executedSteps`; ''let the model plan the steps'', ''dynamic plan from a goal'', ''decompose a goal into capability calls'', ''spawn a sub-agent for a subtask''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a FIXED known pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; routing one input to a specialist each turn — `@warlock.js/ai/run-supervisor/SKILL.md`; a single model + tools call — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: 'Goal-driven planning with ai.planner({...}) — an LLM GENERATES an ordered execution plan over your registered capabilities (agents / workflows / supervisors / tools), then the planner EXECUTES it, threading each step output into the next, and returns the unified {data, report, usage, error} envelope with report.type "planner". Supports DAG scheduling (dag:true + maxConcurrency off dependsOn), adaptive re-planning (replan:{maxReplans} + the onStep continue/abort/replan directive), and plan-only / approval (mode:"plan-only" → status "awaiting-approval" → approvedPlan). A plan step may delegate via ai.spawnSubAgent({...}) — a GENERAL one-shot-agent helper covered in `@warlock.js/ai/run-ai-agent/SKILL.md`; it is not planner-specific. Triggers: `ai.planner`, `planner.execute`, `spawnSubAgent`, `PlannerConfig`, `PlannerCapability`, `PlannerResult`, `PlannerReport`, `PlannerPlan`, `PlannerStep`, `PlannerStepDirective`, `PlannerPlanInvalidError`, `maxSteps`, `dag`, `maxConcurrency`, `dependsOn`, `replan`, `onStep`, `mode`, `approvedPlan`, `awaiting-approval`, `report.plan`, `report.executedSteps`; ''let the model plan the steps'', ''dynamic plan from a goal'', ''run independent steps in parallel'', ''re-plan when a step fails'', ''generate a plan for approval before running it''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a FIXED known pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; routing one input to a specialist each turn — `@warlock.js/ai/run-supervisor/SKILL.md`; a single model + tools call — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
 ---
 
 # `ai.planner()` — LLM-generated, then executed, plans
@@ -2508,16 +3900,19 @@ A planner turns a free-form **goal** into an ordered **plan** the LLM writes its
 - **`agent`** — one model + tools, single task. No multi-step decomposition.
 - **`workflow`** — a FIXED pipeline you author by hand (`steps: [...]`). The steps are known at design time.
 - **`supervisor`** — routes one input to the right specialist each turn; loops on a quality verdict.
-- **`planner`** — the steps are NOT known in advance. The LLM generates the ordered plan from the goal, then the planner executes it. Bounded v1: strictly sequential, no DAG scheduling, no mid-plan re-planning.
+- **`planner`** — the steps are NOT known in advance. The LLM generates the ordered plan from the goal, then the planner executes it. Sequential by default; opt into **DAG** scheduling, **adaptive re-planning**, and **plan-only / approval** as needed (below).
 
 ## Shape
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
 const research = ai.planner({
   name: "research-assistant",
-  model: ai.openai.model({ name: "gpt-4o" }), // the plan-GENERATION brain
+  model: openai.model({ name: "gpt-4o" }), // the plan-GENERATION brain
   capabilities: [
     { name: "search", description: "Search the web for sources", executable: searchAgent },
     { name: "summarize", description: "Summarize text into bullet points", executable: summarizer },
@@ -2538,19 +3933,81 @@ for (const step of report.executedSteps) {  // forensic, in execution order
 - `planner` lets you bring your own fully-configured planning agent (custom prompt, middleware). The planner injects the plan schema as that agent's per-call `output`.
 - A `capability` is `{ name, description, executable }`. The `name` is what the LLM references per step; the `description` is what it reads to pick. `executable` is any `ExecutableContract` (agent / workflow / supervisor / tool).
 
-## Execution model (bounded v1)
+## Execution model
 
-1. **Generate** — the planning agent is asked for a `{ steps, summary? }` plan via a generated schema whose `capability` field is an `enum` of your capability names.
-2. **Execute** — steps run **strictly in array order**. Each completed step's output is threaded into the next step's input as "Context from earlier steps". `dependsOn` on a step is advisory metadata only — recorded, not scheduled on.
+1. **Generate** — the planning agent is asked for a `{ steps, summary? }` plan via a generated schema whose `capability` field is an `enum` of your capability names. Each `PlannerStep` is `{ capability, input, id?, reason?, dependsOn? }`.
+2. **Execute** — by default steps run **strictly in array order**; each completed step's output is threaded into the next step's input as "Context from earlier steps". (Set `dag: true` to schedule on `dependsOn` instead — below.)
 3. **Finalize** — when `output` is set (factory or per-call), the LAST completed step's structured output is validated into `result.data`. A capability that should feed typed output to the planner's `output` should declare its own `output` schema (the planner reads `data`, falling back to an agent's raw `text`).
 
-`report.type === "planner"`; `report.children[]` carries every dispatched capability report (plus the planning trip), with usage rolled up. Lazy capability loading is **deferred** — every capability is fully constructed up front.
+`report.type === "planner"`; `report.children[]` carries every dispatched capability report (plus the planning trip), with usage rolled up. `report.executedSteps` is the authoritative per-step record (`PlannerStepSnapshot[]`). Lazy capability loading is **deferred** — every capability is fully constructed up front.
+
+## DAG scheduling — `dag: true` + `maxConcurrency`
+
+Run independent steps in parallel instead of array-order:
+
+```ts
+const research = ai.planner({
+  name: "research",
+  model,
+  capabilities,
+  dag: true,            // build a DAG from each step's `id` / `dependsOn`
+  maxConcurrency: 4,    // max steps in flight at once. default 4
+});
+```
+
+With `dag: true` the planner builds a DAG from step `id` / `dependsOn`, runs each **ready level concurrently** (up to `maxConcurrency`), and feeds each step **only its dependencies' outputs** (not the whole prior transcript). A **cycle** or a `dependsOn` naming an unknown step raises a typed `PlannerPlanInvalidError` **before any step runs**. Default `false` ⇒ the strict array-order loop, byte-for-byte unchanged (where `dependsOn` is advisory-only metadata).
+
+## Adaptive re-planning — `replan: { maxReplans }` + `onStep`
+
+When set, a **failed step** (or a `replan` verdict from the `onStep` hook) **revises the REMAINING plan** instead of aborting — re-asking the planning agent for a fresh plan seeded with the executed-step digest plus the feedback. Bounded by `maxReplans`; on exhaustion the run ends with the last failure.
+
+```ts
+const planner = ai.planner({
+  name: "adaptive",
+  model,
+  capabilities,
+  replan: { maxReplans: 2 },
+});
+
+await planner.execute(goal, {
+  onStep: (snapshot, plan) => {
+    // fired after EACH step settles (both the sequential and the DAG path)
+    if (snapshot.status === "completed" && looksWrong(snapshot.output)) {
+      return { type: "replan", feedback: "The summary missed the pricing section." };
+    }
+    // return nothing / { type: "continue" } to proceed; { type: "abort" } to stop
+  },
+});
+```
+
+The `onStep` directive (`PlannerStepDirective`):
+
+- `{ type: "continue" }` (or returning nothing) — proceed.
+- `{ type: "abort" }` — stop; remaining steps recorded `skipped` (exactly as a failure aborts).
+- `{ type: "replan"; feedback }` — re-plan the remainder, seeded with the digest + `feedback`. **A `replan` directive with no `replan` config is treated as `continue`** (no-op). Default off ⇒ a failure aborts exactly as before.
+
+## Plan-only / approval — `mode: "plan-only"` + `approvedPlan`
+
+Generate (and validate) a plan, return it for human sign-off, then execute the approved plan in a follow-up call:
+
+```ts
+// 1. Generate WITHOUT executing.
+const draft = await planner.execute(goal, { mode: "plan-only" });
+// draft.report.status === "awaiting-approval"; draft.plan carries the generated PlannerPlan.
+
+// 2. (human reviews draft.plan) ... then execute it verbatim.
+const final = await planner.execute(goal, { approvedPlan: draft.plan! });
+```
+
+- `mode: "plan-only"` generates + validates the plan and returns **without executing** — `report.status === "awaiting-approval"` (a planner-specific NON-terminal status) and `result.plan` carries the generated plan.
+- `approvedPlan` executes that exact plan, **skipping plan generation entirely**. It is still validated against the **live** capabilities, so a stale plan naming a capability the planner no longer has surfaces a `PlannerPlanInvalidError`.
+- `mode: "plan-only"` **with** `approvedPlan` is contradictory — `approvedPlan` wins (the plan executes).
 
 ## Failure + cancellation
 
 `execute()` never throws — failures surface on `result.error`:
 
-- **`PlannerPlanInvalidError`** (`PLANNER_PLAN_INVALID`, category `schema`) — empty plan or a step naming an unknown capability; also a final-output validation failure.
+- **`PlannerPlanInvalidError`** (`PLANNER_PLAN_INVALID`, category `schema`) — empty plan, a step naming an unknown capability, a DAG cycle, a `dependsOn` naming an unknown step, a stale `approvedPlan`, or a final-output validation failure.
 - **`PlannerCancelledError`** (`PLANNER_CANCELLED`, category `cancelled`) — the `AbortSignal` fired. `report.status === "cancelled"`, `report.cancelledAt` set; remaining steps are `skipped`.
 - A child capability's own error (agent / tool / provider) flows through unchanged on the failing step's snapshot and as `result.error`. The planner stops at the first failed step and marks the rest `skipped`.
 - **`PlannerFailedError`** is the base for the `PLANNER_*` family.
@@ -2568,7 +4025,7 @@ Use `MockSDK` for the planning model — script the plan as a JSON string matchi
 
 ---
 name: run-supervisor
-description: 'Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback, intents as agents / workflows / callbacks, fan-out, evaluate quality loop, ack receptionist, supervisor-level middleware. Triggers: `ai.supervisor`, `ai.router`, `ai.fanOut`, `supervisor.execute`, `supervisor.resume`, `intents`, `router`, `route`, `classifier`, `evaluate`, `ack`, `artifactsSchema`, `middleware`, `END`, `ctx.intents.X.execute`; ''route one input across specialists'', ''multi-intent dispatch'', ''fan-out then evaluate'', ''classifier then router'', ''supervisor middleware'', ''self-consistency / voting''; typical import `import { ai } from "@warlock.js/ai"`. Skip: durable multi-turn sessions — `@warlock.js/ai/run-orchestrator/SKILL.md`; fixed pipelines — `@warlock.js/ai/run-ai-workflow/SKILL.md`; single agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: 'Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback, intents as agents / workflows / callbacks, fan-out, evaluate quality loop, ack receptionist, supervisor-level middleware. A callback that calls agent.execute() directly auto-nests agent → tool under the callback span (ambient RunFrame) with usage / cost rolled up — same for team members and orchestrator turns. Triggers: `ai.supervisor`, `ai.router`, `ai.fanOut`, `supervisor.execute`, `supervisor.resume`, `intents`, `router`, `route`, `classifier`, `evaluate`, `ack`, `artifactsSchema`, `middleware`, `END`, `ctx.intents.X.execute`, `ctx.run`, `RunFrame`, `callback span`, `children`, `parentRunId`, `rootRunId`, `trace nesting`, `sub-agent`; ''route one input across specialists'', ''multi-intent dispatch'', ''fan-out then evaluate'', ''classifier then router'', ''supervisor middleware'', ''self-consistency / voting'', ''why is my callback agent not nested / cost is $0'', ''nest a sub-agent under a callback''; typical import `import { ai } from "@warlock.js/ai"`. Skip: durable multi-turn sessions — `@warlock.js/ai/run-orchestrator/SKILL.md`; fixed pipelines — `@warlock.js/ai/run-ai-workflow/SKILL.md`; single agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
 ---
 
 # `ai.supervisor()` — multi-intent routing
@@ -2835,6 +4292,25 @@ intents: {
 
 Cycle protection: per-branch call stack. Re-entry on same intent → `SUPERVISOR_DISPATCH_CYCLE`.
 
+### Sub-agent trace nesting — `agent.execute()` inside a callback auto-nests
+
+A callback that calls `agent.execute()` (or `team` member / `orchestrator` turn callback) **directly** — not through `ctx.run(agent)` / `ctx.intents.X.execute()` — still nests under its enclosing span. An ambient async-local `RunFrame` lets the agent self-attach to the callback's `children[]`, so the report tree is `callback → agent → tool` with usage / cost **rolled up** (no `$0` lone callback span, no manual id threading):
+
+```ts
+ai.supervisor({
+  intents: {
+    delegate: async (ctx) => {
+      const result = await worker.execute(String(ctx.input)); // direct call — still nested
+      return { reply: result.text };
+    },
+  },
+  route: (ctx) => (ctx.iteration === 0 ? "delegate" : END),
+});
+// report → callback("delegate") → agent("worker") → tool("echo"); usage flows up to the root.
+```
+
+Same behavior across `ai.supervisor`, `ai.team` (member callbacks), and `ai.orchestrator` (turn callbacks) — and `sessionId` propagates onto the captured subtree. `ctx.run(agent)` is captured **exactly once** (the explicit path does not double-count via the ambient frame), and a standalone `agent.execute()` **outside** any callback keeps its own self-root (no frame leakage). This is what an `Observer` / panoptic sees — see [`@warlock.js/ai/observe-ai-flows/SKILL.md`](@warlock.js/ai/observe-ai-flows/SKILL.md).
+
 ## Per-call options
 
 ```ts
@@ -3050,11 +4526,121 @@ Drivers without similarity support throw `CacheUnsupportedError` from `set({ vec
 - [`@warlock.js/cache/cache-basics/SKILL.md`](@warlock.js/cache/cache-basics/SKILL.md) — vector driver catalog
 
 
+## use-runtime-skills  `@warlock.js/ai/use-runtime-skills/SKILL.md`
+
+---
+name: use-runtime-skills
+description: 'Progressive-disclosure agent skills with ai.skills({...}) and the first-class `skills` option on ai.agent — an always-injected cheap metadata catalog plus an on-demand loadSkill tool, backed by directory / url / store sources. Covers inject ("all" | {select:"semantic",topK,embedder}), maxLoadsPerRun, scope tags, the MockSkillsStore, semantic preload, and the inert-by-default Phase-2 self-authoring (saveSkill + default-DENY review gate → promote). Triggers: `ai.skills`, `SkillsConfig`, `SkillsContract`, `SkillSource`, `SkillInjectMode`, `SkillRecord`, `SkillCatalogEntry`, `loadSkill`, `loadSkillTool`, `saveSkill`, `saveSkillTool`, `SkillReviewGate`, `runReviewGate`, `MockSkillsStore`, `proceduralSkillStore`, `maxLoadsPerRun`, `inject`, `scope`, `review`, the agent `skills:` option; ''give an agent loadable skills'', ''progressive disclosure of instructions'', ''catalog of skills the model pulls on demand'', ''semantic preload of skill bodies'', ''let an agent author and review a skill''; typical import `import { ai } from "@warlock.js/ai"`. Skip: composing static system prompts — `@warlock.js/ai/write-system-prompt/SKILL.md`; durable agent memory tiers — `@warlock.js/ai/use-ai-memory/SKILL.md`; defining callable tools — `@warlock.js/ai/define-ai-tool/SKILL.md`.'
+---
+
+# `ai.skills()` — runtime skills with progressive disclosure
+
+A **skill is text injected into an agent's context — it never runs code.** `ai.skills(config)` builds a `SkillsContract`: the mechanism behind the first-class `skills` agent option. The agent always injects a cheap **metadata catalog** (one line per in-scope skill) and registers a `loadSkill` tool so the model pulls a skill's full **body** only when it needs it (progressive disclosure). Bodies are withheld until loaded — keeping context lean.
+
+## The first-class agent option (the supported way)
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+const agent = ai.agent({
+  model: openai.model({ name: "gpt-4o" }),
+  systemPrompt: "You are a build assistant.",
+  skills: {                                   // a SkillsConfig OR an ai.skills(...) instance
+    name: "build-skills",
+    sources: [{ type: "directory", path: "./agent-skills" }],
+  },
+});
+```
+
+When `skills` is set the agent owns the runtime flow at execute time: it **prepends the always-injected catalog** (and, under `inject`, the preloaded bodies) in front of your system prompt, auto-registers `loadSkill` (plus `saveSkill` only when a `review` gate is configured), and threads the run id so `maxLoadsPerRun` is enforced per execution. **Omitted ⇒ no skills behavior; the agent runs byte-for-byte as today.** The option accepts a raw `SkillsConfig` (the agent passes it to `skills()` for you) or a pre-built `SkillsContract`.
+
+## Factory config — `SkillsConfig`
+
+```ts
+const lib = ai.skills({
+  name: "build-skills",                        // surfaced in analytics + the catalog block
+  sources: [{ type: "directory", path: "./agent-skills" }], // >= 1; later source wins on name clash
+  inject: { select: "semantic", topK: 2, embedder },        // body-injection policy (see below)
+  maxLoadsPerRun: 4,                           // cap on loadSkill calls per run. default 5
+  scope: { tags: ["frontend"] },               // only skills whose tags intersect are catalogued
+  review: { approve, store },                  // Phase 2 — absent ⇒ saveSkill is NOT exposed
+  analytics: (event) => track(event),          // optional efficacy sink (errors swallowed)
+});
+```
+
+### Sources — `SkillSource` (discriminated by `type`, never `kind`)
+
+- `{ type: "directory", path }` — reads `path/<folder>/SKILL.md` off disk (lazy `node:fs/promises`).
+- `{ type: "url", url, headers? }` — `fetch()`es a JSON manifest of skills.
+- `{ type: "store", store }` — any `SkillsStoreContract`, e.g. `MockSkillsStore`.
+
+Sources merge in order; a later source wins on a name collision.
+
+### Injection — `inject` (`SkillInjectMode`)
+
+The metadata catalog is **always** injected (it's cheap). `inject` controls whether any **bodies** are auto-injected up front:
+
+- **omitted** (default) — inject NO bodies; the model pulls them via `loadSkill`. Pure progressive disclosure.
+- `"all"` — inject every body up front (small libraries only).
+- `{ select: "semantic", topK, embedder?, threshold? }` — embed the run input, rank the catalog by cosine similarity, inject the top-`topK` bodies. Needs an embedder (passed here, or lazily auto-resolved).
+
+## `SkillsContract` surface
+
+```ts
+interface SkillsContract {
+  readonly name: string;
+  catalog(scopeInput?: string): Promise<SkillCatalogEntry[]>;  // cheap metadata, body omitted
+  catalogPrompt(scopeInput?: string): Promise<string>;          // catalog rendered as a system block
+  preload(input: string): Promise<SkillRecord[]>;               // bodies per `inject`; [] when omitted
+  tools(runId?: string): AgentToolEntry<any, any>[];            // loadSkill always; saveSkill iff review
+}
+```
+
+A `SkillCatalogEntry` is `Pick<SkillRecord, "name"|"description"|"version"|"tags"|"type">` — the **structural omission of `body`** is the type-level guarantee the catalog never carries skill bodies. A `SkillRecord` adds the full `body` plus `type: "authored" | "promoted" | "candidate"`.
+
+## `maxLoadsPerRun` — a budget, not a throw
+
+`loadSkill` calls are capped per run (default 5). Exhaustion is an **error RESULT the model self-corrects from**, never a throw — the tool returns `{ error }` and the loop continues. `runId` scopes both the budget and analytics correlation.
+
+## Stores
+
+```ts
+import { ai, MockSkillsStore } from "@warlock.js/ai";
+
+const store = new MockSkillsStore([
+  { name: "scaffold", description: "Scaffold a form", version: 1, body: "...", type: "authored" },
+]);
+const lib = ai.skills({ name: "build", sources: [{ type: "store", store }] });
+```
+
+`MockSkillsStore` is an in-memory `SkillsStoreContract` that ships with the package (construct via `new` — it is a concrete test/utility store, not a factory-fronted primitive). It holds the latest record per name, filters out `candidate`s from `list()` / `load()`, and exposes `saveCandidate` / `promote`. `proceduralSkillStore` is also exported (unifies proven procedural memories with named skills).
+
+## Phase 2 — self-authoring (inert by default)
+
+Self-authoring is **gated and OFF unless a `review` gate is wired**:
+
+- Without `review`, the `saveSkill` tool is **never registered** — a candidate can never be written, let alone injected.
+- With `review: { approve, store }`, `saveSkill` writes an **INERT** `type: "candidate"` (`version: 0`), filtered out of every catalog/load until promoted.
+- The `SkillReviewGate.approve(candidate)` is **default-DENY**: only `{ approve: true }` promotes the candidate to a new audited version (`promote` → `type: "promoted"`, `version + 1`). Anything else — `{ approve: false }`, a malformed result, or a **throw** (fail-closed) — keeps it inert. `runReviewGate(candidate, gate, emit?)` runs this and never throws (a throwing gate is a denial), emitting `promoted` / `denied` analytics events.
+
+The three interchangeable approve shapes — a policy fn, a validator agent, a human callback — all reduce to one `Promise<{ approve: boolean; reason? }>`.
+
+## Analytics
+
+The optional `analytics` sink fires `catalogued` / `loaded` / `used` / `saved` / `promoted` / `denied` events `{ type, skill, version, runId?, outcome? }`. Errors from the sink are swallowed (mirroring the agent's `onUsage` / `onComplete`), so analytics never crash a run.
+
+## See also
+
+- [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — static persona / instruction blocks (vs. dynamic loaded skills)
+- [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md) — the procedural memory tier `proceduralSkillStore` unifies with
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the agent the `skills` option attaches to
+
+
 ## write-system-prompt  `@warlock.js/ai/write-system-prompt/SKILL.md`
 
 ---
 name: write-system-prompt
-description: 'Compose system prompts via ai.systemPrompt() / ai.persona() / ai.instruction() — immutable builders with {{placeholder}} substitution, plus ai.systemPrompt.fromFile(path) to seed from a file read once at construction. Triggers: `ai.systemPrompt`, `ai.systemPrompt.fromFile`, `ai.persona`, `ai.instruction`, `SystemPromptBlockContract`, `PersonaContract`, `InstructionContract`, `placeholders`, `{{placeholder|default}}`, `InvalidRequestError`; ''write a system prompt'', ''compose persona + instructions'', ''prompt from a file'', ''per-call prompt override'', ''mustache placeholder''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent factory wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langchain` `PromptTemplate`, raw f-strings.'
+description: 'Compose system prompts via ai.systemPrompt() / ai.persona() / ai.instruction() — immutable builders with {{placeholder}} substitution, plus ai.systemPrompt.fromFile(path) to seed from a file read once at construction. Carry identity with .meta({ name, version, description, required }) (a name auto-registers in ai.prompts) and compose with merge(...blocks) / merge(contract) / merge(name, { fromVersion }) (provenance in meta.composedFrom). Triggers: `ai.systemPrompt`, `ai.systemPrompt.fromFile`, `ai.persona`, `ai.instruction`, `SystemPromptBlockContract`, `SystemPromptContract`, `SystemPromptMeta`, `SystemPromptMergeOptions`, `PersonaContract`, `InstructionContract`, `meta`, `merge`, `composedFrom`, `fromVersion`, `placeholders`, `{{placeholder|default}}`, `InvalidRequestError`; ''write a system prompt'', ''compose persona + instructions'', ''prompt from a file'', ''name and version a prompt'', ''merge prompts together'', ''per-call prompt override'', ''mustache placeholder''; typical import `import { ai } from "@warlock.js/ai"`. Skip: the named/versioned prompt registry (register / resolve / tag / diff / export / validate) — `@warlock.js/ai/manage-prompts/SKILL.md`; agent factory wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langchain` `PromptTemplate`, raw f-strings.'
 ---
 
 # System prompts — immutable builders
@@ -3161,6 +4747,34 @@ ai.agent({ model, systemPrompt: prompt, placeholders: { language: "Arabic" } });
 
 Substitution works on the **rendered** concatenation of every block, so `{{key}}` inside a persona and inside an instruction both resolve against the same placeholder bag.
 
+## Identity + composition — `.meta()` and `merge()`
+
+A prompt carries optional `SystemPromptMeta` — `{ name?, version?, description?, required?, composedFrom? }`. Read it with the no-argument accessor; update it immutably with the one-argument form. **Giving a prompt a `name` auto-registers it in the `ai.prompts` registry** (keyed by `name@version`):
+
+```ts
+const base = ai.systemPrompt("You are support.", { name: "support", version: "1" });
+base.meta();                       // → { name: "support", version: "1" }
+const v2 = base.meta({ version: "2" }); // new builder; original untouched; re-registers under support@2
+```
+
+`merge(...)` folds blocks from another source into a **new** builder — a persona **replaces**, instructions **append**:
+
+```ts
+// (a) N pre-built blocks in one call
+const p = ai.systemPrompt().merge(ai.persona("You are Alex."), ai.instruction("Be concise."));
+
+// (b) another prompt contract — its blocks fold in; meta.composedFrom records provenance
+const merged = ai.systemPrompt("Be terse.").merge(otherPrompt);
+merged.meta()?.composedFrom;       // deterministic source labels, e.g. ["base@2"]
+
+// (c) a registered prompt resolved from ai.prompts by name (latest, or a pinned fromVersion)
+const composed = ai.systemPrompt("You are support.").merge("global", { fromVersion: "1" });
+```
+
+The name / contract / registry-name forms are the registry's composition surface — full coverage (register / resolve / version / tag / diff / validate) in [`@warlock.js/ai/manage-prompts/SKILL.md`](@warlock.js/ai/manage-prompts/SKILL.md).
+
+`.validate(options?)` is per-builder sugar over `ai.prompts.validate(this, options)` — the deterministic missing-placeholder check plus an optional Nova-safe LLM-judge.
+
 ## Per-call overrides
 
 Replace the agent's system prompt for a single run:
@@ -3192,6 +4806,7 @@ Three distinct prompts, one common foundation. Base is immutable — safe to sha
 
 ## See also
 
+- [`@warlock.js/ai/manage-prompts/SKILL.md`](@warlock.js/ai/manage-prompts/SKILL.md) — the `ai.prompts` registry these named prompts auto-register into (resolve / version / tag / diff / export / validate)
 - [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `systemPrompt` on factory + per-call override
 - [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) — per-step agent references inherit their own system prompt
 
