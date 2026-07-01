@@ -2,8 +2,10 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { FlowObserveOption } from "../../observe/resolve-observers";
 import type { AgentContract } from "../agent/agent.contract";
 import type { ModelContract } from "../model.contract";
+import type { SnapshotStore } from "../orchestrator/snapshot-store.contract";
 import type { SystemPromptContract } from "../system-prompt.contract";
 import type { PlannerCapability } from "./planner-capability.type";
+import type { PlannerSnapshot } from "./planner-snapshot.type";
 
 /**
  * Factory config for `ai.planner(config)`.
@@ -103,4 +105,34 @@ export type PlannerConfig<TOutput = unknown> = {
    * Default off ⇒ a failure aborts exactly as today.
    */
   replan?: { maxReplans: number };
+  /**
+   * Opt-in durable mid-run crash-resume. When set, the planner
+   * checkpoints its state to a {@link SnapshotStore} after every settled
+   * plan node, so a `planner.resume(runId)` after a crash re-hydrates the
+   * frozen plan + executed-node ledger + usage + child reports and
+   * continues scheduling only the unfinished frontier — never re-calling
+   * the planning LLM and never re-dispatching a completed node's
+   * capability.
+   *
+   * Absent ⇒ no persistence, zero behavior change: the planner runs
+   * byte-for-byte as today.
+   *
+   * - `store` — the snapshot store to persist to. Optional; falls back to
+   *   `ai.config({ defaultSnapshotStore })`. When neither is set, snapshot
+   *   writes silently skip and `resume()` throws.
+   * - `deleteOnComplete` — drop the snapshot once the run terminates
+   *   successfully. Default `false` (keep it for the completed-run
+   *   short-circuit + audit).
+   *
+   * **Idempotency caveat.** A crash mid-node re-runs that node's
+   * capability on resume; side-effectful capabilities must be idempotent —
+   * the same caller-responsibility boundary the supervisor and workflow
+   * primitives already document.
+   */
+  durable?: {
+    /** Snapshot store to persist to. Falls back to the global default. */
+    store?: SnapshotStore<PlannerSnapshot>;
+    /** Drop the snapshot on successful completion. Default `false`. */
+    deleteOnComplete?: boolean;
+  };
 };

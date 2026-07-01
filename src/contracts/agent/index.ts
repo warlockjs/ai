@@ -1,4 +1,11 @@
-export type { AgentExecuteOptions } from "./agent-options.type";
+export type {
+  AgentExecuteOptions,
+  AgentResumeOptions,
+} from "./agent-options.type";
+export type {
+  AgentSnapshot,
+  AgentSnapshotStatus,
+} from "./agent-snapshot.type";
 export type { AgentContract, AgentEventHandler } from "./agent.contract";
 export type {
   EvalCase,

@@ -2,7 +2,7 @@ import type { AgentEventMap } from "../events/event-map.type";
 import type { ExecutableContract } from "../executable.contract";
 import type { AgentResult } from "../result/agent-result.type";
 import type { StreamContract } from "../stream/stream.contract";
-import type { AgentExecuteOptions } from "./agent-options.type";
+import type { AgentExecuteOptions, AgentResumeOptions } from "./agent-options.type";
 import type { EvalOptions, EvalReport } from "./eval.type";
 
 /**
@@ -78,6 +78,14 @@ export interface AgentContract<TOutput = unknown> extends ExecutableContract<
    */
   readonly description?: string;
   /**
+   * Structural drift fingerprint of the agent definition — model +
+   * provider + sorted tool names + maxTrips + output presence + version.
+   * Stamped on every durable snapshot and compared on `resume()`; a
+   * mismatch throws `AgentDriftError`. Always populated (computed at
+   * factory time), independent of whether `durable` is configured.
+   */
+  readonly signature: string;
+  /**
    * Stream execution events in real time.
    * Yields typed StreamEvent values and resolves result when done.
    */
@@ -85,6 +93,30 @@ export interface AgentContract<TOutput = unknown> extends ExecutableContract<
     input: string,
     options?: AgentExecuteOptions<TOutput>,
   ): StreamContract<AgentResult<TOutput>>;
+
+  /**
+   * Resume a durable run after a crash. Loads the snapshot persisted
+   * under `runId` (requires `durable` on the config, or a global
+   * `defaultSnapshotStore`), re-hydrates the completed trips + tool
+   * calls + usage, and continues the trip loop from the next trip —
+   * never re-issuing a completed trip's model call or re-invoking its
+   * tools. A resume of an already-settled run re-returns the stored
+   * result without running anything.
+   *
+   * Refuses to continue when the current definition has structurally
+   * drifted from the snapshot (`AgentDriftError`), unless
+   * `{ force: true }` is passed. Throws `AgentExecutionError` when no
+   * store is configured or no snapshot exists for `runId`.
+   *
+   * @example
+   * const result = await writer.execute("research X", { runId: "run-42" });
+   * // ...process crashes mid-run...
+   * const recovered = await writer.resume("run-42");
+   */
+  resume(
+    runId: string,
+    options?: AgentResumeOptions<TOutput>,
+  ): Promise<AgentResult<TOutput>>;
 
   /**
    * Subscribe a handler to a single event name for the lifetime of

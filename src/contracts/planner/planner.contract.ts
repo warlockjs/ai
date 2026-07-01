@@ -1,5 +1,8 @@
 import type { ExecutableContract } from "../executable.contract";
-import type { PlannerExecuteOptions } from "./planner-execute-options.type";
+import type {
+  PlannerExecuteOptions,
+  PlannerResumeOptions,
+} from "./planner-execute-options.type";
 import type { PlannerResult } from "./planner-result.type";
 
 /**
@@ -60,5 +63,29 @@ export interface PlannerContract<TOutput = unknown> extends ExecutableContract<
   execute(
     goal: string,
     options?: PlannerExecuteOptions<TOutput>,
+  ): Promise<PlannerResult<TOutput>>;
+
+  /**
+   * Resume a durable run after a crash. Loads the snapshot persisted
+   * under `runId` (requires `durable` on the config, or a global
+   * `defaultSnapshotStore`), re-hydrates the frozen plan + executed-node
+   * ledger + usage, and continues scheduling only the unfinished frontier
+   * — never re-calling the planning LLM and never re-dispatching a
+   * completed node's capability. A resume of an already-settled run
+   * re-returns the stored result without running anything.
+   *
+   * Refuses to continue when the current definition has structurally
+   * drifted from the snapshot (`PlannerDriftError`), unless
+   * `{ force: true }` is passed. Throws `PlannerFailedError` when no store
+   * is configured or no snapshot exists for `runId`.
+   *
+   * @example
+   * const result = await research.execute("compare A vs B", { runId: "plan-7" });
+   * // ...process crashes mid-run...
+   * const recovered = await research.resume("plan-7");
+   */
+  resume(
+    runId: string,
+    options?: PlannerResumeOptions<TOutput>,
   ): Promise<PlannerResult<TOutput>>;
 }

@@ -22,6 +22,15 @@ export type { Chunk, ChunkOptions, ChunkType } from "./contracts";
 // Vector store
 export { cacheVectorStore } from "./store/cache-vector-store";
 export type { VectorStore } from "./store/vector-store.contract";
+export { pgVectorStore, vectorLiteral } from "./store/pg-vector-store";
+export type {
+  PgClientLike,
+  PgVectorStoreInstance,
+  PgVectorStoreOptions,
+} from "./store/pg-vector-store";
+
+// Document loaders (text / html / web (SSRF-safe) / pdf → RagDocument).
+export * from "./loaders";
 
 // Rerank
 export { keywordReranker } from "./rerank/keyword-reranker";

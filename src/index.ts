@@ -7,6 +7,15 @@ export * from "./config";
 export * from "./contracts";
 export * from "./errors";
 export * from "./eval";
+// Image generation (`ai.image`) — the image-output verb of the modality
+// track (Theme I). The `ImageModelContract` / `GeneratedImage` types ride
+// out via `./contracts`; this surfaces the facade verb + cost helper.
+export * from "./image";
+// Speech (`ai.speech`, TTS) + transcription (`ai.transcribe`, STT) — the
+// audio verbs of the modality track (Theme I). Contracts ride out via
+// `./contracts`; these surface the facade verbs.
+export * from "./speech";
+export * from "./transcribe";
 // Human-in-the-loop tool approval (interrupt / resume) — public surface of
 // the `ai.human.*` namespace. The runtime namespace is mounted on `ai` in
 // `./ai`; these are the standalone factories, errors, and contract types.

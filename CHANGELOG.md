@@ -4,6 +4,20 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.6.0
+
+### Added
+
+- **`ai.image(params)`** — image generation, the first verb of the output-modality track (Theme I). Wraps an `ImageModelContract` in the uniform never-throws `{ data, error, usage, report }` envelope, with cost-truth (per-token for `gpt-image`, per-image for DALL·E / Imagen) folded into the same `Usage.cost` rollup and a `type: "image"` report routed to observers. Ships on the OpenAI + Google adapters.
+- **`SDKAdapterContract.image?(config)`** — the image-model capability seam, mirroring `embedder?()`. Adds `ImageModelContract`, `GeneratedImage` (discriminated `base64` | `url`), `ImageModelPricing`, and `ImageGenerationOptions`.
+- **`MockSDK().image(...)` + `MockImageModel`** — deterministic image doubles (scriptable responses, recorded calls, pricing) for tests.
+- **`ai.speech(params)` + `ai.transcribe(params)`** — text-to-speech and speech-to-text, the audio verbs of the modality track. Same uniform never-throws envelope + cost-truth (per-character / per-minute / per-token). New `SpeechModelContract` / `TranscriptionModelContract` on `SDKAdapterContract.speech?()` / `transcribe?()`, plus `MockSpeechModel` / `MockTranscriptionModel`.
+- **`ai.audioFromFile(path)` / `ai.audioFromBuffer(bytes, mediaType)` / `ai.audioMediaTypeForFilename(name)`** — non-AI utilities that package audio (WhatsApp `.ogg`/`.opus`, iOS `.m4a`, …) into the `AudioInput` shape `ai.transcribe` consumes.
+- **`ai.rag.pgVectorStore({ client })`** — a Postgres + pgvector vector store satisfying `VectorStoreContract` (upsert / query / removeNamespace), with an `ensureSchema()` DDL helper and a lazy `pg` optional peer.
+- **`ai.rag.loadText` / `loadHtml` / `loadWeb` / `loadPdf`** — document loaders producing `RagDocument`s for `.index()`. `loadWeb` is SSRF-safe (routes through `guardedFetch` / `OutboundPolicy`); `loadPdf` uses a lazy `pdf-parse` optional peer.
+- **Durable mid-run crash-resume** — opt-in `durable: { store, deleteOnComplete? }` on `ai.agent` / `ai.planner` with a stable `runId` + `agent.resume(runId)` / `planner.resume(runId)`. Per-trip (agent) / per-node (planner) checkpoints reuse `ai.snapshot.{memory,pg,redis}`; drift detection via `AgentDriftError` / `PlannerDriftError` (bypass with `{ force: true }`); completed work never re-runs its tools and usage is never double-counted.
+- **`ai.rag.*` namespace** now also carries `chunk`, `cacheVectorStore`, `pgVectorStore`, `loadText`/`loadHtml`/`loadWeb`/`loadPdf`, `bm25Rank`, `reciprocalRankFusion`, `hybridRank`, `multiQuery` (previously standalone-only exports), for `ai.*`-namespace consistency.
+
 ## 4.5.0 - 2026-07-01
 
 ### Added

@@ -36,6 +36,8 @@ import {
   SchemaValidationError,
 } from "../errors";
 import type { AgentContract as AgentContractType } from "../contracts/agent/agent.contract";
+import type { AgentResumeOptions } from "../contracts/agent/agent-options.type";
+import type { AgentSnapshot, AgentSnapshotStatus } from "../contracts/agent/agent-snapshot.type";
 import type { EvalOptions, EvalReport } from "../contracts/agent/eval.type";
 import { runEval } from "../eval/eval-runner";
 import { runPipeline } from "../middleware";
@@ -61,6 +63,12 @@ import { logAgentEvent } from "./agent-log-event";
 import { createAgentStream, type StreamController } from "./agent-stream";
 import { agentEventToStreamEvent } from "./agent-to-stream-event";
 import { JsonStreamGuard } from "./json-stream-guard";
+import { computeAgentSignature } from "./signature";
+import {
+  deleteAgentSnapshot,
+  loadAgentSnapshotForResume,
+  persistAgentSnapshot,
+} from "./snapshot";
 
 const LOG_MODULE = "ai.agent";
 
@@ -80,6 +88,14 @@ type ResolvedAgentConfig<TOutput> = Omit<AgentConfig<TOutput>, "tools" | "skills
    * then behaves byte-for-byte as today.
    */
   skillsLib?: SkillsContract;
+  /**
+   * Structural drift fingerprint computed once at factory time from the
+   * agent's identity-defining fields (model + provider + sorted tool
+   * names + maxTrips + output + version). Stamped on every durable
+   * snapshot and compared on `resume()`. Always present so the resume
+   * path never re-derives it.
+   */
+  signature: string;
 };
 
 /**
@@ -274,11 +290,26 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
       : skills(config.skills)
     : undefined;
 
+  // Drift fingerprint for durable resume — computed once over the
+  // resolved identity (model + provider + sorted tool names + maxTrips +
+  // output + version). Cheap FNV-1a; stamped on every snapshot and
+  // compared on `resume()`. Computed unconditionally (whether or not
+  // `durable` is set) so the value is stable and the resume path is free.
+  const signature = computeAgentSignature({
+    name: isAnonymous ? undefined : name,
+    version: config.version,
+    model: { name: config.model?.name, provider: config.model?.provider },
+    tools,
+    maxTrips: config.maxTrips,
+    output: config.output,
+  });
+
   const resolvedConfig: ResolvedAgentConfig<TOutput> = {
     ...config,
     name,
     tools,
     skillsLib,
+    signature,
   };
 
   // Instance-level handlers registered via `.on()`. Stored here
@@ -321,6 +352,7 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
     name,
     isAnonymous,
     description: config.description,
+    signature,
     async execute(
       input: string,
       options?: AgentExecuteOptions<TOutput>,
@@ -351,6 +383,37 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
       void execution.run();
 
       return stream;
+    },
+
+    async resume(
+      runId: string,
+      options?: AgentResumeOptions<TOutput>,
+    ): Promise<AgentResult<TOutput>> {
+      // Load the persisted snapshot and run the drift check (throws
+      // AgentDriftError on a structural mismatch unless `{ force: true }`).
+      const snapshot = await loadAgentSnapshotForResume({
+        durable: resolvedConfig.durable,
+        agentName: name,
+        signature,
+        runId,
+        options: options as AgentResumeOptions<unknown> | undefined,
+      });
+
+      // A completed / cancelled / failed snapshot already settled — there
+      // is nothing left to run. Rebuild the final result from the stored
+      // state and short-circuit so resume is idempotent (mirrors the
+      // supervisor "resume is a no-op and returns the final state").
+      // `running` is the only status the trip loop re-enters.
+      const execution = new Execution<TOutput>(
+        resolvedConfig,
+        snapshot.input,
+        { ...options, runId } as AgentExecuteOptions<TOutput>,
+        undefined,
+        instanceHandlers,
+        snapshot,
+      );
+
+      return execution.run();
     },
 
     on,
@@ -480,9 +543,16 @@ class Execution<TOutput> {
   /** Registry version label paired with {@link Execution.promptName}. */
   private promptVersion?: string;
   private readonly maxTrips: number;
-  private readonly startedAt = new Date();
+  private readonly startedAt: Date;
   private readonly start = performance.now();
-  private readonly runId = generateRunId("agent");
+  /**
+   * Stable run id. A caller-supplied `options.runId` wins (load-bearing
+   * for durable resume — the snapshot key must stay constant across the
+   * crash); otherwise a fresh id is generated. When `resumeFrom` is set
+   * its `runId` is authoritative so the resumed run writes back to the
+   * same key.
+   */
+  private readonly runId: string;
   private readonly logger: Logger = log;
   /**
    * Event names whose handler already threw once this run — so the
@@ -521,10 +591,38 @@ class Execution<TOutput> {
     private readonly options?: AgentExecuteOptions<TOutput>,
     private readonly streamController?: StreamController<AgentResult<TOutput>>,
     private readonly instanceHandlers?: InstanceHandlerMap,
+    private readonly resumeFrom?: AgentSnapshot,
   ) {
     this.maxTrips = config.maxTrips ?? 10;
     this.middleware = config.middleware ?? [];
     this.judgeConfig = resolveJudgeConfig(config.judge);
+
+    // Resolve the run id: a resumed run reuses the snapshot's key so it
+    // writes back to the same record; otherwise a caller-supplied
+    // `options.runId` wins (durable callers pass a stable key), else a
+    // fresh id is generated. `startedAt` likewise restores from the
+    // snapshot so the resumed report spans the whole run, not just the tail.
+    this.runId = resumeFrom?.runId ?? options?.runId ?? generateRunId("agent");
+    this.startedAt = resumeFrom ? new Date(resumeFrom.startedAt) : new Date();
+
+    // Seed the accumulators from the snapshot on resume — re-hydrate the
+    // assembled conversation, the completed trips, the dispatched tool
+    // records, the running usage, and the resolved prompt/schema metadata.
+    // Pushing directly into `this.trips` (rather than re-running `runTrip`)
+    // is what keeps a resume from re-emitting completed trips' lifecycle
+    // events or re-invoking their tools — the loop later starts at
+    // `this.trips.length`. When `resumeFrom` is absent every accumulator
+    // stays empty, so the non-durable path is byte-for-byte unchanged.
+    if (resumeFrom) {
+      this.messages.push(...resumeFrom.messages);
+      this.trips.push(...resumeFrom.trips);
+      this.toolCalls.push(...resumeFrom.toolCalls);
+      mergeUsage(this.usage, resumeFrom.usage);
+      this.systemPrompt = resumeFrom.systemPrompt;
+      this.responseSchema = resumeFrom.responseSchema;
+      this.promptName = resumeFrom.promptName;
+      this.promptVersion = resumeFrom.promptVersion;
+    }
 
     // Build this run's skill tools once with this run's id so the
     // per-run `maxLoadsPerRun` counter (closed over inside `loadSkillTool`)
@@ -634,10 +732,28 @@ class Execution<TOutput> {
    * with `error` populated when things went wrong.
    */
   private async runCore(): Promise<AgentResult<TOutput>> {
-    try {
-      await this.buildInitialMessages();
+    // Completed-run short-circuit. A resume of a snapshot whose run
+    // already COMPLETED re-runs nothing — the stored trips ARE the
+    // result. Rebuild the final result from the re-hydrated accumulators
+    // and return, so resume is idempotent (mirrors the supervisor
+    // "resume is a no-op and returns the final state"). A `failed` or
+    // `cancelled` snapshot is intentionally NOT short-circuited — those
+    // are exactly the runs a caller resumes to retry the remaining work
+    // after fixing the cause, so they re-enter the trip loop below.
+    if (this.resumeFrom && this.resumeFrom.status === "completed") {
+      return this.rebuildResumedResult(this.resumeFrom);
+    }
 
-      this.emit("agent.starting", { input: this.input });
+    try {
+      // On resume the conversation is already hydrated from the snapshot,
+      // so skip the (re)build of the initial messages AND the
+      // `agent.starting` emit — those belong to the original run. A fresh
+      // run (resumeFrom absent) takes the normal path unchanged.
+      if (!this.resumeFrom) {
+        await this.buildInitialMessages();
+
+        this.emit("agent.starting", { input: this.input });
+      }
 
       await this.runTripLoop();
 
@@ -648,6 +764,26 @@ class Execution<TOutput> {
       }
     } catch (thrown) {
       this.error = this.toAIError(thrown);
+    }
+
+    // Terminal checkpoint — persist the final state so a completed-run
+    // resume short-circuits to the stored result, then optionally drop
+    // the snapshot when `deleteOnComplete` is set and the run succeeded.
+    // No-op when `durable` is absent.
+    await this.checkpoint(this.resolveSnapshotStatus());
+
+    if (!this.error && this.config.durable?.deleteOnComplete) {
+      const outcome = await deleteAgentSnapshot({
+        durable: this.config.durable,
+        runId: this.runId,
+      });
+
+      if (!outcome.ok) {
+        this.logger.warn(LOG_MODULE, "snapshot.delete.failed", "durable snapshot delete failed", {
+          runId: this.runId,
+          error: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
+        });
+      }
     }
 
     return this.buildResult();
@@ -744,7 +880,11 @@ class Execution<TOutput> {
    * error so the caller can distinguish runaway tool loops from a real result.
    */
   private async runTripLoop(): Promise<void> {
-    for (let tripIndex = 0; tripIndex < this.maxTrips; tripIndex++) {
+    // Start at the resumed offset, not 0. On a fresh run `this.trips`
+    // is empty so this is `0` and the loop behaves exactly as before; on
+    // a resume the already-settled trips are skipped entirely — their
+    // model calls and tool dispatches are never re-issued.
+    for (let tripIndex = this.trips.length; tripIndex < this.maxTrips; tripIndex++) {
       if (this.options?.signal?.aborted) {
         this.error = this.makeCancelledError();
         return;
@@ -807,6 +947,12 @@ class Execution<TOutput> {
       this.emit("agent.trip.completed", { trip: failedTrip });
       this.emit("agent.error", { error: this.error });
 
+      // Persist the failed trip too, so a resume sees it in the ledger
+      // and the terminal checkpoint records the run as `failed`. The
+      // trip's model call already threw — there is no tool side effect to
+      // double-count here. No-op when `durable` is absent.
+      await this.checkpoint("failed");
+
       return "error";
     }
 
@@ -866,6 +1012,15 @@ class Execution<TOutput> {
     this.trips.push(trip);
 
     this.emit("agent.trip.completed", { trip });
+
+    // Per-trip durable checkpoint. Sits AFTER the trip push + the
+    // `agent.trip.completed` emit and AFTER every tool this trip
+    // requested has been dispatched (the block above) — the only point
+    // where `messages`, `trips`, `toolCalls`, and `usage` are mutually
+    // consistent. Swallow-and-log: a failed checkpoint never aborts the
+    // run, it only loses resume-ability from here. No-op when `durable`
+    // is absent.
+    await this.checkpoint("running");
 
     if (!isToolCallTrip) {
       return "stop";
@@ -1472,6 +1627,83 @@ class Execution<TOutput> {
       usage: this.usage,
       error: this.error,
     };
+  }
+
+  /**
+   * Map the run's terminal outcome to the persisted snapshot status.
+   * A cancelled error reads as `"cancelled"`, any other error as
+   * `"failed"`, otherwise `"completed"`. Mirrors the report-status
+   * mapping in {@link buildResult}.
+   */
+  private resolveSnapshotStatus(): AgentSnapshotStatus {
+    if (!this.error) {
+      return "completed";
+    }
+
+    return this.error instanceof AgentCancelledError ? "cancelled" : "failed";
+  }
+
+  /**
+   * Build and persist an {@link AgentSnapshot} from the current
+   * accumulators. The per-trip and terminal checkpoints both route
+   * through here. Reuses {@link captureMessages} to normalize the live
+   * `Message[]` into JSON-safe form so the snapshot round-trips through
+   * any store backend.
+   *
+   * No-op (returns immediately) when `durable` is absent — the common
+   * non-durable path stays free. A failed persist is logged and
+   * swallowed (never aborts the run), matching the supervisor / workflow
+   * checkpoint policy.
+   */
+  private async checkpoint(status: AgentSnapshotStatus): Promise<void> {
+    if (!this.config.durable) {
+      return;
+    }
+
+    const outcome = await persistAgentSnapshot({
+      durable: this.config.durable,
+      runId: this.runId,
+      agentName: this.config.name ?? this.config.model.name,
+      signature: this.config.signature,
+      version: this.config.version,
+      input: this.input,
+      systemPrompt: this.systemPrompt,
+      responseSchema: this.responseSchema,
+      promptName: this.promptName,
+      promptVersion: this.promptVersion,
+      messages: this.captureMessages() as unknown as Message[],
+      trips: this.trips,
+      toolCalls: this.toolCalls,
+      usage: this.usage,
+      status,
+      startedAt: this.startedAt.toISOString(),
+    });
+
+    if (!outcome.ok) {
+      this.logger.warn(LOG_MODULE, "snapshot.persist.failed", "durable snapshot persist failed", {
+        runId: this.runId,
+        status,
+        error: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
+      });
+    }
+  }
+
+  /**
+   * Rebuild the final {@link AgentResult} from a COMPLETED snapshot
+   * WITHOUT re-running anything. Used by the completed-run resume
+   * short-circuit: the persisted trips / tool calls / usage are the
+   * authoritative outcome, so a resume of a settled run re-returns that
+   * outcome idempotently. Re-derives `this.data` from the final trip
+   * output against the schema (cheap, no model call) so the rebuilt
+   * result carries the same structured payload the original produced.
+   *
+   * Only reached for a `completed` snapshot — `failed` / `cancelled`
+   * snapshots re-enter the trip loop to retry the remaining work instead.
+   */
+  private async rebuildResumedResult(_snapshot: AgentSnapshot): Promise<AgentResult<TOutput>> {
+    await this.parseOutput();
+
+    return this.buildResult();
   }
 
   /**

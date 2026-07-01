@@ -1,6 +1,12 @@
 import type { EmbedderConfig, EmbedderContract } from "./embedder.contract";
+import type { ImageModelConfig, ImageModelContract } from "./image-model.contract";
 import type { ModelContract } from "./model.contract";
 import type { ModelPricing } from "./result/model-pricing.type";
+import type { SpeechModelConfig, SpeechModelContract } from "./speech-model.contract";
+import type {
+  TranscriptionModelConfig,
+  TranscriptionModelContract,
+} from "./transcription-model.contract";
 
 /**
  * Configuration passed to SDKAdapterContract.model() to create a model instance.
@@ -77,4 +83,41 @@ export interface SDKAdapterContract {
    * const { vector } = await embedder.embed("Hello world");
    */
   embedder?(config: EmbedderConfig): EmbedderContract;
+
+  /**
+   * Create an image-generation model bound to this SDK's client.
+   * Optional — only providers with an image API expose it (OpenAI,
+   * Google today; Anthropic/Bedrock/Ollama do not). The structural
+   * absence of this method IS the capability guard: an adapter that
+   * can't generate images simply doesn't define it, so `ai.someSdk.image(...)`
+   * is a compile-time error rather than a silent runtime failure.
+   * Hand the returned model to `ai.image({ model, prompt })`.
+   *
+   * @example
+   * const model = openai.image({ name: "gpt-image-1" });
+   * const { data } = await ai.image({ model, prompt: "a red bicycle" });
+   */
+  image?(config: ImageModelConfig): ImageModelContract;
+
+  /**
+   * Create a text-to-speech model bound to this SDK's client, for use
+   * with `ai.speech({ model, text })`. Optional — only providers with a
+   * TTS API expose it. Structural absence is the capability guard.
+   *
+   * @example
+   * const tts = openai.speech({ name: "tts-1", voice: "alloy" });
+   * const { data } = await ai.speech({ model: tts, text: "Hello" });
+   */
+  speech?(config: SpeechModelConfig): SpeechModelContract;
+
+  /**
+   * Create a speech-to-text (transcription) model bound to this SDK's
+   * client, for use with `ai.transcribe({ model, audio })`. Optional —
+   * only providers with an STT API expose it.
+   *
+   * @example
+   * const stt = openai.transcribe({ name: "whisper-1" });
+   * const { data } = await ai.transcribe({ model: stt, audio });
+   */
+  transcribe?(config: TranscriptionModelConfig): TranscriptionModelContract;
 }

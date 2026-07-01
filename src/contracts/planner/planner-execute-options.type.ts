@@ -85,3 +85,17 @@ export type PlannerExecuteOptions<TOutput = unknown> = {
     plan: PlannerPlan,
   ) => void | PlannerStepDirective | Promise<void | PlannerStepDirective>;
 };
+
+/**
+ * Options accepted by `planner.resume(runId, options?)`.
+ *
+ * `force: true` bypasses the signature drift check — use only when you
+ * have verified the definition change is safe for the in-flight
+ * snapshot. `PlannerDriftError` is otherwise thrown without executing
+ * anything. Everything else mirrors {@link PlannerExecuteOptions} (e.g.
+ * re-supply a `signal` to keep the resumed run cancellable).
+ */
+export type PlannerResumeOptions<TOutput = unknown> = PlannerExecuteOptions<TOutput> & {
+  /** Bypass the drift check and resume against the changed definition. */
+  force?: boolean;
+};

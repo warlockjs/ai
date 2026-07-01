@@ -1,10 +1,12 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { AgentSnapshot } from "../contracts/agent/agent-snapshot.type";
 import type { AttachmentPolicy } from "../contracts/attachment-policy.type";
 import type { CompleteEvent } from "../contracts/events/complete-event.type";
 import type { AgentEventMap } from "../contracts/events/event-map.type";
 import type { UsageEvent } from "../contracts/events/usage-event.type";
 import type { AgentMiddleware } from "../contracts/middleware";
 import type { ModelCallOptions, ModelContract } from "../contracts/model.contract";
+import type { SnapshotStore } from "../contracts/orchestrator/snapshot-store.contract";
 import type { Placeholders } from "../contracts/placeholders.type";
 import type { StreamingToolGuardConfig } from "../contracts/streaming-tool-guard-config.type";
 import type { SystemPromptContract } from "../contracts/system-prompt.contract";
@@ -261,4 +263,33 @@ export type AgentConfig<TOutput = unknown> = {
    * Observer errors are swallowed — they never break the run.
    */
   observe?: FlowObserveOption;
+  /**
+   * Opt-in durable mid-run crash-resume. When set, the agent checkpoints
+   * its state to a {@link SnapshotStore} after every settled trip, so a
+   * `agent.resume(runId)` after a crash re-hydrates the completed trips +
+   * tool calls + usage and continues the trip loop from the next trip —
+   * never re-issuing a completed trip's model call or re-invoking its
+   * tools.
+   *
+   * Absent ⇒ no persistence, zero behavior change: the trip loop starts
+   * at trip 0, never writes a snapshot, and runs byte-for-byte as today.
+   *
+   * - `store` — the snapshot store to persist to. Optional; falls back to
+   *   `ai.config({ defaultSnapshotStore })` when omitted. When neither is
+   *   set, snapshot writes silently skip and `resume()` throws.
+   * - `deleteOnComplete` — drop the snapshot once the run terminates
+   *   successfully. Default `false` (keep it, so a completed-run resume
+   *   short-circuits to the stored result and the snapshot stays for audit).
+   *
+   * **Idempotency caveat.** A crash mid-trip re-runs that trip's tools on
+   * resume; side-effectful tools (charging a card, sending an email) must
+   * be idempotent — the same caller-responsibility boundary the supervisor
+   * and workflow primitives already document.
+   */
+  durable?: {
+    /** Snapshot store to persist to. Falls back to the global default. */
+    store?: SnapshotStore<AgentSnapshot>;
+    /** Drop the snapshot on successful completion. Default `false`. */
+    deleteOnComplete?: boolean;
+  };
 };

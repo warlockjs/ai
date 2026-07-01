@@ -29,7 +29,12 @@ export type ReportType =
   | "team"
   | "orchestrator"
   | "batch"
-  | "planner";
+  | "planner"
+  | "image"
+  | "speech"
+  | "transcription"
+  | "video"
+  | "realtime";
 
 /**
  * Terminal status every executable primitive reports. Unified across

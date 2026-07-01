@@ -11,6 +11,14 @@ import { setAIConfig } from "./config";
 import { dataset, evalScorers } from "./eval";
 import { humanApproval } from "./human/human-approval";
 import { human } from "./human/register";
+import { image } from "./image";
+import { speech } from "./speech";
+import {
+  audioFromBuffer,
+  audioFromFile,
+  audioMediaTypeForFilename,
+  transcribe,
+} from "./transcribe";
 import { resume } from "./human/resume";
 import {
   interruptMemory,
@@ -28,9 +36,23 @@ import { fallbackModel } from "./model";
 import { orchestrator } from "./orchestrator";
 import { planner } from "./planner";
 import { defaultPromptsManager } from "./prompts/prompts-manager";
-import { rag } from "./rag";
-import { keywordReranker } from "./rag/rerank/keyword-reranker";
-import { llmReranker } from "./rag/rerank/llm-reranker";
+import {
+  bm25Rank,
+  cacheVectorStore,
+  chunk,
+  hybridRank,
+  keywordReranker,
+  llmReranker,
+  loadHtml,
+  loadPdf,
+  loadText,
+  loadWeb,
+  multiQuery,
+  pgVectorStore,
+  rag,
+  reciprocalRankFusion,
+  vectorLiteral,
+} from "./rag";
 import { spawnSubAgent } from "./agent/spawn-sub-agent";
 import { skills } from "./skills";
 import { prompt } from "./prompt";
@@ -71,6 +93,18 @@ export interface Ai {
   rag: typeof rag & {
     keywordReranker: typeof keywordReranker;
     llmReranker: typeof llmReranker;
+    chunk: typeof chunk;
+    cacheVectorStore: typeof cacheVectorStore;
+    pgVectorStore: typeof pgVectorStore;
+    vectorLiteral: typeof vectorLiteral;
+    loadText: typeof loadText;
+    loadHtml: typeof loadHtml;
+    loadWeb: typeof loadWeb;
+    loadPdf: typeof loadPdf;
+    bm25Rank: typeof bm25Rank;
+    reciprocalRankFusion: typeof reciprocalRankFusion;
+    hybridRank: typeof hybridRank;
+    multiQuery: typeof multiQuery;
   };
   spawnSubAgent: typeof spawnSubAgent;
   router: typeof router;
@@ -80,6 +114,24 @@ export interface Ai {
   streamObject: typeof streamObject;
   /** Serve an executable as an SSE HTTP endpoint — production serving primitive (A3). */
   serve: typeof serve;
+  /**
+   * Generate images from a text prompt — the image-output verb of the
+   * output-modality track (Theme I). Wraps an `ImageModelContract` (from
+   * `openai.image(...)` / `google.image(...)`) in the uniform
+   * never-throws `{ data, error, usage, report }` envelope with cost-truth
+   * and observability.
+   */
+  image: typeof image;
+  /** Text-to-speech (TTS) — the audio-output verb of the modality track (Theme I). */
+  speech: typeof speech;
+  /** Speech-to-text (STT / transcription) — the audio-input verb of the modality track (Theme I). */
+  transcribe: typeof transcribe;
+  /** Read an audio file from disk → `AudioInput` for `ai.transcribe` (non-AI file plumbing). */
+  audioFromFile: typeof audioFromFile;
+  /** Package raw audio bytes → `AudioInput` for `ai.transcribe`. */
+  audioFromBuffer: typeof audioFromBuffer;
+  /** Resolve the audio media type from a filename's extension. */
+  audioMediaTypeForFilename: typeof audioMediaTypeForFilename;
   fallbackModel: typeof fallbackModel;
   eval: typeof evalScorers;
   dataset: typeof dataset;
@@ -194,13 +246,34 @@ export const ai = {
   memory,
   skills,
   planner,
-  rag: Object.assign(rag, { keywordReranker, llmReranker }),
+  rag: Object.assign(rag, {
+    keywordReranker,
+    llmReranker,
+    chunk,
+    cacheVectorStore,
+    pgVectorStore,
+    vectorLiteral,
+    loadText,
+    loadHtml,
+    loadWeb,
+    loadPdf,
+    bm25Rank,
+    reciprocalRankFusion,
+    hybridRank,
+    multiQuery,
+  }),
   spawnSubAgent,
   router,
   fanOut,
   batch,
   streamObject,
   serve,
+  image,
+  speech,
+  transcribe,
+  audioFromFile,
+  audioFromBuffer,
+  audioMediaTypeForFilename,
   fallbackModel,
   eval: evalScorers,
   dataset,

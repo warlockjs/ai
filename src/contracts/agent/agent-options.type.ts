@@ -24,6 +24,14 @@ import type { ToolContext } from "../tool.contract";
  * });
  */
 export type AgentExecuteOptions<TOutput = unknown> = {
+  /**
+   * Caller-chosen stable run identifier. Auto-generated (`agent_<rand>`)
+   * when omitted. Load-bearing for durable resume: when `durable` is on,
+   * pass a stable `runId` here (or read the generated one off
+   * `result.report.runId`) so a later `agent.resume(runId)` can find the
+   * snapshot. Mirrors `SupervisorExecuteOptions.runId`.
+   */
+  runId?: string;
   /** Prior conversation messages to prepend as context */
   history?: Message[];
   /** Files or URLs to attach to the message */
@@ -141,4 +149,18 @@ export type AgentExecuteOptions<TOutput = unknown> = {
    * observability identity is shared.
    */
   sessionId?: string;
+};
+
+/**
+ * Options accepted by `agent.resume(runId, options?)`.
+ *
+ * `force: true` bypasses the signature drift check — use only when you
+ * have verified the definition change is safe for the in-flight
+ * snapshot. `AgentDriftError` is otherwise thrown without executing
+ * anything. Everything else mirrors {@link AgentExecuteOptions} (e.g.
+ * re-supply a `signal` to keep the resumed run cancellable).
+ */
+export type AgentResumeOptions<TOutput = unknown> = AgentExecuteOptions<TOutput> & {
+  /** Bypass the drift check and resume against the changed definition. */
+  force?: boolean;
 };

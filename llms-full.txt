@@ -951,6 +951,145 @@ npm install openai
 - [`@warlock.js/ai-guard/escalate-block-to-human/SKILL.md`](@warlock.js/ai-guard/escalate-block-to-human/SKILL.md) — escalating a hard `block` to a human-review surface.
 
 
+## durable-agent-runs  `@warlock.js/ai/durable-agent-runs/SKILL.md`
+
+---
+name: durable-agent-runs
+description: 'Mid-run crash-resume for agents AND planners — opt in with durable: { store, deleteOnComplete? } on the config, pass a stable runId to execute(), and call agent.resume(runId) / planner.resume(runId) after a crash to continue from the last settled trip / plan node. Reuses the ai.snapshot.{memory,pg,redis} stores; checkpoints per-trip (agent) / per-node (planner); completed trips + nodes never re-run their tools and usage is never double-counted; a drifted definition throws AgentDriftError / PlannerDriftError (bypass with { force: true }). Triggers: `durable`, `agent.resume`, `planner.resume`, `resume(runId)`, `runId`, `AgentSnapshot`, `PlannerSnapshot`, `AgentSnapshotStatus`, `PlannerSnapshotStatus`, `AgentDriftError`, `PlannerDriftError`, `computeAgentSignature`, `agent.signature`, `deleteOnComplete`, `defaultSnapshotStore`, `ai.snapshot.pg`, `ai.snapshot.memory`, `SnapshotStore`, `force: true`; ''resume an agent after a crash'', ''durable agent run'', ''continue a planner from where it crashed'', ''checkpoint agent state'', ''idempotent tool re-run on resume'', ''signature drift on resume''; typical import `import { ai } from "@warlock.js/ai"`. Skip: durable human-in-the-loop approval resume (ai.human.resume of a PendingInterrupt) — `@warlock.js/ai/durable-resume/SKILL.md`; supervisor/workflow iterate-mid-turn snapshot resume + the store contracts themselves — `@warlock.js/ai/manage-ai-stores/SKILL.md`; competing libs `temporal`, `inngest`, `restate`.'
+---
+
+# Durable agent + planner runs — resume from the last checkpoint
+
+Opt-in mid-run crash-resume for the two long-running primitives. Turn it on, give the run a stable `runId`, and after a process crash `resume(runId)` re-hydrates the persisted state and continues from where it stopped — never re-issuing a settled trip's model call or re-invoking a completed node's capability.
+
+> **Not the same as [[durable-resume]].** That skill is `ai.human.resume(interruptId, decision)` — resuming a **gated tool call** hours later after a human rules (a `PendingInterrupt` in an `InterruptStore`). *This* skill is **crash-resume of an in-flight run** (an `AgentSnapshot` / `PlannerSnapshot` in a `SnapshotStore`): the process died mid-run, you restart, and continue the same trip / plan. Different trigger (a crash, not a human), different store, different verb (`agent.resume` / `planner.resume`, not `ai.human.resume`).
+
+## Opt in — `durable` on the config
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+const writer = ai.agent({
+  name: "writer",
+  model,
+  tools: [searchTool, draftTool],
+  durable: {
+    store: ai.snapshot.pg({ client: pgPool }), // reuses the ai.snapshot.* stores
+    deleteOnComplete: false,                    // default — keep for the completed-run short-circuit + audit
+  },
+});
+```
+
+`durable` shape (identical on the agent and planner config):
+
+- **`store?`** — a `SnapshotStore`. Falls back to `ai.config({ defaultSnapshotStore })`. When neither resolves, snapshot writes **silently skip** and `resume()` throws.
+- **`deleteOnComplete?`** — drop the snapshot once the run completes successfully. Default `false`.
+
+**Absent `durable` ⇒ zero behavior change** — the loop starts at trip 0 / the first node, never writes a snapshot, and runs byte-for-byte as before.
+
+## Run with a stable `runId`, then resume
+
+The `runId` is the store key. Pass a stable one to `execute()` (or read the generated one off `result.report.runId`) so a later `resume()` can find the snapshot:
+
+```ts
+const result = await writer.execute("research X", { runId: "run-42" });
+
+// ...process crashes mid-run, restarts...
+
+const recovered = await writer.resume("run-42");
+// continues from the next unsettled trip; `recovered.report.status === "completed"`
+```
+
+Planners are the mirror image — `durable` on the config, `runId` on `execute(goal)`, `planner.resume(runId)`:
+
+```ts
+const research = ai.planner({
+  name: "research-assistant",
+  model,
+  capabilities: [{ name: "search", executable: searchAgent }, { name: "write", executable: writerAgent }],
+  durable: { store: ai.snapshot.pg({ client: pgPool }) },
+});
+
+const first = await research.execute("compare A vs B", { runId: "plan-7" });
+// ...crash...
+const done = await research.resume("plan-7");
+```
+
+## Checkpoint granularity
+
+| Primitive | Written | Contains | Resume continues at |
+|---|---|---|---|
+| **agent** | after every settled **trip** (`runTrip` end) | `messages`, `trips`, `toolCalls`, `usage`, resolved `systemPrompt` / `responseSchema`, `signature`, `status` | `trips.length` (the next trip index) |
+| **planner** | after every settled **plan node** (`executeStep` end) | the frozen `plan`, `executedSteps` ledger, `usage`, child `children` reports, `replanCount`, `signature`, `status` | the unfinished frontier (from `executedSteps`) |
+
+The write happens only where the persisted arrays are mutually consistent — for the agent, after every tool a trip requested has been dispatched and its result appended. A crash **mid-trip** loses only that in-flight trip (never checkpointed), which the resume re-issues cleanly. The planner **never re-calls the planning LLM** on resume — the plan is frozen on the first run; re-asking would burn tokens and risk a plan that no longer matches the ledger. Every field on both snapshots is JSON-serializable, so they round-trip through any `ai.snapshot.{memory,pg,redis}` backend verbatim.
+
+## Idempotency — what does and doesn't re-run
+
+```ts
+// Completed run: resume is a no-op that re-returns the stored result.
+const again = await writer.resume("run-42"); // runs nothing when status === "completed"
+```
+
+- **Completed trips / nodes never re-run their tools.** On agent resume, `trips.length` is the starting trip index — earlier trips' model calls are not replayed and their tool dispatches are not re-invoked. On planner resume, a completed node's capability dispatch is skipped (the sequential skip-guard / DAG re-seed derive the completed set from `executedSteps`).
+- **Usage is never double-counted.** The running `usage` total is restored from the snapshot; only the newly-executed trips / nodes add to it.
+- **Caveat — a crash MID-trip re-runs that trip's tools.** The in-flight trip was never checkpointed, so on resume its tools fire again. **Side-effectful tools (charging a card, sending an email) must be idempotent** — the same caller-responsibility boundary the supervisor and workflow primitives document. Guard them with your own dedupe key (e.g. `${runId}:${toolCallId}`).
+
+## Drift — definition changed since the snapshot
+
+Every agent / planner carries a structural `signature` (`agent.signature` — computed at factory time by `computeAgentSignature`), stamped on each snapshot. `resume()` compares the stored signature against the current definition; a mismatch throws before executing anything:
+
+- **agent** covers: model name + provider, sorted tool names, `maxTrips`, whether a default `output` schema is set, `version`. It does **not** cover system-prompt text, middleware, per-event handlers, placeholders, or `modelOptions` — runtime knobs that don't change a resumable run's shape.
+- **planner** covers: name + ordered capability names. A mid-run **re-plan is NOT drift** (the plan changed, not the definition); `replanCount` is persisted so the replan budget survives a resume.
+
+```ts
+import { AgentDriftError } from "@warlock.js/ai";
+
+try {
+  await writer.resume("run-42");
+} catch (error) {
+  if (error instanceof AgentDriftError) {
+    // The definition changed (a tool was added, the model swapped). Either roll the
+    // definition back, or — only when you've verified the change is snapshot-safe:
+    await writer.resume("run-42", { force: true }); // bypasses the drift check
+  }
+}
+```
+
+`{ force: true }` is the escape hatch (mirror `PlannerDriftError` for planners). `resume()` also throws `AgentExecutionError` / `PlannerFailedError` when no store is configured or no snapshot exists for the `runId`.
+
+## Pattern — a boot-drain resume loop
+
+On restart, resume every run the store still has in flight. Snapshots carry a `status` (`"running" | "completed" | "cancelled" | "failed"`), so you only resume the live ones:
+
+```ts
+const store = ai.snapshot.pg({ client: pgPool });
+const runIds = (await store.list?.()) ?? [];
+
+for (const runId of runIds) {
+  const snapshot = await store.load(runId);
+  if (snapshot?.status === "running") {
+    await writer.resume(runId); // completed/failed snapshots short-circuit or re-throw — skip them
+  }
+}
+```
+
+Pair `deleteOnComplete: true` with this loop when you don't need the completed-run audit trail — the store then holds only genuinely-unfinished runs, so the drain never touches settled ones.
+
+## Cost + testing
+
+- **Checkpointing cost is one store write per settled trip / node** — a `JSONB` upsert on `pg`, an in-process `Map` set on `memory`. A failed checkpoint is surfaced via logs, not thrown: it loses resume-ability from that point but never breaks an otherwise-healthy run.
+- **Resume saves the tokens of every settled trip / node** — their model calls are not replayed. A completed-run resume spends nothing (it rebuilds the result from the snapshot). The planning LLM is never re-called on planner resume.
+- **Test with `ai.snapshot.memory()`.** Drive `execute(input, { runId })` against a flaky model that throws once, assert the tool spy was called once, flip the failure off, `resume(runId)`, and assert (a) `status === "completed"`, (b) the tool spy count is unchanged (no re-invoke), and (c) `usage.total` counts each trip's tokens exactly once. Drift is testable by mutating the definition (add a tool) between `execute` and `resume` and asserting `AgentDriftError` — then `{ force: true }` proceeds.
+
+## See also
+
+- [[handle-ai-errors]] — the typed `AgentDriftError` / `PlannerDriftError` / `AgentExecutionError` / `PlannerFailedError` and how `result.error` surfaces a failed run.
+- [[manage-ai-stores]] — the `ai.snapshot.{memory,pg,redis}()` factories, the `SnapshotStore` contract, dev-owned `pg` / `redis` clients, and never-auto-migrated `schema()`.
+- [[persist-ai-data]] — supervisor / workflow snapshot resume (the sibling `iterate`-style durability) and the SnapshotStore migration notes.
+- [[durable-resume]] — the OTHER resume: `ai.human.resume` of a gated tool call (human-in-the-loop), not a crash.
+
+
 ## durable-resume  `@warlock.js/ai/durable-resume/SKILL.md`
 
 ---
@@ -1400,6 +1539,291 @@ if (report.regression && !report.regression.passed) process.exit(1);
 - [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md) — `ai.eval.{exact,contains,predicate,judge}` scorers + Vitest matchers
 - [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `agent.eval` scoring loop, `EvalCase` / `EvalJudge`
 - [`@warlock.js/ai/record-replay-llm/SKILL.md`](@warlock.js/ai/record-replay-llm/SKILL.md) — `ai.vcr` for deterministic, offline eval runs
+
+
+## generate-images  `@warlock.js/ai/generate-images/SKILL.md`
+
+---
+name: generate-images
+description: 'Text-to-image via ai.image({ model: sdk.image({ name }), prompt }) — the image-OUTPUT verb (Theme I), returning the uniform never-throws { data, error, usage, report } envelope with cost-truth + panoptic observation. Models come from an adapter''s image() factory: OpenAI gpt-image-* (token-metered) / dall-e-* (per-image), Google imagen-* (per-image). Result images are a discriminated GeneratedImage = { type: "base64" } | { type: "url" }. Triggers: `ai.image`, `sdk.image`, `openai.image`, `google.image`, `ImageModelContract`, `GeneratedImage`, `ImageModelPricing`; ''generate an image'', ''text to image'', ''gpt-image'', ''dall-e'', ''imagen'', ''product thumbnail'', ''image output''; typical import `import { ai } from "@warlock.js/ai"` + `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: image INPUT / vision attachments to a chat agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; embeddings — `@warlock.js/ai/embed-text/SKILL.md`; competing libs raw `openai.images.generate`, `langchain` image tools.'
+---
+
+# Generate images — the image-output verb (`ai.image`)
+
+`ai.image()` is the output counterpart to `ai.agent` for the image modality (the first verb of the output-modality track, Theme I). Prompt-in / images-out, wrapped in the same uniform result contract every executable returns — so it slots into cost dashboards and panoptic traces exactly like an agent run.
+
+This is image **output** (generation). For image/PDF/audio **input** to a chat agent (vision), see [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md).
+
+## Shape
+
+```ts
+// 1. Build an image model from an adapter's image() factory.
+const model = openai.image({ name: "gpt-image-1" });   // ImageModelContract
+
+// 2. Run the verb — never throws; failures land on result.error.
+const { data, error, usage, report } = await ai.image({ model, prompt: "a red bicycle" });
+
+if (error) {
+  console.warn(error.code);          // typed AIError (auth / rate-limit / content-filter / …)
+} else {
+  for (const img of data.images) {   // GeneratedImage[]
+    if (img.type === "base64") save(Buffer.from(img.base64, "base64"), img.mediaType);
+    else download(img.url);
+  }
+}
+```
+
+`ImageModelContract` mirrors `EmbedderContract` — a peer primitive on the SDK adapter, produced by the optional `image?()` factory. An adapter without an image API simply doesn't define `image()`, so `ai.anthropic.image(...)` is a **compile-time** error, not a silent runtime failure.
+
+## The result envelope
+
+```ts
+type ImageResult = {
+  type: "image";
+  data?: { images: GeneratedImage[] };  // undefined on failure
+  error?: AIError;                       // undefined on success — NEVER thrown
+  usage: Usage;                          // tokens (gpt-image) + cost when priced
+  report: ImageReport;                   // type:"image", model, imageCount, lineage
+};
+
+type GeneratedImage =
+  | { type: "base64"; base64: string; mediaType: string; revisedPrompt?: string }
+  | { type: "url"; url: string; mediaType?: string; revisedPrompt?: string };
+```
+
+## Generation options (provider-neutral)
+
+```ts
+await ai.image({
+  model,
+  prompt: "an isometric office desk, soft studio lighting",
+  count: 2,            // n images
+  size: "1024x1024",   // OpenAI WxH (also resolves perImageBySize pricing)
+  quality: "high",     // OpenAI quality tier
+  aspectRatio: "16:9", // Imagen ratio
+  negativePrompt: "blurry, watermark", // Imagen
+  format: "png",       // output container hint
+  signal,              // AbortSignal
+  observe: collector,  // route the report to an Observer (panoptic), like agents
+  sessionId: "checkout-123",
+  options: { background: "transparent" }, // provider-specific passthrough
+});
+```
+
+Each adapter maps the options its API supports and ignores the rest. `options` is the escape hatch for provider-specific knobs (OpenAI `background`, DALL·E `responseFormat: "url"`, Imagen `imageSize` / `personGeneration`).
+
+## OpenAI — gpt-image (token-metered) + DALL·E (per-image)
+
+```ts
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+// gpt-image-1 always returns base64 bytes; priced per TOKEN.
+const gpt = openai.image({ name: "gpt-image-1", pricing: { input: 5, output: 40 } });
+
+// DALL·E 3 — per-image pricing; defaults to base64 (opt into url with options).
+const dalle = openai.image({ name: "dall-e-3", pricing: { perImage: 0.04 } });
+```
+
+A non-image model id (`openai.image({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — fail fast, like the embedder/vision guards.
+
+## Google — Imagen (per-image)
+
+```ts
+import { GoogleSDK } from "@warlock.js/ai-google";
+
+const google = new GoogleSDK({ apiKey: process.env.GEMINI_API_KEY! });
+const imagen = google.image({ name: "imagen-4.0-generate-001", pricing: { perImage: 0.04 } });
+
+const { data } = await ai.image({ model: imagen, prompt: "a watercolor lighthouse at dawn", aspectRatio: "3:4" });
+```
+
+Imagen returns base64 bytes (no hosted URL). When every candidate is safety-filtered, `ai.image` surfaces a typed `ContentFilterError` on `result.error`.
+
+## Cost-truth — one rollup, two metering models
+
+`ai.image` fills `usage.cost` (a `ModelPricing`-shaped USD breakdown) so image spend folds into the **same** `Usage.cost` rollup as text — no second accounting path:
+
+- **Token-metered** (gpt-image-1): `{ input, output }` USD-per-1M-tokens → standard `computeCost` against the returned token usage.
+- **Per-image** (DALL·E, Imagen): `{ perImage }` (or `perImageBySize["1792x1024"]`) × image count → `cost.output`.
+
+Unpriced model → `usage.cost` stays `undefined` (honest "cost unknown", never a false zero). A pre-priced adapter response is honored, not overwritten.
+
+## Pattern — catalog thumbnail in a workflow `run` step
+
+```ts
+ai.step({
+  name: "thumbnail",
+  run: async (ctx) => {
+    const { data, error } = await ai.image({
+      model: openai.image({ name: "gpt-image-1" }),
+      prompt: `product photo, white background: ${ctx.steps.extract.output.title}`,
+      size: "1024x1024",
+    });
+    if (error) throw error; // step retry/backoff handles transient provider faults
+    ctx.state.thumb = data.images[0];
+  },
+});
+```
+
+## Observability
+
+The completed `ImageReport` routes to any registered `Observer` (panoptic, OTel, …) through the shared `observe` seam — pass `observe: true` (global), an `Observer` object (flow-local), or rely on observe-all. Cost + latency attribute to `report.model` for free. See [`@warlock.js/ai/observe-ai-flows/SKILL.md`](@warlock.js/ai/observe-ai-flows/SKILL.md).
+
+## Testing
+
+`MockSDK({ imageResponses, imagePricing }).image({ name })` returns a deterministic `MockImageModel` — no HTTP. Script images/usage/errors and inspect `model.calls`.
+
+```ts
+import { MockSDK } from "@warlock.js/ai";
+
+const mock = MockSDK({ imageResponses: [{}], imagePricing: { perImage: 0.04 } });
+const { data, usage } = await ai.image({ model: mock.image({ name: "mock-image" }), prompt: "x" });
+```
+
+
+## generate-speech  `@warlock.js/ai/generate-speech/SKILL.md`
+
+---
+name: generate-speech
+description: 'Text-to-speech via ai.speech({ model: sdk.speech({ name }), text }) — the audio-OUTPUT verb (Theme I), returning the uniform never-throws { data, error, usage, report } envelope with cost-truth + panoptic observation. Models come from an adapter''s speech() factory: OpenAI tts-1 / tts-1-hd (per-character) or gpt-4o-mini-tts (per-token). Synthesized audio is a discriminated GeneratedAudio = { type: "base64"; base64; mediaType }. Options: voice / format / speed / instructions / signal. Triggers: `ai.speech`, `sdk.speech`, `openai.speech`, `SpeechModelContract`, `GeneratedAudio`, `SpeechModelPricing`, `SpeechOptions`, `MockSpeechModel`; ''text to speech'', ''TTS'', ''synthesize voice'', ''read this aloud'', ''tts-1'', ''gpt-4o-mini-tts'', ''voice narration'', ''audio output'', ''speak this text''; typical import `import { ai } from "@warlock.js/ai"` + `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: speech-to-text / transcribing a voice note — [[transcribe-audio]]; image OUTPUT — [[generate-images]]; competing libs raw `openai.audio.speech.create`, `elevenlabs` SDK.'
+---
+
+# Generate speech — the text-to-speech verb (`ai.speech`)
+
+`ai.speech()` is the audio-output counterpart to `ai.image()` on the output-modality track (Theme I). Text-in / audio-out, wrapped in the same uniform result contract every executable returns — so a synthesized voicemail slots into cost dashboards and panoptic traces exactly like an agent run.
+
+This is audio **output** (TTS). For audio **input** (speech-to-text on a WhatsApp voice note or a meeting recording), see [[transcribe-audio]].
+
+## Shape
+
+```ts
+// 1. Build a speech model from an adapter's speech() factory.
+const model = openai.speech({ name: "tts-1", voice: "alloy" }); // SpeechModelContract
+
+// 2. Run the verb — never throws; failures land on result.error.
+const { data, error, usage, report } = await ai.speech({ model, text: "Your order has shipped." });
+
+if (error) {
+  console.warn(error.code);          // typed AIError (auth / rate-limit / content-filter / …)
+} else {
+  const { base64, mediaType } = data.audio; // GeneratedAudio (always base64 today)
+  await fs.writeFile("ship.mp3", Buffer.from(base64, "base64"));
+}
+```
+
+`SpeechModelContract` mirrors `EmbedderContract` / `ImageModelContract` — a peer primitive produced by the adapter's optional `speech?()` factory. An adapter without a TTS API simply doesn't define `speech()`, so calling it is a **compile-time** error, not a silent runtime failure. A non-TTS model id (`openai.speech({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — fail fast, like the embedder/image guards.
+
+## The result envelope
+
+```ts
+type SpeechResult = {
+  type: "speech";
+  data?: { audio: GeneratedAudio }; // undefined on failure
+  error?: AIError;                  // undefined on success — NEVER thrown
+  usage: Usage;                     // tokens (gpt-4o-mini-tts) + cost when priced
+  report: SpeechReport;             // type:"speech", model, characters, lineage
+};
+
+type GeneratedAudio = {
+  type: "base64";
+  base64: string;    // base64-encoded audio bytes
+  mediaType: string; // IANA type, e.g. "audio/mpeg", "audio/wav"
+};
+```
+
+`GeneratedAudio` is a discriminated union with a single `base64` variant today — the union leaves room for a future hosted-`url` variant without a breaking change, so always branch on `audio.type` rather than assuming `base64`.
+
+## Generation options (provider-neutral)
+
+```ts
+await ai.speech({
+  model,
+  text: "Welcome aboard. Let's get you set up.",
+  voice: "verse",                 // voice id/name; overrides the model's default
+  format: "wav",                  // "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm"
+  speed: 1.25,                    // playback multiplier (OpenAI 0.25–4.0)
+  instructions: "calm, warm",     // tone/delivery steering (gpt-4o-mini-tts only)
+  signal,                         // AbortSignal
+  observe: collector,             // route the report to an Observer (panoptic), like agents
+  sessionId: "onboarding-42",     // group into a session for flat cost/trace queries
+  options: { /* provider passthrough */ },
+});
+```
+
+Each adapter maps the options its API supports and forwards `options` verbatim. On OpenAI the container defaults to `mp3` (→ `audio/mpeg`); `speed` and `instructions` are only sent when set, and the default voice is `alloy` when neither the call nor the model config supplies one.
+
+## OpenAI — tts-1 (per-character) + gpt-4o-mini-tts (per-token)
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+// tts-1 / tts-1-hd — billed per INPUT CHARACTER.
+const classic = openai.speech({ name: "tts-1", voice: "alloy", pricing: { perMillionCharacters: 15 } });
+
+// gpt-4o-mini-tts — billed per TOKEN like a chat model; supports `instructions`.
+const steered = openai.speech({ name: "gpt-4o-mini-tts", pricing: { input: 0.6, output: 12 } });
+
+const { data } = await ai.speech({ model: steered, text: "Read this warmly.", instructions: "gentle" });
+```
+
+## Cost-truth — one rollup, two metering models
+
+`ai.speech` fills `usage.cost` (a USD breakdown) so TTS spend folds into the **same** `Usage.cost` rollup as text — no second accounting path:
+
+- **Per-character** (`tts-1` / `tts-1-hd`): `{ perMillionCharacters }` × `report.characters` → `cost.input`. The Speech API reports no token usage, so `usage` tokens stay `{ 0, 0, 0 }` and spend is priced entirely from the input character count.
+- **Token-metered** (`gpt-4o-mini-tts`): `{ input, output }` USD-per-1M-tokens → standard `computeCost` against the returned token usage.
+
+Per-character wins when both are set. An unpriced model leaves `usage.cost` **`undefined`** (honest "cost unknown", never a false zero); a pre-priced adapter response is honored, not overwritten.
+
+## Pattern — order-confirmation voice line in a workflow `run` step
+
+```ts
+ai.step({
+  name: "voiceLine",
+  run: async (ctx) => {
+    const { data, error } = await ai.speech({
+      model: openai.speech({ name: "tts-1", voice: "alloy" }),
+      text: `Order ${ctx.steps.order.output.id} confirmed. Thank you!`,
+      format: "mp3",
+    });
+    if (error) throw error; // step retry/backoff handles transient provider faults
+    ctx.state.audio = data.audio; // { type:"base64", base64, mediaType:"audio/mpeg" }
+  },
+});
+```
+
+## Observability
+
+The completed `SpeechReport` (with `report.characters` and cost/latency attributed to `report.model`) routes to any registered `Observer` (panoptic, OTel, …) through the shared `observe` seam — pass `observe: true` (global), an `Observer` object (flow-local), or rely on observe-all. See [[observe-ai-flows]]. Provider faults surface as typed `AIError`s on `result.error`; see [[handle-ai-errors]].
+
+## Testing
+
+`MockSpeechModel(name, responses, pricing?)` is a deterministic `SpeechModelContract` double — no HTTP. Script audio/usage/errors and inspect `model.calls`. `MockSDK({ speechResponses, speechPricing }).speech({ name })` wires the same double behind a full adapter.
+
+```ts
+import { MockSpeechModel } from "@warlock.js/ai";
+import { speech } from "@warlock.js/ai";
+
+const model = new MockSpeechModel("tts-1", [{}], { perMillionCharacters: 15 });
+const { data, usage } = await speech({ model, text: "abcdefghij" }); // 10 chars
+// data.audio → { type:"base64", base64:"AAAA", mediaType:"audio/mpeg" }
+// usage.cost.input → (10 * 15) / 1_000_000
+// model.calls[0] records { text, options } for assertions
+```
+
+Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the never-throws path — `result.error` is the typed error and `result.data` is `undefined`.
+
+## See also
+
+- [[transcribe-audio]] — the inverse verb (`ai.transcribe`), audio → text
+- [[generate-images]] — the sibling image-output verb (`ai.image`)
+- [[observe-ai-flows]] — routing the `SpeechReport` to panoptic / OTel
+- [[handle-ai-errors]] — the typed `AIError` taxonomy on `result.error`
 
 
 ## guard-input-output  `@warlock.js/ai/guard-input-output/SKILL.md`
@@ -2721,6 +3145,174 @@ If you switch providers mid-project (e.g. OpenAI → Anthropic):
 - [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — model passed into `ai.agent({...})`
 - [`@warlock.js/ai/embed-text/SKILL.md`](@warlock.js/ai/embed-text/SKILL.md) — embedder primitive on the SDK
 - [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — adapter error categorization
+
+
+## rag-loaders-and-stores  `@warlock.js/ai/rag-loaders-and-stores/SKILL.md`
+
+---
+name: rag-loaders-and-stores
+description: 'Turn any source into a RagDocument and index it in a production vector store — the document loaders ai.rag.loadText / loadHtml / loadWeb (SSRF-safe via guardedFetch) / loadPdf (lazy pdf-parse peer), plus the swappable stores ai.rag.pgVectorStore({client}) (pgvector + ensureSchema DDL + hnsw/ivfflat index) and ai.rag.cacheVectorStore(driver), both satisfying VectorStoreContract (upsert / query / removeNamespace). Loaders return the exact RagDocument[] that kb.index() consumes — no adapter. Triggers: `ai.rag.loadText`, `ai.rag.loadHtml`, `ai.rag.loadWeb`, `ai.rag.loadPdf`, `loadText`, `loadHtml`, `loadWeb`, `loadPdf`, `ai.rag.pgVectorStore`, `ai.rag.cacheVectorStore`, `pgVectorStore`, `cacheVectorStore`, `VectorStore`, `PgVectorStoreOptions`, `PgVectorStoreInstance`, `ensureSchema`, `schema()`, `RagLoaderResult`, `LoadWebOptions`, `LoadPdfOptions`, `perPage`, `OutboundPolicy`, `guardedFetch`, `hnsw`, `ivfflat`, `pgvector`, `dimensions`, `PgClientLike`, `PDF_PARSE_INSTALL_INSTRUCTIONS`; ''load a website into a knowledge base'', ''index a PDF for RAG'', ''strip HTML to text for embedding'', ''pgvector store for RAG'', ''SSRF-safe document fetch'', ''one document per PDF page'', ''swap the vector store''; typical import `import { ai } from "@warlock.js/ai"`. Skip: the chunk → embed → retrieve → rerank → cite pipeline that consumes these — `@warlock.js/ai/run-ai-rag/SKILL.md`; the raw embedder primitive — `@warlock.js/ai/embed-text/SKILL.md`; cache similarity internals — `@warlock.js/cache/use-cache-similarity/SKILL.md`; competing libs `langchain` loaders, `llamaindex` readers.'
+---
+
+# RAG loaders + vector stores — source → `RagDocument` → durable store
+
+Two feature groups that bracket `ai.rag()`: **loaders** turn a source (string, raw HTML, a URL, or PDF bytes) into the exact `RagDocument[]` shape `kb.index()` consumes, and **stores** are the swappable backends that hold the embeddings. Both live on the `ai.rag.*` namespace — present the moment `@warlock.js/ai` is imported, no side-effect import, no module augmentation.
+
+## Contract — what each side produces / satisfies
+
+Every loader returns `RagLoaderResult` — a plain `RagDocument[]` — so a load feeds `index()` with no adapter and callers never branch on arity (one page ⇒ 1 doc, a per-page PDF ⇒ N docs):
+
+```ts
+type RagLoaderResult = RagDocument[];
+type RagDocument = { id: string; text: string; metadata?: Record<string, unknown>; tags?: string[] };
+```
+
+Every store satisfies the three-method `VectorStore` contract (a thin narrowing of the cache `similar()` surface — NOT a new engine):
+
+```ts
+interface VectorStore {
+  upsert(key: string, value: unknown, vector: number[], tags?: string[]): Promise<void>;
+  query<T>(vector: number[], options: { topK: number; threshold?: number; tags?: string[] }): Promise<{ key: string; value: T; score: number }[]>;
+  removeNamespace(namespace: string): Promise<void>;
+}
+```
+
+## Loaders
+
+| Loader | Input | Deps | Emits |
+|---|---|---|---|
+| `ai.rag.loadText(input, opts?)` | `string` \| `{ id, text }` \| array of either | none | one doc per non-empty item |
+| `ai.rag.loadHtml(html, opts?)` | raw HTML string | none (regex strip) | one doc, `metadata.title` from `<title>` |
+| `ai.rag.loadWeb(url, opts?)` | absolute URL | none (uses core `guardedFetch`) | one doc, SSRF-safe fetch |
+| `ai.rag.loadPdf(bytes, opts?)` | `Buffer` \| `ArrayBuffer` \| `Uint8Array` | lazy `pdf-parse` peer | one doc, or one per page with `perPage: true` |
+
+Shared options (`RagLoaderOptions`): `id` (source id — falls back to the URL for web, `"document"` otherwise), `metadata` (merged **over** the loader-derived keys, so an explicit `metadata.title` always wins), and `tags` (applied to every chunk for `retrieve({ tags })` filtering). Loader-derived keys: `source`, `loader` (`"text" | "html" | "web" | "pdf"`), plus `title` / `page` / `pageCount` / `contentType` where determinable. Empty / whitespace-only / all-markup inputs emit **no** document — never a no-op record for `index()` to skip.
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+// Bare string, or many records → many distinctly-identified docs:
+await kb.index(ai.rag.loadText([
+  { id: "faq-billing", text: "…", metadata: { section: "billing" } },
+  { id: "faq-shipping", text: "…" },
+]));
+
+// Raw HTML → readable text (scripts/styles dropped, entities decoded):
+await kb.index(ai.rag.loadHtml(rawHtml, { id: "landing", tags: ["marketing"] }));
+```
+
+### `loadWeb` is SSRF-safe — never a raw `fetch`
+
+Every request goes through core's `guardedFetch` under an `OutboundPolicy`. The strict defaults (https-only, private-IP-deny on, 10s timeout, 5 MiB cap) apply even when you pass no `policy`, so an untuned call is already hardened. Tighten it per call:
+
+```ts
+await kb.index(await ai.rag.loadWeb("https://docs.example.com/guide", {
+  policy: { hostAllowlist: ["docs.example.com"], maxBytes: 2_000_000, timeoutMs: 5_000 },
+  tags: ["docs"],
+}));
+```
+
+HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL, `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout, or an over-cap body throws `OutboundPolicyError`.
+
+### `loadPdf` — lazy optional peer, page-precise citations
+
+`pdf-parse` is an **optional** peer, dynamic-imported on the FIRST `loadPdf` call — importing `@warlock.js/ai` never forces it. When it is absent, the curated `PDF_PARSE_INSTALL_INSTRUCTIONS` string is thrown as a plain `Error` (a missing infra peer, not a content problem), never a raw module-resolution stack trace.
+
+```ts
+import { readFile } from "node:fs/promises";
+
+// Whole PDF → one doc carrying metadata.pageCount:
+await kb.index(await ai.rag.loadPdf(await readFile("manual.pdf"), { id: "manual" }));
+
+// One doc per page → citations stay page-precise (id suffixed `#p<n>`, metadata.page set):
+await kb.index(await ai.rag.loadPdf(bytes, { id: "manual", perPage: true }));
+```
+
+An image-only / scanned page has no text layer and is dropped, so a fully-scanned PDF yields zero docs (nothing to embed).
+
+## Stores
+
+### `ai.rag.cacheVectorStore(driver)` — adapt any `@warlock.js/cache` driver
+
+The cache driver **is** the vector store — `upsert → set({ vector, tags })`, `query → similar()`, `removeNamespace → removeNamespace()`. A driver without similarity support throws `CacheUnsupportedError` unchanged (pointing you at the `pg` / `redis` cache drivers).
+
+```ts
+import { MemoryCacheDriver } from "@warlock.js/cache";
+
+const store = ai.rag.cacheVectorStore(new MemoryCacheDriver()); // dev / tests
+```
+
+### `ai.rag.pgVectorStore(options)` — production pgvector
+
+One durable row per chunk keyed by the pipeline's dotted key, the chunk payload in a `JSONB` `value` column, the embedding in a pgvector `vector` column. Pass a live pool (`{ client }` — `@warlock.js/ai` imports **nothing**) or a `{ connectionString }` and let the store lazily `import("pg")` (the optional peer; curated install string on first use if absent). Exactly one of the two is required.
+
+```ts
+type PgVectorStoreOptions = {
+  client?: PgClientLike;               // a pg.Pool / pg.Client — only `query` is ever called
+  connectionString?: string;           // else the store builds its own Pool lazily
+  table?: string;                      // default "warlock_ai_rag_vectors"; must be a safe identifier
+  dimensions?: number;                 // vector(N) width in the DDL, default 1536
+  index?: "hnsw" | "ivfflat" | "none"; // ANN strategy, default "hnsw"
+  ivfflatLists?: number;               // ivfflat only, default 100
+};
+```
+
+`schema()` (alias `ensureSchema()`) returns the reference migration DDL — `CREATE EXTENSION vector`, the table, a GIN index on `tags`, and the chosen ANN index (`USING hnsw (embedding vector_cosine_ops)`). It **only returns the string**; the framework never auto-migrates — you run it once through your own tool. Index and query MUST use the same embedding model: the `vector(N)` width is fixed at table-creation time from `dimensions`.
+
+```ts
+import { Pool } from "pg";
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const store = ai.rag.pgVectorStore({ client: pool, dimensions: 1536, index: "hnsw" });
+
+// Once, via your migration tooling — never auto-run:
+await pool.query(store.ensureSchema());
+```
+
+`query()` runs the cosine floor (`threshold`) and `tags` overlap filter **in SQL** (a below-floor row never crosses the wire), orders by `embedding <=> $vec`, caps at `topK`, and maps the pgvector distance back to a `[0,1]` cosine-similarity `score` — the same scale the cache store emits. `removeNamespace()` is a prefix DELETE that escapes `_` / `%` so dropping `ai.rag.docs` never also catches `ai.rag.docs2`.
+
+## Pattern — a knowledge base from a website, backed by pgvector
+
+```ts
+import { Pool } from "pg";
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+const store = ai.rag.pgVectorStore({ client: pool, dimensions: 1536 });
+await pool.query(store.ensureSchema()); // once at boot / migration
+
+const kb = ai.rag({
+  name: "docs",
+  embedder: openai.embedder({ name: "text-embedding-3-small" }), // 1536 dims — matches the DDL
+  store,
+});
+
+// Crawl a few pages (SSRF-safe) + a spec PDF into the same namespace:
+for (const url of ["https://docs.example.com/intro", "https://docs.example.com/config"]) {
+  await kb.index(await ai.rag.loadWeb(url, { policy: { hostAllowlist: ["docs.example.com"] }, tags: ["docs"] }));
+}
+await kb.index(await ai.rag.loadPdf(await readFile("spec.pdf"), { id: "spec", perPage: true, tags: ["spec"] }));
+
+// Now retrieve — every hit's citation traces back to its source URL / page:
+const { chunks } = await kb.retrieve("how do I configure caching?", { topK: 4, tags: ["docs"] });
+```
+
+The `embedder`'s `dimensions` MUST equal the store's `dimensions` — a mismatch is a runtime insert failure at the pgvector column, not a type error.
+
+## Cost + testing
+
+- **Loaders are cheap.** `loadText` / `loadHtml` are zero-dependency string passes; `loadWeb` costs one guarded HTTP round-trip; `loadPdf` costs the `pdf-parse` parse. **None embed** — embedding cost lands entirely in `kb.index()` (batched, 96 texts per `embedMany` call). The token spend is per chunk, so `perPage` PDFs and finer chunking mean more, smaller vectors.
+- **`pgVectorStore` construction is synchronous and does no I/O** — the `pg` import + pool build are deferred to first `query`/`upsert`. Table-name validation (`/^[A-Za-z_][A-Za-z0-9_]*$/`) throws at construction, so a `table: "bad; DROP TABLE x"` fails fast.
+- **Unit-test loaders with fixtures** (a stubbed `policy.fetch` for `loadWeb`, `vi.mock("pdf-parse")` for `loadPdf` — the literal specifier is mockable). Test stores against a `FakePgClient` implementing `{ query }`, or `cacheVectorStore(new MemoryCacheDriver())` for a real end-to-end index/retrieve with no external service.
+
+## See also
+
+- [[run-ai-rag]] — the chunk → embed → retrieve → rerank → cite pipeline that **consumes** these loaders and stores (`ai.rag({ embedder, store })`, `index()` / `retrieve()`).
+- [[embed-text]] — the `sdk.embedder` primitive whose `dimensions` must match the store's `vector(N)` width.
+- [`@warlock.js/cache/use-cache-similarity/SKILL.md`](@warlock.js/cache/use-cache-similarity/SKILL.md) — the cache driver `cacheVectorStore` adapts.
 
 
 ## record-replay-llm  `@warlock.js/ai/record-replay-llm/SKILL.md`
@@ -4396,6 +4988,167 @@ const escalationAgent = ai.agent({ model, tools: [supportTool] });
 - [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md) — `snapshotStore` + resume
 - [`@warlock.js/ai/attach-ai-middleware/SKILL.md`](@warlock.js/ai/attach-ai-middleware/SKILL.md) — `semanticCache` fits under each agent's middleware
 - [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — tool artifacts side-channel
+
+
+## transcribe-audio  `@warlock.js/ai/transcribe-audio/SKILL.md`
+
+---
+name: transcribe-audio
+description: 'Speech-to-text via ai.transcribe({ model: sdk.transcribe({ name }), audio }) — the audio-INPUT verb (Theme I), returning the uniform never-throws { data, error, usage, report } envelope with cost-truth + panoptic observation. Feed it an AudioInput = { base64; mediaType; filename? } — build one with ai.audioFromFile(path) (reads disk, infers media type incl. WhatsApp .ogg/.opus) or ai.audioFromBuffer(bytes, mediaType). Models: OpenAI whisper-1 (verbose_json, per-minute, segments + durationSeconds) or gpt-4o-transcribe (json, per-token). Triggers: `ai.transcribe`, `ai.audioFromFile`, `ai.audioFromBuffer`, `sdk.transcribe`, `openai.transcribe`, `TranscriptionModelContract`, `AudioInput`, `TranscriptionSegment`, `MockTranscriptionModel`; ''speech to text'', ''transcribe audio'', ''voice note to text'', ''WhatsApp voice message'', ''whisper'', ''gpt-4o-transcribe'', ''subtitle segments'', ''audio input''; typical import `import { ai } from "@warlock.js/ai"` + `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: text-to-speech / synthesizing a voice — [[generate-speech]]; competing libs raw `openai.audio.transcriptions.create`, `whisper.cpp`.'
+---
+
+# Transcribe audio — the speech-to-text verb (`ai.transcribe`)
+
+`ai.transcribe()` is the inverse of `ai.speech()` on the modality track (Theme I). Audio-in / text-out, wrapped in the same uniform result contract every executable returns — so transcribing a support voicemail slots into cost dashboards and panoptic traces exactly like an agent run.
+
+**Extracting text from an audio file NEEDS AI** — that is the `ai.transcribe` step. The file handling (`ai.audioFromFile` / `ai.audioFromBuffer`) is pure, non-AI **utility** that just packages bytes into an `AudioInput`; it does no I/O to a provider on its own.
+
+This is audio **input** (STT). For audio **output** (synthesizing a voice line), see [[generate-speech]].
+
+## Shape — WhatsApp voice note → text, end to end
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+// audioFromFile reads the file + infers the media type from the extension.
+// .ogg / .opus (Android WhatsApp) and .m4a (iOS) are recognized out of the box.
+const audio = await ai.audioFromFile("./voice-note.ogg");
+
+const { data, error } = await ai.transcribe({
+  model: openai.transcribe({ name: "whisper-1" }),
+  audio,
+  language: "en", // BCP-47 hint — improves accuracy + latency
+});
+
+if (error) console.warn(error.code); // typed AIError
+else console.log(data.text);         // the transcript
+```
+
+`TranscriptionModelContract` mirrors `SpeechModelContract` — a peer primitive produced by the adapter's optional `transcribe?()` factory. A non-STT model id (`openai.transcribe({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — fail fast, like the speech/embedder guards.
+
+## The `AudioInput` shape + the two builders
+
+```ts
+type AudioInput = {
+  base64: string;    // base64-encoded audio bytes
+  mediaType: string; // IANA type, e.g. "audio/ogg", "audio/mpeg"
+  filename?: string; // helps providers infer the codec from the extension
+};
+
+// From a file on disk — reads + infers media type (override for extensionless files).
+const fromDisk = await ai.audioFromFile("./meeting.m4a");
+const forced   = await ai.audioFromFile("./blob", { mediaType: "audio/ogg" });
+
+// From bytes you already hold (an upload buffer, a downloaded blob) — no I/O, no AI.
+const fromBytes = ai.audioFromBuffer(uploadBuffer, "audio/ogg", "note.ogg");
+```
+
+Keeping `AudioInput` as inlined base64 + explicit media type makes the verb provider-neutral and serializable — there is no `fs` coupling in core, so the same request can cross a queue or an RPC boundary.
+
+## The result envelope
+
+```ts
+type TranscriptionResult = {
+  type: "transcription";
+  data?: {
+    text: string;                    // full transcript
+    segments?: TranscriptionSegment[]; // timestamped, in verbose mode
+  };                                 // undefined on failure
+  error?: AIError;                   // undefined on success — NEVER thrown
+  usage: Usage;                      // tokens (gpt-4o-transcribe) + cost when priced
+  report: TranscriptionReport;       // type:"transcription", model, durationSeconds, lineage
+};
+
+type TranscriptionSegment = { text: string; start?: number; end?: number };
+```
+
+`segments` and `report.durationSeconds` appear only when the provider returns them (whisper's `verbose_json` mode). Use segments to build subtitles or to jump-to-timestamp in a player.
+
+## Transcribe options (provider-neutral)
+
+```ts
+await ai.transcribe({
+  model,
+  audio,
+  language: "en",              // BCP-47 hint
+  prompt: "Names: Acme, Zoë",  // priming — spelling / style hints
+  format: "verbose_json",      // response-format override (segments + duration)
+  signal,                      // AbortSignal
+  observe: collector,          // route the report to an Observer (panoptic)
+  sessionId: "ticket-88",      // group into a session for flat cost/trace queries
+  options: { /* provider passthrough */ },
+});
+```
+
+## OpenAI — whisper-1 (per-minute) + gpt-4o-transcribe (per-token)
+
+```ts
+// whisper-1 — defaults to verbose_json → segments + duration; billed PER MINUTE.
+const whisper = openai.transcribe({ name: "whisper-1", pricing: { perMinute: 0.006 } });
+
+// gpt-4o-transcribe — defaults to json; billed PER TOKEN like a chat model.
+const gpt = openai.transcribe({ name: "gpt-4o-transcribe", pricing: { input: 2.5, output: 10 } });
+
+const { data, usage } = await ai.transcribe({ model: whisper, audio });
+// data.segments → [{ text, start, end }, …]; usage.cost from report.durationSeconds
+```
+
+The adapter wraps the base64 bytes in an uploadable via the SDK's `toFile`, using `audio.filename` (or `"audio"`) and `audio.mediaType` so the codec is declared correctly.
+
+## Cost-truth — one rollup, two metering models
+
+`ai.transcribe` fills `usage.cost` so STT spend folds into the **same** `Usage.cost` rollup as text:
+
+- **Per-minute** (`whisper-1`): `{ perMinute }` × `(durationSeconds / 60)` → `cost.input`. If the provider didn't report a duration, cost stays **`undefined`** (no guessing).
+- **Token-metered** (`gpt-4o-transcribe`): `{ input, output }` USD-per-1M-tokens → standard `computeCost` against the returned token usage.
+
+Per-minute wins when both are set; an unpriced model leaves `usage.cost` **`undefined`** (honest "cost unknown", never a false zero).
+
+## Pattern — inbound voice-message webhook
+
+```ts
+const stt = openai.transcribe({ name: "whisper-1" });
+
+async function onVoiceMessage(buffer: Buffer, mediaType: string) {
+  const audio = ai.audioFromBuffer(buffer, mediaType, "inbound.ogg");
+  const { data, error } = await ai.transcribe({ model: stt, audio, sessionId: "inbox" });
+
+  if (error) return replyWith("Sorry, I couldn't understand that audio.");
+  return routeToAgent(data.text); // hand the transcript to an ai.agent for a reply
+}
+```
+
+## Observability
+
+The completed `TranscriptionReport` (with `report.durationSeconds` and cost/latency attributed to `report.model`) routes to any registered `Observer` (panoptic, OTel, …) through the shared `observe` seam — `observe: true` (global), an `Observer` (flow-local), or observe-all. See [[observe-ai-flows]]. Provider faults surface as typed `AIError`s on `result.error`; see [[handle-ai-errors]].
+
+## Testing
+
+`MockTranscriptionModel(name, responses, pricing?)` is a deterministic `TranscriptionModelContract` double — no HTTP. Script text/segments/duration/usage/errors and inspect `model.calls`. `MockSDK({ transcriptionResponses, transcriptionPricing }).transcribe({ name })` wires the same double behind a full adapter.
+
+```ts
+import { MockTranscriptionModel, transcribe } from "@warlock.js/ai";
+
+const AUDIO = { base64: "QUJD", mediaType: "audio/mpeg", filename: "clip.mp3" };
+
+const model = new MockTranscriptionModel("whisper-1", [{ durationSeconds: 120 }], { perMinute: 0.006 });
+const { data, usage, report } = await transcribe({ model, audio: AUDIO });
+// data.text → "mock transcript"
+// usage.cost.input → (120 / 60) * 0.006   report.durationSeconds → 120
+// model.calls[0] records { audio, options } for assertions
+```
+
+Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the never-throws path — `result.error` is the typed error and `result.data` is `undefined`.
+
+## See also
+
+- [[generate-speech]] — the inverse verb (`ai.speech`), text → audio
+- [[generate-images]] — the sibling image-output verb (`ai.image`)
+- [[observe-ai-flows]] — routing the `TranscriptionReport` to panoptic / OTel
+- [[handle-ai-errors]] — the typed `AIError` taxonomy on `result.error`
 
 
 ## use-ai-memory  `@warlock.js/ai/use-ai-memory/SKILL.md`

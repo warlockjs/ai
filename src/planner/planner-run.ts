@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import { log } from "@warlock.js/logger";
 import type { AgentContract } from "../contracts/agent/agent.contract";
 import type { PlannerCapability } from "../contracts/planner/planner-capability.type";
 import type { PlannerConfig } from "../contracts/planner/planner-config.type";
@@ -12,6 +13,10 @@ import type {
   PlannerResult,
   PlannerStepSnapshot,
 } from "../contracts/planner/planner-result.type";
+import type {
+  PlannerSnapshot,
+  PlannerSnapshotStatus,
+} from "../contracts/planner/planner-snapshot.type";
 import type { BaseReport } from "../contracts/result/base-report.type";
 import { REPORT_SCHEMA_VERSION } from "../contracts/result/base-report.type";
 import type { BaseResult } from "../contracts/result/base-result.type";
@@ -29,6 +34,10 @@ import { stampReportLineage } from "../utils/stamp-report-lineage";
 import type { DagNode, PlannerDag } from "./dag-scheduler";
 import { buildDag, readyNodes, sinkNodes } from "./dag-scheduler";
 import { planSchema } from "./plan-schema";
+import {
+  deletePlannerSnapshot,
+  persistPlannerSnapshot,
+} from "./snapshot";
 
 /**
  * Construction args for one {@link PlannerRun}. Carries everything the
@@ -43,6 +52,13 @@ export type PlannerRunArgs<TOutput> = {
   planningAgent: AgentContract<unknown>;
   goal: string;
   options?: PlannerExecuteOptions<TOutput>;
+  /**
+   * Durable resume seed. When present the run re-hydrates the frozen plan
+   * + executed-node ledger + usage + child reports + replan budget from a
+   * prior crash, skips plan generation, and continues scheduling only the
+   * unfinished frontier. Absent ⇒ a normal cold run.
+   */
+  resumeFrom?: PlannerSnapshot;
 };
 
 /**
@@ -65,7 +81,12 @@ export type PlannerRunArgs<TOutput> = {
  */
 export class PlannerRun<TOutput> {
   private readonly runId: string;
-  private readonly startedAt = new Date().toISOString();
+  /**
+   * Run start timestamp. A resumed run restores it from the snapshot (in
+   * the constructor) so the rebuilt report spans the whole run, not just
+   * the resumed tail — hence not `readonly`.
+   */
+  private startedAt = new Date().toISOString();
   private readonly startPerf = performance.now();
 
   private readonly usage: Usage = { input: 0, output: 0, total: 0 };
@@ -83,8 +104,35 @@ export class PlannerRun<TOutput> {
   /** How many times the plan has been regenerated mid-run (≤ maxReplans). */
   private replanCount = 0;
 
+  /**
+   * One-shot guard so the DAG resume re-seed runs only on the first
+   * `executeDag` pass — a later replan recursion gets a fresh plan with
+   * different node ids and must NOT re-seed against the stale ledger.
+   */
+  private dagResumeConsumed = false;
+
   public constructor(private readonly args: PlannerRunArgs<TOutput>) {
-    this.runId = args.options?.runId ?? generateRunId("planner");
+    // A resumed run reuses the snapshot's key so it writes back to the
+    // same record; otherwise a caller-supplied `options.runId` wins, else
+    // a fresh id is generated.
+    this.runId = args.resumeFrom?.runId ?? args.options?.runId ?? generateRunId("planner");
+
+    // Seed the accumulators from the snapshot on resume — re-hydrate the
+    // frozen plan, the per-node ledger, the rolled-up usage, the child
+    // reports, and the replan budget. `startedAt` restores too so the
+    // resumed report spans the whole run. Pushing into the ledger rather
+    // than re-running nodes is what keeps completed capabilities from
+    // re-dispatching — the sequential guard / DAG re-seed read "what ran"
+    // straight off `executedSteps`. Absent ⇒ accumulators stay empty and
+    // the cold path is byte-for-byte unchanged.
+    if (args.resumeFrom) {
+      this.plan = args.resumeFrom.plan;
+      this.executedSteps.push(...args.resumeFrom.executedSteps);
+      this.children.push(...args.resumeFrom.children);
+      this.mergeUsage(this.usage, args.resumeFrom.usage);
+      this.replanCount = args.resumeFrom.replanCount;
+      this.startedAt = args.resumeFrom.startedAt;
+    }
   }
 
   /**
@@ -116,33 +164,62 @@ export class PlannerRun<TOutput> {
    * unified tree is emitted exactly once.
    */
   private async runPlan(): Promise<PlannerResult<TOutput>> {
+    // Completed-run short-circuit. A resume of a snapshot whose run
+    // already COMPLETED re-runs nothing — the stored ledger IS the
+    // result. A `failed` / `cancelled` snapshot is NOT short-circuited:
+    // those are the runs a caller resumes to retry the unfinished
+    // frontier after fixing the cause, so they re-enter execution below.
+    if (this.args.resumeFrom && this.args.resumeFrom.status === "completed") {
+      this.rebuildResumedTerminal("completed");
+      return this.buildResult();
+    }
+
     try {
       if (this.isAborted()) {
         this.markCancelled();
+        await this.checkpoint(this.resolveSnapshotStatus());
         return this.buildResult();
       }
 
-      // Approval fork — an `approvedPlan` skips generation entirely; it is
-      // still validated against the live capabilities so a stale plan
-      // surfaces a typed PlannerPlanInvalidError rather than mis-dispatching.
-      const plan = this.args.options?.approvedPlan ?? (await this.generatePlan());
+      // Resume fork — the plan is frozen (re-asking the LLM would burn
+      // tokens and risk a different plan that no longer matches the
+      // executed-node ledger). Skip generation entirely and execute the
+      // re-hydrated plan; the sequential guard / DAG re-seed skip the
+      // nodes already terminal in `executedSteps`.
+      const plan = this.args.resumeFrom
+        ? (this.plan as PlannerPlan)
+        : (this.args.options?.approvedPlan ?? (await this.generatePlan()));
 
       if (this.error || !plan) {
+        await this.checkpoint(this.resolveSnapshotStatus());
         return this.buildResult();
       }
 
-      this.assertPlanValid(plan);
+      // On a fresh run, validate the plan (a generated / approved plan
+      // could name an unknown capability). A resumed plan was already
+      // valid when persisted, so skip re-validation unless drift `force`
+      // is implied — re-validating a frozen plan against the same live
+      // capabilities is redundant.
+      if (!this.args.resumeFrom) {
+        this.assertPlanValid(plan);
 
-      if (this.error) {
-        return this.buildResult();
+        if (this.error) {
+          await this.checkpoint(this.resolveSnapshotStatus());
+          return this.buildResult();
+        }
       }
 
       this.plan = plan;
 
       // Plan-only mode — surface the validated plan for sign-off and execute
       // NOTHING. `approvedPlan` overrides this (execute the supplied plan),
-      // mirroring the documented "approvedPlan wins" precedence.
-      if (this.args.options?.mode === "plan-only" && !this.args.options?.approvedPlan) {
+      // mirroring the documented "approvedPlan wins" precedence. A resume is
+      // always an execution, never a plan-only short-circuit.
+      if (
+        !this.args.resumeFrom &&
+        this.args.options?.mode === "plan-only" &&
+        !this.args.options?.approvedPlan
+      ) {
         this.awaitingApproval = true;
         return this.buildResult();
       }
@@ -152,6 +229,23 @@ export class PlannerRun<TOutput> {
       await this.finalizeOutput();
     } catch (caught) {
       this.error = this.toAIError(caught);
+    }
+
+    // Terminal checkpoint — persist the final state so a completed-run
+    // resume short-circuits, then optionally drop the snapshot when
+    // `deleteOnComplete` is set and the run succeeded. No-op when
+    // `durable` is absent.
+    await this.checkpoint(this.resolveSnapshotStatus());
+
+    if (!this.error && this.args.config.durable?.deleteOnComplete) {
+      const outcome = await deletePlannerSnapshot({
+        durable: this.args.config.durable,
+        runId: this.runId,
+      });
+
+      if (!outcome.ok) {
+        this.logDurableFailure("snapshot.delete.failed", outcome.error);
+      }
     }
 
     return this.buildResult();
@@ -280,6 +374,16 @@ export class PlannerRun<TOutput> {
     let steps = plan.steps;
     let index = 0;
 
+    // Resume re-seed (sequential). The frozen plan's already-completed
+    // prefix lives in the persisted ledger; thread its outputs forward and
+    // jump the cursor past it so completed nodes are never re-dispatched.
+    // Stale non-completed entries (the failed node that crashed the run,
+    // and any `skipped` tail) are pruned so the re-run repopulates them
+    // cleanly instead of duplicating. No-op on a cold run (empty ledger).
+    if (this.args.resumeFrom) {
+      index = this.rehydrateSequentialState(steps, previousOutputs);
+    }
+
     while (index < steps.length) {
       const step = steps[index] as PlannerStep;
 
@@ -354,6 +458,18 @@ export class PlannerRun<TOutput> {
     const outputs = new Map<string, string>();
     const rawOutputs = new Map<string, unknown>();
     let executedCount = 0;
+
+    // Resume re-seed (DAG). Re-derive the scheduler's working sets from
+    // the persisted ledger so `readyNodes` schedules only the unfinished
+    // frontier — completed nodes go straight into `completed` + `done`
+    // with their outputs restored; stale non-completed entries are pruned
+    // so the re-run repopulates them. One-shot: consumed on the first DAG
+    // pass so a later replan recursion (fresh plan, different node ids)
+    // doesn't re-seed against a stale ledger. No-op on a cold run.
+    if (this.args.resumeFrom && !this.dagResumeConsumed) {
+      this.dagResumeConsumed = true;
+      executedCount = this.rehydrateDagState(dag, completed, done, outputs, rawOutputs);
+    }
 
     while (done.size < dag.nodes.length) {
       if (this.isAborted()) {
@@ -502,6 +618,14 @@ export class PlannerRun<TOutput> {
       usage: result.usage,
       childReport,
     });
+
+    // Per-node durable checkpoint. Sits AFTER the node's snapshot is
+    // pushed and `absorb` has folded its usage + child report — the only
+    // point where the ledger + usage + children are mutually consistent.
+    // A completed node is never re-dispatched on resume (the sequential
+    // guard / DAG re-seed skip it). Swallow-and-log; no-op when `durable`
+    // is absent.
+    await this.checkpoint("running");
 
     if (failed) {
       this.error = result.error;
@@ -910,6 +1034,178 @@ export class PlannerRun<TOutput> {
     if (mergedCost !== undefined) {
       target.cost = mergedCost;
     }
+  }
+
+  /**
+   * Re-derive the sequential cursor + prior-output context from the
+   * persisted ledger on resume. Threads every already-`completed` node's
+   * output into `previousOutputs`, returns the first index NOT completed
+   * as the resume cursor, and prunes stale non-completed ledger entries
+   * (the failed node + any skipped tail) at-or-after that cursor so the
+   * re-run repopulates them without duplicating.
+   */
+  private rehydrateSequentialState(
+    steps: PlannerStep[],
+    previousOutputs: string[],
+  ): number {
+    let cursor = 0;
+
+    for (let index = 0; index < steps.length; index++) {
+      const snapshot = this.snapshotFor(index);
+
+      if (snapshot?.status === "completed") {
+        const step = steps[index] as PlannerStep;
+        previousOutputs.push(this.stringifyOutput(step.capability, snapshot.output));
+        cursor = index + 1;
+        continue;
+      }
+
+      // First non-completed index — this is where the re-run resumes.
+      break;
+    }
+
+    // Drop any ledger entries at-or-after the cursor (failed / skipped
+    // from the crashed run) so the resumed loop's pushes don't duplicate.
+    this.pruneLedgerFrom(cursor);
+
+    return cursor;
+  }
+
+  /**
+   * Re-derive the DAG scheduler's working sets from the persisted ledger
+   * on resume. Completed nodes go into `completed` + `done` with their
+   * string + raw outputs restored (so dependents read the right context);
+   * stale non-completed entries are pruned so the re-run repopulates them.
+   * Returns the count of nodes already dispatched (for the `maxSteps`
+   * truncation budget).
+   */
+  private rehydrateDagState(
+    dag: PlannerDag,
+    completed: Set<string>,
+    done: Set<string>,
+    outputs: Map<string, string>,
+    rawOutputs: Map<string, unknown>,
+  ): number {
+    const completedIndices = new Set<number>();
+
+    for (const node of dag.nodes) {
+      const snapshot = this.snapshotFor(node.index);
+
+      if (snapshot?.status !== "completed") {
+        continue;
+      }
+
+      completed.add(node.id);
+      done.add(node.id);
+      completedIndices.add(node.index);
+      rawOutputs.set(node.id, snapshot.output);
+      outputs.set(node.id, this.stringifyOutput(node.step.capability, snapshot.output));
+    }
+
+    // Prune every non-completed ledger entry so the re-run's pushes don't
+    // duplicate the failed / skipped frontier from the crashed run.
+    const retained = this.executedSteps.filter((snapshot) =>
+      completedIndices.has(snapshot.index),
+    );
+    this.executedSteps.length = 0;
+    this.executedSteps.push(...retained);
+
+    return completedIndices.size;
+  }
+
+  /**
+   * Drop every ledger entry whose index is at or after `from`. Used by
+   * the sequential resume re-seed to clear the crashed run's failed /
+   * skipped frontier before the re-run repopulates it.
+   */
+  private pruneLedgerFrom(from: number): void {
+    const retained = this.executedSteps.filter((snapshot) => snapshot.index < from);
+    this.executedSteps.length = 0;
+    this.executedSteps.push(...retained);
+  }
+
+  /**
+   * Map the run's terminal outcome to the persisted snapshot status.
+   * `awaiting-approval` (plan-only) never persists a durable snapshot
+   * (resume is always an execution), so it folds to `running` here —
+   * but the durable + plan-only combination is disallowed at the call
+   * site, so this path is effectively unreachable.
+   */
+  private resolveSnapshotStatus(): PlannerSnapshotStatus {
+    if (this.cancelledAt !== undefined) {
+      return "cancelled";
+    }
+
+    if (this.error) {
+      return "failed";
+    }
+
+    if (this.awaitingApproval) {
+      return "running";
+    }
+
+    return "completed";
+  }
+
+  /**
+   * Build and persist a {@link PlannerSnapshot} from the current
+   * accumulators. The per-node and terminal checkpoints both route
+   * through here. No-op when `durable` is absent. A failed persist is
+   * logged and swallowed (never aborts the run), matching the supervisor
+   * / workflow checkpoint policy.
+   */
+  private async checkpoint(status: PlannerSnapshotStatus): Promise<void> {
+    if (!this.args.config.durable || !this.plan) {
+      return;
+    }
+
+    const outcome = await persistPlannerSnapshot({
+      durable: this.args.config.durable,
+      runId: this.runId,
+      plannerName: this.args.config.name,
+      signature: this.args.signature,
+      version: this.args.config.version,
+      goal: this.args.goal,
+      plan: this.plan,
+      executedSteps: this.executedSteps,
+      usage: this.usage,
+      children: this.children,
+      replanCount: this.replanCount,
+      status,
+      startedAt: this.startedAt,
+    });
+
+    if (!outcome.ok) {
+      this.logDurableFailure("snapshot.persist.failed", outcome.error);
+    }
+  }
+
+  /**
+   * Re-derive the terminal state when a resume short-circuits a snapshot
+   * whose run already COMPLETED. The persisted ledger is the
+   * authoritative outcome — `this.data` is restored from the last
+   * completed node so the rebuilt result carries the final output.
+   *
+   * Only reached for a `completed` snapshot — `failed` / `cancelled`
+   * snapshots re-enter execution to retry the unfinished frontier instead.
+   */
+  private rebuildResumedTerminal(_status: PlannerSnapshotStatus): void {
+    const lastCompleted = [...this.executedSteps]
+      .reverse()
+      .find((snapshot) => snapshot.status === "completed");
+
+    if (lastCompleted) {
+      this.data = lastCompleted.output as TOutput;
+    }
+  }
+
+  /** Structured-log a durable persist/delete failure. */
+  private logDurableFailure(action: string, error: unknown): void {
+    log.warn("ai.planner", action, "durable snapshot operation failed", {
+      runId: this.runId,
+      planner: this.args.config.name,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   /** Whether the caller's abort signal has fired. */

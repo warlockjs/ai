@@ -3,13 +3,17 @@ import { agent } from "../agent/agent";
 import type { AgentContract } from "../contracts/agent/agent.contract";
 import type { PlannerCapability } from "../contracts/planner/planner-capability.type";
 import type { PlannerConfig } from "../contracts/planner/planner-config.type";
-import type { PlannerExecuteOptions } from "../contracts/planner/planner-execute-options.type";
+import type {
+  PlannerExecuteOptions,
+  PlannerResumeOptions,
+} from "../contracts/planner/planner-execute-options.type";
 import type { PlannerResult } from "../contracts/planner/planner-result.type";
 import type { PlannerContract } from "../contracts/planner/planner.contract";
 import { PlannerFailedError } from "../errors";
 import { buildPlanSystemPrompt } from "./plan-prompt";
 import { PlannerRun } from "./planner-run";
 import { computeSignature } from "./signature";
+import { loadPlannerSnapshotForResume } from "./snapshot";
 
 const LOG_MODULE = "ai.planner";
 
@@ -77,10 +81,37 @@ export function planner<TOutput = unknown>(
     }).run();
   }
 
+  async function resume(
+    runId: string,
+    options?: PlannerResumeOptions<TOutput>,
+  ): Promise<PlannerResult<TOutput>> {
+    // Load the persisted snapshot and run the drift check (throws
+    // PlannerDriftError on a structural mismatch unless `{ force: true }`).
+    const snapshot = await loadPlannerSnapshotForResume({
+      durable: config.durable,
+      plannerName: config.name,
+      signature,
+      runId,
+      options: options as PlannerResumeOptions<unknown> | undefined,
+    });
+
+    return new PlannerRun<TOutput>({
+      config,
+      capabilities,
+      maxSteps,
+      signature,
+      planningAgent,
+      goal: snapshot.goal,
+      options: { ...options, runId } as PlannerExecuteOptions<TOutput>,
+      resumeFrom: snapshot,
+    }).run();
+  }
+
   return {
     name: config.name,
     signature,
     execute,
+    resume,
   };
 }
 

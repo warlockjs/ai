@@ -2,6 +2,10 @@ export {
   AgentCancelledError,
   type AgentCancelledErrorOptions,
 } from "./agent-cancelled-error";
+export {
+  AgentDriftError,
+  type AgentDriftErrorOptions,
+} from "./agent-drift-error";
 export { AgentExecutionError } from "./agent-execution-error";
 export {
   AgentMaxTripsError,
@@ -52,6 +56,10 @@ export {
   PlannerCancelledError,
   type PlannerCancelledErrorOptions,
 } from "./planner-cancelled-error";
+export {
+  PlannerDriftError,
+  type PlannerDriftErrorOptions,
+} from "./planner-drift-error";
 export { PlannerFailedError } from "./planner-failed-error";
 export { PlannerPlanInvalidError } from "./planner-plan-invalid-error";
 export { ProviderAuthError } from "./provider-auth-error";

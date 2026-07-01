@@ -422,12 +422,16 @@ function isDispatchableUnit(
 function detectType(
   unit: AgentContract<unknown> | WorkflowInstance<unknown, unknown>,
 ): "agent" | "workflow" {
-  // Workflows expose a structural `signature` field; agents don't.
-  if (typeof (unit as WorkflowInstance<unknown, unknown>).signature === "string") {
-    return "workflow";
+  // Both agents and workflows now expose a structural `signature` (the
+  // drift fingerprint durable resume added to the agent), so `signature`
+  // no longer distinguishes them. Agents expose a token-`stream()` method;
+  // workflows do not (workflow streaming is step-level, not a `.stream`
+  // API) — use that as the positive agent marker.
+  if (typeof (unit as AgentContract<unknown>).stream === "function") {
+    return "agent";
   }
 
-  return "agent";
+  return "workflow";
 }
 
 function resolveAgentLikeDescription(
