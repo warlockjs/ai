@@ -3,6 +3,8 @@ import type { Placeholders } from "../contracts/placeholders.type";
 import type {
   InstructionContract,
   PersonaContract,
+  RefinedSystemPromptContract,
+  RefinedSystemPromptOptions,
   SystemPromptBlockContract,
   SystemPromptContract,
   SystemPromptMergeOptions,
@@ -16,6 +18,7 @@ import type {
 } from "../prompts/prompts-manager.type";
 import { Instruction } from "./instruction";
 import { Persona } from "./persona";
+import { RefinedSystemPrompt } from "./refined-system-prompt";
 
 /**
  * Monotonic source of the internal, non-registry display id every
@@ -355,6 +358,28 @@ export class SystemPrompt implements SystemPromptContract {
     options?: PromptsValidateOptions,
   ): Promise<PromptValidationResult> {
     return defaultPromptsManager().validate(this, options);
+  }
+
+  /**
+   * Derive the compiled form of this prompt — a lazy wrapper that rewrites
+   * the human-authored text into a model-optimized version on first use,
+   * pins the result, and serves the pin thereafter. See
+   * {@link RefinedSystemPromptContract} for the full semantics (lockfile
+   * pinning, placeholder parity, advisory fallback, `refine()` /
+   * `refinePrompt()`).
+   *
+   * The wrapper's collaborators are injected here rather than imported by
+   * `refined-system-prompt.ts` — importing this module (or the prompts
+   * manager) back from there would close an import cycle.
+   */
+  public refined(
+    options: RefinedSystemPromptOptions,
+  ): RefinedSystemPromptContract {
+    return new RefinedSystemPrompt(this, options, {
+      buildPrompt: (blocks, meta) => new SystemPrompt([...blocks], meta),
+      validatePrompt: (target, validateOptions) =>
+        defaultPromptsManager().validate(target, validateOptions),
+    });
   }
 }
 

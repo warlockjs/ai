@@ -123,6 +123,42 @@ function buildJudgeAgent(model: ModelContract): AgentContract<unknown> {
   });
 }
 
+/**
+ * Turn caller-supplied `criteria` into the judge rubric that replaces the
+ * built-in {@link PROMPT_JUDGE_RUBRIC}. A single string is used verbatim;
+ * a list is joined into a numbered rule set the judge must check ALL of.
+ * Returns `undefined` for an empty/blank input, so the caller falls back
+ * to the default rubric.
+ *
+ * @example
+ * formatCriteria(["Addresses the user by {{name}}", "Under 200 words"]);
+ * // → "Grade the system prompt against ALL of these criteria …\n1. …\n2. …"
+ */
+export function formatCriteria(
+  criteria: string | readonly string[] | undefined,
+): string | undefined {
+  if (criteria === undefined) {
+    return undefined;
+  }
+
+  if (typeof criteria === "string") {
+    const trimmed = criteria.trim();
+
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  const rules = criteria.map(rule => rule.trim()).filter(rule => rule.length > 0);
+
+  if (rules.length === 0) {
+    return undefined;
+  }
+
+  return (
+    "Grade the system prompt against ALL of the following criteria — it passes only if it satisfies every one:\n" +
+    rules.map((rule, index) => `${index + 1}. ${rule}`).join("\n")
+  );
+}
+
 /** Outcome of the optional LLM-as-judge pass over a resolved prompt body. */
 export type JudgeOutcome = {
   /**
@@ -148,14 +184,20 @@ export type JudgeOutcome = {
  *
  * @param text - The resolved prompt body under evaluation.
  * @param model - The model that powers the judge agent.
+ * @param criteria - Optional caller rules that REPLACE the built-in rubric
+ *   ({@link formatCriteria}). Omitted ⇒ the default prompt-quality rubric.
  */
 export async function judgePromptBody(
   text: string,
   model: ModelContract,
+  criteria?: string | readonly string[],
 ): Promise<JudgeOutcome> {
   try {
     const judgeAgent = buildJudgeAgent(model);
-    const scorer = judge({ agent: judgeAgent, rubric: PROMPT_JUDGE_RUBRIC });
+    const scorer = judge({
+      agent: judgeAgent,
+      rubric: formatCriteria(criteria) ?? PROMPT_JUDGE_RUBRIC,
+    });
 
     const verdict = await scorer({
       case: { name: "prompt-quality", input: "Grade the system prompt below." },
@@ -222,13 +264,20 @@ function hashString(input: string): string {
 }
 
 /**
- * Build the judge-verdict cache key for a resolved prompt body + judge model.
- * Combines the model's `provider:name` identity with a content hash of the
- * body, so the same prompt graded by the same judge hits the cache, while any
- * change to either misses it.
+ * Build the judge-verdict cache key for a resolved prompt body + judge model
+ * + the effective rubric. Combines the model's `provider:name` identity with a
+ * content hash of the rubric-plus-body, so the same prompt graded by the same
+ * judge against the same rules hits the cache — while a change to the prompt,
+ * the model, OR the `criteria` misses it (different rules ⇒ different verdict).
  */
-export function judgeCacheKey(text: string, model: ModelContract): string {
-  return `prompts.judge.${model.provider}:${model.name}.${hashString(text)}`;
+export function judgeCacheKey(
+  text: string,
+  model: ModelContract,
+  criteria?: string | readonly string[],
+): string {
+  const rubric = formatCriteria(criteria) ?? PROMPT_JUDGE_RUBRIC;
+
+  return `prompts.judge.${model.provider}:${model.name}.${hashString(`${rubric} ${text}`)}`;
 }
 
 /**
@@ -244,17 +293,20 @@ export function judgeCacheKey(text: string, model: ModelContract): string {
  * @param text - The resolved prompt body under evaluation.
  * @param model - The judge model.
  * @param cache - Optional verdict memo (any `CacheDriver`-like get/set surface).
+ * @param criteria - Optional caller rules that REPLACE the built-in rubric; also
+ *   folded into the cache key so a re-validation with different rules re-runs.
  */
 export async function judgePromptBodyCached(
   text: string,
   model: ModelContract,
   cache?: PromptJudgeCacheLike,
+  criteria?: string | readonly string[],
 ): Promise<JudgeOutcome> {
   if (!cache) {
-    return judgePromptBody(text, model);
+    return judgePromptBody(text, model, criteria);
   }
 
-  const key = judgeCacheKey(text, model);
+  const key = judgeCacheKey(text, model, criteria);
 
   const cached = await readJudgeCache(cache, key);
 
@@ -262,7 +314,7 @@ export async function judgePromptBodyCached(
     return cached;
   }
 
-  const outcome = await judgePromptBody(text, model);
+  const outcome = await judgePromptBody(text, model, criteria);
 
   // Only memoize a usable verdict — never a degraded (scoreless) one.
   if (outcome.score !== undefined) {

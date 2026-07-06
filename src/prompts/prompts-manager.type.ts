@@ -64,6 +64,22 @@ export interface PromptsValidateOptions {
   readonly judge?: ModelContract;
 
   /**
+   * Your own rules to grade the prompt against — a single string or a list of
+   * short rules. When set (and a `judge` model is supplied), these REPLACE the
+   * built-in prompt-quality rubric, so the judge's `score` / `issues` reflect
+   * YOUR criteria (a failed rule is named in `issues`). Omitted ⇒ the default
+   * quality rubric. Purely advisory — like any judge output, it never flips the
+   * deterministic `ok`.
+   *
+   * @example
+   * ai.prompts.validate("support@2", {
+   *   judge: model,
+   *   criteria: ["Addresses the user by {{name}}", "Never gives medical advice", "Under 200 words"],
+   * });
+   */
+  readonly criteria?: string | readonly string[];
+
+  /**
    * Per-call judge-verdict cache override. When set, takes precedence over the
    * manager's `judgeCache` for this call only. Same memo semantics: only used
    * when `judge` is also supplied.

@@ -297,9 +297,15 @@ class PromptsManager implements PromptsManagerContract {
       };
     }
 
-    // Per-call cache override wins over the manager-level memo.
+    // Per-call cache override wins over the manager-level memo. `criteria`
+    // (when set) replaces the built-in rubric the judge grades against.
     const cache = options.judgeCache ?? this.judgeCache;
-    const judgeOutcome = await judgePromptBodyCached(text, options.judge, cache);
+    const judgeOutcome = await judgePromptBodyCached(
+      text,
+      options.judge,
+      cache,
+      options.criteria,
+    );
 
     const issues = [
       ...unreferenced.map(

@@ -85,6 +85,14 @@ export async function buildAgentInputMessages<TOutput>(params: {
   if (typeof systemPrompt === "string") {
     systemContent = systemPrompt;
   } else if (systemPrompt) {
+    // A lazily-compiled prompt (`systemPrompt.refined(...)`) finishes its
+    // async work here, before the synchronous `resolve()` below — a no-op for
+    // plain builders, and never throws (a failed refinement falls back to the
+    // original text).
+    if (typeof systemPrompt.materialize === "function") {
+      await systemPrompt.materialize();
+    }
+
     systemContent = systemPrompt.resolve(placeholders);
 
     // Capture prompt-version linkage from the contract's metadata: a *named*

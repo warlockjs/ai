@@ -62,6 +62,11 @@ export {
 } from "./planner-drift-error";
 export { PlannerFailedError } from "./planner-failed-error";
 export { PlannerPlanInvalidError } from "./planner-plan-invalid-error";
+export {
+  PromptRefinementError,
+  type PromptRefinementErrorOptions,
+  type PromptRefinementFailureReason,
+} from "./prompt-refinement-error";
 export { ProviderAuthError } from "./provider-auth-error";
 export { ProviderError } from "./provider-error";
 export {

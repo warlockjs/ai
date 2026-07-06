@@ -73,6 +73,9 @@ function makeSystemPrompt(resolved: string): SystemPromptContract {
     validate() {
       return Promise.resolve({ ok: true, missing: [] });
     },
+    refined(): never {
+      throw new Error("refined() is not supported by this test fake");
+    },
   } as SystemPromptContract;
 }
 
@@ -460,6 +463,9 @@ describe("agent()", () => {
       resolve: resolveMock,
       validate() {
         return Promise.resolve({ ok: true, missing: [] });
+      },
+      refined(): never {
+        throw new Error("refined() is not supported by this test fake");
       },
     } as SystemPromptContract;
 

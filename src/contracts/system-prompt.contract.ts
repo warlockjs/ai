@@ -2,6 +2,7 @@ import type {
   PromptValidationResult,
   PromptsValidateOptions,
 } from "../prompts/prompts-manager.type";
+import type { ModelContract } from "./model.contract";
 import type { Placeholders } from "./placeholders.type";
 
 /**
@@ -94,6 +95,16 @@ export interface SystemPromptMeta {
 
   /** Placeholder keys callers must supply when resolving this prompt. */
   readonly required?: readonly string[];
+
+  /**
+   * Provenance label of the prompt this one was refined from (e.g.
+   * `"support@1"`, or `"anonymous"` for an unnamed source). Stamped by
+   * `refined(...).refinePrompt()` — never set by hand.
+   */
+  readonly refinedFrom?: string;
+
+  /** `provider:name` of the model that produced a refined prompt's text. */
+  readonly refinerModel?: string;
 }
 
 /**
@@ -117,6 +128,60 @@ export type SystemPromptMergeSource =
   | SystemPromptBlockContract
   | SystemPromptContract
   | string;
+
+/**
+ * Structural store a refined prompt pins its compiled text into — the same
+ * `get` / `set` subset of `@warlock.js/cache`'s `CacheDriver` that
+ * `PromptJudgeCacheLike` uses, so any cache driver satisfies it while
+ * `@warlock.js/cache` stays an optional peer.
+ *
+ * Semantically a **store, not a cache**: a pinned refinement is re-generated
+ * only when an input changes (source text, refiner model, criteria, recipe
+ * version) — never evicted-and-silently-recomputed over time. Prefer a
+ * persistent/shared backend (redis, pg) so one process pays the refinement
+ * and the fleet reads the pin.
+ */
+export interface RefinedPromptStoreLike {
+  /** Read a pinned value, or `null` on a miss. */
+  get<T = unknown>(key: string): Promise<T | null>;
+
+  /** Pin a value (TTL / options ignored by this path — pins don't expire). */
+  set(key: string, value: unknown, ttlOrOptions?: unknown): Promise<unknown>;
+}
+
+/**
+ * Configuration for {@link SystemPromptContract.refined} — the prompt
+ * compiler. `model` writes the refined text; `criteria` steers the rewrite;
+ * `store` pins the result across processes.
+ */
+export interface RefinedSystemPromptOptions {
+  /** The refiner model that rewrites the prompt (one call per unique input). */
+  readonly model: ModelContract;
+
+  /**
+   * Rules the rewritten prompt must satisfy, on top of the built-in
+   * refinement recipe — same shape and meaning as `validate({ criteria })`
+   * (validate *grades* against criteria; refined *rewrites* against them).
+   * A single string is used verbatim; a list becomes a numbered rule set.
+   */
+  readonly criteria?: string | readonly string[];
+
+  /**
+   * Where the compiled text is pinned. Omitted ⇒ the pin lives on the
+   * refined prompt instance for the process lifetime (compile once per
+   * instance); pass a shared store for cross-process / persistent pinning.
+   */
+  readonly store?: RefinedPromptStoreLike;
+}
+
+/** Per-call options for `refine()` / `refinePrompt()`. */
+export interface PromptRefineOptions {
+  /**
+   * Skip the pinned value and compile a fresh take (the new result replaces
+   * the pin). Use when you want another attempt at the same source.
+   */
+  readonly fresh?: boolean;
+}
 
 /**
  * Immutable builder for composing a layered system prompt out of persona and
@@ -244,4 +309,112 @@ export interface SystemPromptContract {
    * reflects the deterministic verdict alone; a flaky judge never flips it.
    */
   validate(options?: PromptsValidateOptions): Promise<PromptValidationResult>;
+
+  /**
+   * Derive the **compiled** form of this prompt: a lazy wrapper that rewrites
+   * the human-authored text into a model-optimized version via
+   * `options.model` the first time it is used by an agent, pins the result
+   * (in `options.store` when given, else on the instance), and serves the
+   * pinned text from then on. The source prompt stays the editing surface;
+   * the refined text is a derived artifact — re-compiled only when the
+   * source text, refiner model, `criteria`, or built-in recipe change.
+   *
+   * The wrapper is a full `SystemPromptContract`, so it drops in anywhere a
+   * prompt does. Refinement is advisory on the agent path: if the refiner
+   * fails, the ORIGINAL prompt is served (warned once, never thrown).
+   * Placeholders are contract, not prose — the compiled text keeps the exact
+   * `{{placeholder}}` set or the refinement is rejected.
+   *
+   * @example
+   * const support = ai.systemPrompt(
+   *   [ai.persona("You are a friendly assistant."), ai.instruction("Help {{name}} with orders.")],
+   *   { name: "support" },
+   * ).refined({ model: anthropic.model({ name: "claude-sonnet-4-5" }) });
+   *
+   * const agent = ai.agent({ model, systemPrompt: support }); // compiles lazily on first run
+   */
+  refined(options: RefinedSystemPromptOptions): RefinedSystemPromptContract;
+
+  /**
+   * Optional async pre-resolution hook. When present, consumers that are
+   * about to call the synchronous `resolve()` on an async boundary (the
+   * agent input builder) await it first, letting a lazily-compiled prompt
+   * finish its work. Plain builders don't implement it; implementations
+   * must never throw (degrade to the original text instead).
+   */
+  materialize?(): Promise<void>;
+}
+
+/**
+ * The compiled form of a system prompt, returned by
+ * {@link SystemPromptContract.refined}. A full drop-in prompt contract plus
+ * the explicit compilation surface: `refine()` hands back the compiled
+ * template text (for admin routes, previews, boot warmup, CI), and
+ * `refinePrompt()` hands back a composable `SystemPromptContract` built from
+ * it. All three consumption paths — lazy agent use, `refine()`, and
+ * `refinePrompt()` — share one compilation pipeline and one pin.
+ */
+export interface RefinedSystemPromptContract extends SystemPromptContract {
+  /** The human-authored prompt this wrapper compiles — always the source of truth. */
+  readonly source: SystemPromptContract;
+
+  /**
+   * Chaining stays compiled: every derivation edits the SOURCE and re-wraps
+   * it with the same refinement options, so the return type stays refined —
+   * and the pin invalidates naturally (new source ⇒ new key).
+   */
+  persona(persona: PersonaContract | string): RefinedSystemPromptContract;
+
+  /** See {@link RefinedSystemPromptContract.persona} — chaining stays compiled. */
+  instruction(
+    instruction: InstructionContract | string,
+  ): RefinedSystemPromptContract;
+
+  /** See {@link RefinedSystemPromptContract.persona} — chaining stays compiled. */
+  merge(
+    ...blocks: readonly SystemPromptBlockContract[]
+  ): RefinedSystemPromptContract;
+  merge(source: SystemPromptContract): RefinedSystemPromptContract;
+  merge(
+    name: string,
+    options?: SystemPromptMergeOptions,
+  ): RefinedSystemPromptContract;
+
+  /** Read the SOURCE prompt's metadata — a compiled prompt keeps its source identity. */
+  meta(): SystemPromptMeta | undefined;
+
+  /** Rename the SOURCE and re-wrap — refinement survives the rename. */
+  meta(meta: SystemPromptMeta): RefinedSystemPromptContract;
+
+  /**
+   * Compile now (or read the pin) and return the refined template **string**.
+   * Still a template: the exact `{{placeholder}}` set of the source survives
+   * verbatim, so the text stays parametric. Store-first — an unchanged input
+   * returns the pinned text without a model call; `{ fresh: true }` forces a
+   * new take (which replaces the pin).
+   *
+   * Unlike the lazy agent path, this explicit call **throws**
+   * `PromptRefinementError` when the refiner fails or breaks placeholder
+   * parity — a route/CI caller needs the failure, not a silent fallback.
+   */
+  refine(options?: PromptRefineOptions): Promise<string>;
+
+  /**
+   * Same compilation, returned as a new `SystemPromptContract` (one
+   * instruction block holding the refined template) for composition:
+   * hand it to an agent, `.resolve(placeholders)`, `.merge(...)`,
+   * `validate({ criteria })`, or `.meta({ name })` it to register the
+   * compiled text as a next version (unlocking `ai.prompts.diff` as the
+   * original-vs-refined review flow). Carries `meta.refinedFrom` /
+   * `meta.refinerModel` provenance and the source's `required` keys; never
+   * auto-registers — registry versions stay human-intentional.
+   */
+  refinePrompt(options?: PromptRefineOptions): Promise<SystemPromptContract>;
+
+  /**
+   * The advisory compilation hook the agent path awaits: compiles + pins on
+   * first call, no-op once pinned, and NEVER throws — on any refiner failure
+   * it warns once and leaves `resolve()` serving the original text.
+   */
+  materialize(): Promise<void>;
 }

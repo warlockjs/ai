@@ -167,5 +167,6 @@ Three distinct prompts, one common foundation. Base is immutable — safe to sha
 ## See also
 
 - [`@warlock.js/ai/manage-prompts/SKILL.md`](@warlock.js/ai/manage-prompts/SKILL.md) — the `ai.prompts` registry these named prompts auto-register into (resolve / version / tag / diff / export / validate)
+- [`@warlock.js/ai/refine-prompts/SKILL.md`](@warlock.js/ai/refine-prompts/SKILL.md) — `.refined({ model, criteria, store })`, the prompt compiler: lazily rewrite this builder into a model-optimized version, pinned like a lockfile
 - [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `systemPrompt` on factory + per-call override
 - [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) — per-step agent references inherit their own system prompt

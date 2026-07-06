@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.7.0
+
+### Added
+
+- **`systemPrompt().refined({ model, criteria, store })`** — the prompt compiler. Humans keep writing human prompt text; the refined wrapper lazily rewrites it into a model-optimized version on first agent use and pins the result like a lockfile (re-compiled only when the source text, refiner model, `criteria`, or recipe version change — never silently). `await refined.refine()` returns the compiled template **string** (placeholders intact — routes / previews / warmup / CI; throws `PromptRefinementError` on failure) and `await refined.refinePrompt()` returns a composable prompt with `meta.refinedFrom` / `meta.refinerModel` provenance (register it to `diff` original vs refined). Placeholder parity is machine-enforced (one repair re-ask, then rejected); the lazy agent path never throws — it warns once and serves the original.
+- **`ai.prompts.validate({ criteria })`** — validate a prompt against your **own** rules. Pass `criteria` (a string or a list of short rules) and, when a `judge` model is supplied, it replaces the built-in quality rubric so the judge's `score` / `issues` reflect your criteria (a failed rule is named in `issues`). Advisory only — never flips the deterministic `ok`; folded into the `judgeCache` key so different rules re-run.
+
 ## 4.6.0
 
 ### Added
