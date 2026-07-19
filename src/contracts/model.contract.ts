@@ -43,12 +43,20 @@ export type ModelCallOptions = {
   /**
    * Reasoning / thinking-effort control for reasoning-capable models.
    * `effort` maps to OpenAI `reasoning_effort`; `maxTokens` caps the
-   * Anthropic extended-thinking budget. Adapters whose
-   * `capabilities.reasoning` is absent/false ignore this rather than
+   * Anthropic extended-thinking budget. `effort: "none"` runs the model
+   * **without reasoning, explicitly** — distinct from an absent `effort`
+   * (which requests the provider default, i.e. the model may still reason
+   * server-side). It is the only mode in which OpenAI's gpt-5 / o-series
+   * models accept function tools on the Chat Completions API. Adapters
+   * whose `capabilities.reasoning` is absent/false ignore this rather than
    * forwarding unsupported params. Absent = provider default.
    *
    * @example
    * await model.complete(messages, { reasoning: { effort: "high" } });
+   *
+   * @example
+   * // gpt-5 / o-series + tools: turn reasoning off so tools are accepted.
+   * await model.complete(messages, { reasoning: { effort: "none" }, tools });
    */
   reasoning?: {
     effort?: ReasoningEffort;
@@ -76,8 +84,18 @@ export type ModelCallOptions = {
  * Reasoning/thinking-effort levels for reasoning-capable models. Maps to
  * the provider-native control (OpenAI `reasoning_effort`); adapters
  * without reasoning support ignore it.
+ *
+ * `"none"` means **run without reasoning, explicitly** — not "provider
+ * default" (that is what an absent `effort` requests). It exists because
+ * OpenAI's gpt-5 / o-series models reject function tools on Chat
+ * Completions while reasoning is active: the endpoint accepts tools only
+ * when `reasoning_effort` is sent as `"none"` (the alternative is the
+ * Responses API). The OpenAI adapter forwards `"none"` verbatim so
+ * tool-using agents work on those models; budget-based adapters
+ * (Anthropic / Google `thinking`, Ollama `think`, Bedrock) read `"none"`
+ * as "reasoning off" and disable the thinking channel.
  */
-export type ReasoningEffort = "low" | "medium" | "high";
+export type ReasoningEffort = "low" | "medium" | "high" | "none";
 
 /**
  * Declarative feature flags a `ModelContract` may expose so the agent can

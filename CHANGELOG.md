@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.8.0 - 2026-07-19
+
+### Added
+
+- **`reasoning: { effort: "none" }`** — a neutral "run without reasoning, explicitly" level on `ReasoningEffort`; OpenAI emits `reasoning_effort: "none"` so gpt-5 / o-series accept function tools, and budget-based adapters (Anthropic / Bedrock / Google / Ollama) disable thinking.
+
 ## 4.7.0
 
 ### Added
