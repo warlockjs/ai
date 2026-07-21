@@ -1,4 +1,5 @@
 import type { CacheDriver } from "@warlock.js/cache";
+import { log } from "@warlock.js/logger";
 import type { CheckpointStore } from "./contracts/orchestrator/checkpoint-store.contract";
 import type { SnapshotStore } from "./contracts/orchestrator/snapshot-store.contract";
 
@@ -147,8 +148,8 @@ export function setAIConfig(partial: Partial<AIConfig>): AIConfig {
   for (const listener of configListeners) {
     try {
       listener(snapshot);
-    } catch {
-      // intentionally ignored
+    } catch (error) {
+      log.error("ai", "configListener", error as Error);
     }
   }
 
