@@ -4,6 +4,17 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.8.2 - 2026-07-22
+
+### Added
+
+- `judgePromptBody` / `formatCriteria` / `JudgeOutcome` — the LLM-as-judge building blocks `ai.prompts().validate()` already used internally are now public, so other packages (`@warlock.js/ai-panoptic`'s trace-level system-prompt evaluation) can grade arbitrary prompt text against a model + rubric without a second judging implementation
+
+### Fixed
+
+- `redact()` no longer collapses a raw `Error` (or an `Error` nested in a `cause` chain) to `{}` — `name` / `message` / `stack` aren't own-enumerable on `Error` instances, so the previous `Object.entries()` walk saw none of them. This was silently dropping tool/agent error `cause` detail wherever `redact()` runs it, including `@warlock.js/ai-panoptic`'s trace `cause` field (a failed tool's `ToolExecutionError.cause` showed as an empty object in the dashboard instead of the underlying thrown error)
+- `@warlock.js/ai-openai` and `pdf-parse` declared as optional `peerDependencies` — both are lazily `import()`ed (the skills-catalog embedder probe; `ai.rag.loadPdf`) but weren't listed in either `dependencies` or `peerDependencies`, so pkgist's bundler vendored their source directly into `ai`'s own build instead of leaving them external (the same split-brain class of bug as `core`'s missing `@warlock.js/ai` peerDependency, fixed in 4.8.1). For `@warlock.js/ai-openai` specifically this meant the skills-catalog embedder-installed probe always resolved against the vendored copy bundled into `ai`, so it reported an embedder provider as "installed" even when the app never installed `@warlock.js/ai-openai` itself
+
 ## 4.8.1 - 2026-07-21
 
 ### Fixed

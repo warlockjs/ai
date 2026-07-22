@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai",
-  "version": "4.8.1",
+  "version": "4.8.2",
   "type": "module",
   "description": "Core @warlock.js AI framework — contracts, agent, workflow, supervisor",
   "main": "./src/index.ts",
@@ -31,18 +31,26 @@
     "vitest": "^4.1.4"
   },
   "peerDependencies": {
+    "@warlock.js/ai-openai": "*",
     "@warlock.js/cache": "*",
     "@warlock.js/logger": "*",
     "langfuse": "*",
     "openai": "*",
+    "pdf-parse": "*",
     "pg": "*",
     "redis": "*"
   },
   "peerDependenciesMeta": {
+    "@warlock.js/ai-openai": {
+      "optional": true
+    },
     "langfuse": {
       "optional": true
     },
     "openai": {
+      "optional": true
+    },
+    "pdf-parse": {
       "optional": true
     },
     "pg": {

@@ -80,8 +80,20 @@ export function redact<T>(value: T, options: RedactOptions = {}): T {
       return input.map(item => walk(item, depth + 1));
     }
 
+    // `name` / `message` / `stack` sit on Error's prototype chain (or as
+    // non-enumerable own properties), so a plain `Object.entries()` walk
+    // sees none of them — a raw Error `cause` would otherwise collapse to
+    // `{}`. Project them explicitly; own enumerable extras (`code`,
+    // `cause`, custom AIError fields) still merge in below and recurse
+    // normally, so a chained `cause` that is itself an Error is unwrapped
+    // the same way.
+    const source: Record<string, unknown> =
+      input instanceof Error
+        ? { ...input, name: input.name, message: input.message, stack: input.stack }
+        : (input as Record<string, unknown>);
+
     const out: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(input as Record<string, unknown>)) {
+    for (const [key, val] of Object.entries(source)) {
       out[key] = keyIsSensitive(key, fragments)
         ? placeholder
         : walk(val, depth + 1);

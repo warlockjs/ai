@@ -34,6 +34,22 @@ describe("redact", () => {
     const out = redact({ ssn: "123" }, { keys: ["ssn"], placeholder: "***" });
     expect(out.ssn).toBe("***");
   });
+
+  it("preserves name/message/stack when redacting a raw Error (previously collapsed to {})", () => {
+    const out = redact(new Error("boom")) as { name: string; message: string; stack: string };
+    expect(out.name).toBe("Error");
+    expect(out.message).toBe("boom");
+    expect(typeof out.stack).toBe("string");
+  });
+
+  it("unwraps a nested Error cause the same way", () => {
+    const inner = new Error("root cause");
+    const outer = Object.assign(new Error("wrapper"), { cause: inner });
+    const out = redact(outer) as { message: string; cause: { name: string; message: string } };
+    expect(out.message).toBe("wrapper");
+    expect(out.cause.name).toBe("Error");
+    expect(out.cause.message).toBe("root cause");
+  });
 });
 
 describe("scrubSecrets", () => {
