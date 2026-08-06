@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { Logger } from "@warlock.js/logger";
 import type { AgentResult } from "../contracts/result/agent-result.type";
+import type { BaseReport } from "../contracts/result/base-report.type";
 import type { AgentReport } from "../contracts/result/execution-report.type";
 import type { AttemptEntry, StepSnapshot } from "../contracts/result/step-result.type";
 import type { Usage } from "../contracts/result/usage.type";
@@ -9,7 +10,7 @@ import type { StepDefinition } from "../contracts/workflow/step.contract";
 import type { WorkflowContext } from "../contracts/workflow/workflow-context.type";
 import type { WorkflowEventHandlers } from "../contracts/workflow/workflow.contract";
 import { mergeUsage } from "../utils/compute-cost";
-import { withoutRunFrame } from "../utils/run-context";
+import { withoutRunFrame, withRunFrame } from "../utils/run-context";
 import {
   AIError,
   SchemaValidationError,
@@ -40,6 +41,7 @@ export type MutableStepSnapshot = {
   executionResult?: unknown;
   agentReport?: AgentReport;
   agentUsage?: Usage;
+  children?: BaseReport[];
   steps?: Record<string, StepSnapshot>;
 };
 
@@ -68,6 +70,16 @@ export type ExecuteStepParams = {
   }) => WorkflowContext;
   usage: Usage;
   workflowDefaultRetry?: RetryConfig | false;
+  /**
+   * The enclosing workflow's own run-id — the `rootRunId` / `parentRunId`
+   * a `run` step's ambient {@link RunFrame} stamps onto anything it
+   * captures. `stampReportLineage`'s single authoritative pass (run once
+   * on the assembled workflow report) is what makes the exact value here
+   * safe to be provisional.
+   */
+  runId: string;
+  /** Propagated onto anything a `run` step's ambient run-frame captures. */
+  sessionId?: string;
 };
 
 /**
@@ -139,6 +151,10 @@ export async function executeStep(params: ExecuteStepParams): Promise<MutableSte
   let executionResult: unknown;
   let output: unknown;
   let succeeded = false;
+  // Reports a `run` step's callback captured via its ambient run-frame
+  // (see below) — reset each attempt so a failed attempt's captures
+  // never bleed into a later retry's snapshot.
+  let stepChildren: BaseReport[] | undefined;
 
   for (let attempt = 1; attempt <= totalAttempts; attempt++) {
     if (signal?.aborted) throw createCancelledError(signal);
@@ -179,7 +195,39 @@ export async function executeStep(params: ExecuteStepParams): Promise<MutableSte
 
         if (result.error) throw result.error;
       } else if (step.run) {
-        executionResult = await step.run(params.buildContext({ state: attemptState }));
+        // Custom `run` callbacks can call anything — an ambient RunFrame
+        // (mirroring the supervisor/team/orchestrator callback pattern)
+        // is the only way to observe what they invoke, since (unlike
+        // `step.agent` above) there's no single known executable to
+        // explicitly capture. Any `agent.execute(...)` the callback
+        // invokes DIRECTLY self-attaches its report onto `runChildren`
+        // via `captureChildReport` and is suppressed from also
+        // self-routing as a standalone observed trace.
+        const runChildren: BaseReport[] = [];
+
+        try {
+          executionResult = await withRunFrame(
+            {
+              sink: runChildren,
+              rootRunId: params.runId,
+              parentRunId: params.runId,
+              sessionId: params.sessionId,
+            },
+            () => step.run!(params.buildContext({ state: attemptState })),
+          );
+        } finally {
+          // Runs whether the callback resolved or threw — a callback that
+          // calls an agent and THEN throws still gets that call's report
+          // preserved on the failed snapshot (forensic trace, same intent
+          // as the file's other failed-snapshot preservation). Unconditional
+          // reassign (not a conditional-append): a retry whose callback
+          // captures nothing must clear a prior failed attempt's captures.
+          stepChildren = runChildren.length > 0 ? runChildren : undefined;
+
+          for (const child of runChildren) {
+            mergeUsage(params.usage, child.usage);
+          }
+        }
       }
 
       if (step.output) {
@@ -310,6 +358,7 @@ export async function executeStep(params: ExecuteStepParams): Promise<MutableSte
         executionResult && typeof executionResult === "object" ? executionResult : undefined,
       agentReport: failedAgentResult?.report,
       agentUsage: failedAgentResult?.usage,
+      children: stepChildren,
     };
   }
 
@@ -339,6 +388,7 @@ export async function executeStep(params: ExecuteStepParams): Promise<MutableSte
       executionResult && typeof executionResult === "object" ? executionResult : undefined,
     agentReport: completedAgentResult?.report,
     agentUsage: completedAgentResult?.usage,
+    children: stepChildren,
   };
 }
 
@@ -371,6 +421,8 @@ async function runParallelStep(params: ParallelParams): Promise<MutableStepSnaps
         signal,
         buildContext: params.buildContext,
         usage: params.usage,
+        runId: params.runId,
+        sessionId: params.sessionId,
       });
 
       return { child, snap };
@@ -478,6 +530,7 @@ export function finalizeSnapshot(snap: MutableStepSnapshot): StepSnapshot {
     executionResult: snap.executionResult as StepSnapshot["executionResult"],
     agentReport: snap.agentReport,
     agentUsage: snap.agentUsage,
+    children: snap.children,
     steps: snap.steps,
   }) as StepSnapshot;
 }

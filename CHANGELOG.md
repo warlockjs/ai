@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.9.0 - 2026-08-06
+
+### Added
+
+- `StepSnapshot.children` — reports a workflow `run` step captured from any executable its callback invoked DIRECTLY (`agent.execute(...)` rather than the declarative `agent:` field), via the same ambient `RunFrame` a supervisor/team/orchestrator callback already gets. `report.children` now includes these alongside `step.agent` reports.
+
+### Fixed
+
+- A workflow `run` step that calls `agent.execute()` directly no longer produces two disconnected top-level traces (one "agent", one "workflow") with the agent missing from `report.children` — it now nests correctly (`workflow → agent → tool`, usage/cost rolled up) and no longer also self-routes as a separate observed trace. Declarative `step.agent` was already correct; this closes the gap for ad-hoc calls inside `run` (self-documented in `workflow/engine.ts` as a known limitation).
+
 ## 4.8.2 - 2026-07-22
 
 ### Added

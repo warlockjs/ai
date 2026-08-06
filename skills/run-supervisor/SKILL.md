@@ -286,6 +286,8 @@ ai.supervisor({
 
 Same behavior across `ai.supervisor`, `ai.team` (member callbacks), and `ai.orchestrator` (turn callbacks) — and `sessionId` propagates onto the captured subtree. `ctx.run(agent)` is captured **exactly once** (the explicit path does not double-count via the ambient frame), and a standalone `agent.execute()` **outside** any callback keeps its own self-root (no frame leakage). This is what an `Observer` / panoptic sees — see [`@warlock.js/ai/observe-ai-flows/SKILL.md`](@warlock.js/ai/observe-ai-flows/SKILL.md).
 
+`ai.workflow`'s `run` steps get the same ambient-frame treatment (see [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md#run-step-sub-agent-nesting)) — with one shape difference: workflow has no intermediate "callback" report node, so a `run` step's captured agent lands as a DIRECT child of the workflow report (same tree position `step.agent`'s report already occupies), not nested one level deeper under a step-named node.
+
 ## Per-call options
 
 ```ts

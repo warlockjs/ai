@@ -57,6 +57,14 @@ export type ModelCallOptions = {
    * @example
    * // gpt-5 / o-series + tools: turn reasoning off so tools are accepted.
    * await model.complete(messages, { reasoning: { effort: "none" }, tools });
+   *
+   * `@warlock.js/ai-openai` specifically DEFAULTS to `effort: "none"`
+   * automatically whenever `tools` is non-empty and the caller left
+   * `reasoning` unset — there is no working alternative on Chat Completions
+   * in that state, so the explicit form above is for overriding the
+   * default (or documenting intent), not required to get it. This is an
+   * adapter-level default, not a contract guarantee — other adapters may
+   * have different constraints (or none) around reasoning + tools.
    */
   reasoning?: {
     effort?: ReasoningEffort;

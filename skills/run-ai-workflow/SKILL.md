@@ -111,6 +111,25 @@ type WorkflowResult<TOutput> = {
 
 `report.steps[name]` holds a frozen `StepSnapshot` with `output`, `status`, `attempts`, `attemptHistory`, timings, nested children for parallel groups.
 
+### Run-step sub-agent nesting
+
+`report.children` collects every step's captured executable report — a `step.agent`'s report, AND (mirroring the supervisor/team/orchestrator callback pattern — [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md)) anything a `run` step's callback invoked DIRECTLY, e.g. `agent.execute(...)` rather than the declarative `agent` field:
+
+```ts
+ai.step({
+  name: "summarize",
+  run: async (ctx) => {
+    const result = await summarizerAgent.execute(ctx.input.text); // direct call — still nested
+    return { prose: result.text };
+  },
+}),
+// report.children → [ agentReport("summarizer") ] — usage/cost rolled up into
+// report.usage, and the agent does NOT also appear as a separate top-level
+// observed trace (an ambient RunFrame suppresses that self-routing).
+```
+
+No manual id threading, no separate observer wiring — an `Observer` (or Panoptic's dashboard) sees ONE tree: `workflow → agent → tool`, not a disconnected `workflow` trace next to a disconnected `agent` trace. `sessionId` propagates onto the captured subtree the same way. A `run` step's captures land as DIRECT children of the workflow report (the same tree position a `step.agent` report already occupies) — there's no intermediate "step" node, unlike supervisor's "callback" node. Only a step's LAST retry attempt's captures survive into the final snapshot; a failed attempt that called an agent and then threw never leaks that capture into a subsequent successful retry. A standalone `agent.execute()` call OUTSIDE any workflow step is unaffected — it keeps its own self-root, same as always.
+
 ## Step lifecycle
 
 ```

@@ -186,6 +186,8 @@ export async function runWorkflow<TOutput>(
         buildContext,
         usage,
         workflowDefaultRetry: definition.defaultRetry,
+        runId,
+        sessionId: params.sessionId,
       });
 
       Object.assign(state, snapshot.state);
@@ -406,17 +408,20 @@ export async function runWorkflow<TOutput>(
     }
   }
 
-  // Collect child executable reports from every step that ran one.
-  // Today the step runner surfaces agent reports (the only executable
-  // kind steps can invoke natively via `step.agent`); custom `run`
-  // callbacks that call tools/workflows/supervisors can't be observed
-  // here without a richer step-runner API — that's a v1.x follow-up
-  // (see backlog: "step.run executables surface in workflow tree").
+  // Collect child executable reports from every step that produced one —
+  // either the declarative `step.agent` field's own report, or whatever
+  // a `run` callback's ambient run-frame captured from a direct
+  // `agent.execute(...)` call (step-runner.ts's `withRunFrame` around
+  // `step.run`). Order matches step declaration; within a step, the
+  // agentReport (if any) precedes its run-captured children.
   const children: BaseReport[] = [];
   for (const stepName in steps) {
     const snap = steps[stepName];
     if (snap.agentReport) {
       children.push(snap.agentReport);
+    }
+    if (snap.children) {
+      children.push(...snap.children);
     }
   }
 

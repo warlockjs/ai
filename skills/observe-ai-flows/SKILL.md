@@ -66,9 +66,9 @@ report.messages; // CapturedMessage[] — every role (system/user/assistant/tool
 
 A `CapturedMessage` is a JSON-safe projection: `{ role, content, toolCalls?, toolCallId? }` — `content` is always a string (tool results stringified), assistant turns that triggered tools carry `toolCalls`, tool-result turns carry the `toolCallId` they answer. Unlike `trips[].input` (which stubs non-first trips with `"[tool results]"`), this preserves the **real** turn array. Omitted ⇒ the field is **absent** and the report is byte-for-byte as before. Opt-in because messages can be large and sensitive (full prompts, tool inputs/outputs) — and **required for panoptic full-history capture**.
 
-## Callback sub-agents nest in the report tree
+## Callback / run-step sub-agents nest in the report tree
 
-The `ExecutionReport` an observer receives reflects **full** lineage: a supervisor / team / orchestrator callback that calls `agent.execute()` directly auto-nests `callback → agent → tool` (via an ambient `RunFrame`), so usage / cost roll up and panoptic renders the sub-agent under its callback instead of as a lone `$0` span. No observer-side change is needed — the tree arrives already nested. A team's root span carries `type: "team"` (a first-class `ReportType`, not `"supervisor"`), so observers can distinguish, group, and label team runs as their own type. See [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md).
+The `ExecutionReport` an observer receives reflects **full** lineage: a supervisor / team / orchestrator callback, OR a workflow `run` step, that calls `agent.execute()` directly auto-nests `→ agent → tool` (via an ambient `RunFrame`), so usage / cost roll up and panoptic renders the sub-agent under its enclosing node instead of as a lone `$0` span AND a disconnected second top-level trace. No observer-side change is needed — the tree arrives already nested. A team's root span carries `type: "team"` (a first-class `ReportType`, not `"supervisor"`), so observers can distinguish, group, and label team runs as their own type. See [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) and [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md).
 
 ## The config seam — `onConfigApplied`
 

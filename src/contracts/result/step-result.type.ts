@@ -1,6 +1,7 @@
 import type { AIError } from "../../errors/ai-error";
 import type { AgentResult } from "./agent-result.type";
 import type { AttemptEntry } from "./attempt-entry.type";
+import type { BaseReport } from "./base-report.type";
 import type { AgentReport } from "./execution-report.type";
 import type { Usage } from "./usage.type";
 
@@ -40,6 +41,15 @@ export type StepSnapshot = Readonly<{
   agentReport?: AgentReport;
   /** Shortcut: `executionResult.usage` when present. */
   agentUsage?: Usage;
+  /**
+   * Reports of any executable (agent, workflow, tool, supervisor, ...)
+   * a `run` callback invoked DIRECTLY — `agent.execute(...)` rather
+   * than the declarative `agent:` field — captured via the same ambient
+   * run-frame a supervisor/team/orchestrator callback already gets.
+   * Absent for `agent` / skipped / parallel steps, or a `run` step that
+   * invoked nothing observable.
+   */
+  children?: BaseReport[];
   /** Nested children for parallel steps. */
   steps?: Record<string, StepSnapshot>;
 }>;
