@@ -33,7 +33,7 @@ if (error) console.warn(error.code); // typed AIError
 else console.log(data.text);         // the transcript
 ```
 
-`TranscriptionModelContract` mirrors `SpeechModelContract` — a peer primitive produced by the adapter's optional `transcribe?()` factory. A non-STT model id (`openai.transcribe({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — fail fast, like the speech/embedder guards.
+`TranscriptionModelContract` mirrors `SpeechModelContract` — a peer primitive produced by the adapter's optional `transcribe?()` factory. The model id is **not validated locally** — a non-STT id (`openai.transcribe({ name: "gpt-4o" })`) constructs fine and is forwarded to the provider as given, so it fails as a typed provider error on `result.error`, never as a local throw at construction.
 
 ## The `AudioInput` shape + the two builders
 

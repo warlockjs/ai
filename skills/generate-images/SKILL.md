@@ -81,7 +81,7 @@ const gpt = openai.image({ name: "gpt-image-1", pricing: { input: 5, output: 40 
 const dalle = openai.image({ name: "dall-e-3", pricing: { perImage: 0.04 } });
 ```
 
-A non-image model id (`openai.image({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — fail fast, like the embedder/vision guards.
+The model id is **not validated locally**. `openai.image({ name })` forwards the id to `client.images.generate` exactly as given, so a non-image id (`openai.image({ name: "gpt-4o" })`) constructs fine and fails at OpenAI — as a typed provider error on `result.error`, never as a local throw at construction.
 
 ## Google — Imagen (per-image)
 
@@ -95,6 +95,8 @@ const { data } = await ai.image({ model: imagen, prompt: "a watercolor lighthous
 ```
 
 Imagen returns base64 bytes (no hosted URL). When every candidate is safety-filtered, `ai.image` surfaces a typed `ContentFilterError` on `result.error`.
+
+Like every adapter, Google does **not** guard the model id: `google.image({ name })` passes the id through to `ai.models.generateImages` exactly as given, so an id Google does not serve fails as a typed provider error on `result.error` — not with a local throw at construction.
 
 ## Cost-truth — one rollup, two metering models
 
