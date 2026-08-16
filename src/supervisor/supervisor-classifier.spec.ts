@@ -28,13 +28,18 @@ function buildClassifierAgent(name: string, output: { intent: string; reasoning?
     capabilities: { structuredOutput: true },
   });
 
-  const classifierOutputSchema: StandardSchemaV1<{ intent: string; reasoning?: string; confidence?: number }> = schema(value => {
-    if (!value || typeof value !== "object" || typeof (value as { intent?: unknown }).intent !== "string") {
-      return { issues: [{ message: "expected { intent: string }" }] };
-    }
+  const classifierOutputSchema: StandardSchemaV1<{ intent: string; reasoning?: string; confidence?: number }> =
+    schema<{ intent: string; reasoning?: string; confidence?: number }>(value => {
+      if (
+        !value ||
+        typeof value !== "object" ||
+        typeof (value as { intent?: unknown }).intent !== "string"
+      ) {
+        return { issues: [{ message: "expected { intent: string }" }] };
+      }
 
-    return { value: value as { intent: string; reasoning?: string; confidence?: number } };
-  });
+      return { value: value as { intent: string; reasoning?: string; confidence?: number } };
+    });
 
   return agent({
     name,

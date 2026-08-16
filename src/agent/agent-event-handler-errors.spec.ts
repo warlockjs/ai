@@ -5,7 +5,7 @@ import { agent } from "./agent";
 
 describe("agent — event handler error surfacing (C5)", () => {
   it("isolates a throwing event handler but surfaces it via the logger", async () => {
-    const warn = vi.spyOn(log, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(log, "warn").mockImplementation(async () => log);
 
     const sdk = MockSDK({ responses: [{ content: "hi", finishReason: "stop" }] });
     const ai = agent({

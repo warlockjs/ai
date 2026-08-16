@@ -133,7 +133,8 @@ export class MockModel implements ModelContract {
 
   /**
    * Record the call, optionally delay, then emit the scripted response as a
-   * sequence of stream chunks: content split word-by-word as `delta`
+   * sequence of stream chunks: the scripted `deltas` when the entry
+   * supplies them, otherwise content split word-by-word, as `delta`
    * chunks, each scripted tool call as a `tool-call` chunk, and finally a
    * `done` chunk with finish reason + usage. Throws eagerly if the scripted
    * entry carries an `error`.
@@ -154,10 +155,10 @@ export class MockModel implements ModelContract {
       throw mock.error;
     }
 
-    const words = mock.content.split(" ");
+    const chunks = mock.deltas ?? mock.content.split(" ").map((word) => word + " ");
 
-    for (const word of words) {
-      yield { type: "delta", content: word + " " };
+    for (const chunk of chunks) {
+      yield { type: "delta", content: chunk };
     }
 
     if (mock.toolCalls) {

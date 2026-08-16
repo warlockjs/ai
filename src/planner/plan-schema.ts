@@ -20,10 +20,17 @@ import type { PlannerPlan, PlannerStep } from "../contracts/planner/planner-plan
  * `maxItems` so capable providers refuse to over-produce up front
  * (the planner still truncates the tail to `skipped` defensively).
  */
-export function planSchema(
-  capabilityNames: string[],
-  maxSteps?: number,
-): StandardSchemaV1<PlannerPlan> {
+export type PlanSchema = StandardSchemaV1<PlannerPlan> & {
+  "~standard": {
+    /**
+     * JSON Schema extension read by the native structured-output path.
+     * Part of the declared type so callers don't have to re-assert it.
+     */
+    jsonSchema: { input: () => Record<string, unknown> };
+  };
+};
+
+export function planSchema(capabilityNames: string[], maxSteps?: number): PlanSchema {
   // OpenAI strict `json_schema` mode (and other native structured-output
   // providers) require EVERY property to appear in `required` — with truly
   // optional fields expressed as nullable — and reject array `minItems` /

@@ -112,7 +112,7 @@ describe("supervisor — ctx.run and ctx.stream", () => {
   it("ctx.run threads toolCtx — inline agent's tool writes to supervisor's artifacts bag", async () => {
     type Block = { type: "items"; itemIds: string[] };
 
-    const inputSchema: StandardSchemaV1<{ q: string }> = schema(value => {
+    const inputSchema: StandardSchemaV1<{ q: string }> = schema<{ q: string }>(value => {
       if (!value || typeof value !== "object" || typeof (value as { q?: unknown }).q !== "string") {
         return { issues: [{ message: "bad input" }] };
       }
@@ -266,5 +266,44 @@ describe("supervisor — ctx.run and ctx.stream", () => {
     for (const event of seen) {
       expect(event.startsWith("delegate:")).toBe(true);
     }
+  });
+
+  it("ctx.run stringifies a non-string input before handing it to an agent", async () => {
+    // Agents take `string` input; workflows / supervisors take whatever
+    // they declared. Regression guard: the agent-detection branch used
+    // to test `!("signature" in executable)`, which every primitive
+    // fails, so the coercion was dead and the raw object reached
+    // `agent.execute()`.
+    const sdk = MockSDK({ responses: [{ content: "ok", finishReason: "stop" }] });
+    const model = sdk.model({ name: "coerce-model" });
+    const inner = agent({ name: "coerce-inner", model });
+
+    const supervisorInstance = supervisor({
+      name: "coerce-input",
+      intents: {
+        delegate: async ctx => {
+          await ctx.run(inner, { question: "why", attempt: 2 });
+
+          return { done: true };
+        },
+      },
+      route: ctx => (ctx.iteration === 0 ? "delegate" : END),
+    });
+
+    await supervisorInstance.execute("go");
+
+    const userMessages = model.callHistory
+      .flatMap(call => call.messages)
+      .filter(message => message.role === "user");
+
+    expect(userMessages.length).toBeGreaterThan(0);
+
+    for (const message of userMessages) {
+      expect(typeof message.content).toBe("string");
+    }
+
+    expect(userMessages.map(message => message.content).join("|")).toContain(
+      '{"question":"why","attempt":2}',
+    );
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentContract } from "../contracts/agent/agent.contract";
 import { END } from "../contracts/end.type";
+import type { RouteContext } from "../contracts/supervisor/route-context.type";
 import type { MaxIterationsError, SupervisorRoutingError } from "../errors";
 import { step } from "../workflow/step";
 import { workflow } from "../workflow/workflow";
@@ -508,7 +509,7 @@ describe("ai.supervisor — per-agent input and output overrides", () => {
         writer: {
           agent: writerModel,
           description: "drafts with custom input",
-          input: ctx => `CUSTOM:${ctx.input}`,
+          input: (ctx: RouteContext) => `CUSTOM:${ctx.input}`,
         },
       },
       route: ctx => (ctx.iteration === 0 ? "writer" : END),

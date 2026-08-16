@@ -3,11 +3,7 @@ import { planSchema } from "./plan-schema";
 
 /** Pull the JSON Schema form the planning agent's structured-output path consumes. */
 function jsonSchemaOf(schema: ReturnType<typeof planSchema>): Record<string, unknown> {
-  const standard = schema["~standard"] as {
-    jsonSchema: { input: () => Record<string, unknown> };
-  };
-
-  return standard.jsonSchema.input();
+  return schema["~standard"].jsonSchema.input();
 }
 
 describe("planSchema", () => {
@@ -49,9 +45,11 @@ describe("planSchema", () => {
     expect(steps(jsonSchemaOf(planSchema(["a", "b"]))).maxItems).toBeUndefined();
   });
 
-  it("still validates a well-formed plan after the refactor", () => {
+  it("still validates a well-formed plan after the refactor", async () => {
     const schema = planSchema(["search"], 2);
-    const result = schema["~standard"].validate({
+    // Standard Schema permits an async `validate`; awaiting is the
+    // contract-correct way to reach the result either way.
+    const result = await schema["~standard"].validate({
       steps: [{ capability: "search", input: "go" }],
       summary: "do the thing",
     });

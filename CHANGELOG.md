@@ -4,6 +4,28 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.15.0
+
+### Fixed
+
+- **`ctx.run(agent, payload)` now stringifies a non-string payload, as it always claimed to.** `coerceInlineInput` in `src/supervisor/execution.ts` gated on `!("signature" in executable)` to decide whether the target was an agent — but every member of `SupervisableExecutable` (`AgentContract`, `WorkflowInstance`, `SupervisorContract`) declares `signature`, so the condition was **permanently false and the coercion never ran**. A supervisor intent calling `ctx.run(someAgent, { question: "why", attempt: 2 })` handed the raw object to `agent.execute()`, where it landed as the user message `content` — `[object Object]` in the prompt, or a provider-side payload rejection, depending on the adapter. The check now discriminates on `isAnonymous`, the one member unique to `AgentContract`. A regression test covers it; the old guard fails it with `Expected: "string" / Received: "object"`. The unreferenced `isSupervisor()` duck-type helper — whose own JSDoc admitted it could not tell a supervisor from a workflow — is removed
+- **`ToolMeta` no longer forces `label` and `actionLabel` on every tool that supplies `meta`.** It was declared as `Record<"label" | "actionLabel" | (string & {}), unknown>`, which makes both keys **required**, not optional — so any tool author who set one metadata field was made to set all of them. Now an optional-key shape with an index signature
+- **`ToolConfig.action` is checked bivariantly**, via a `ToolActionResolver<T>` method-in-wrapper. The strictly contravariant parameter position rejected heterogeneous tool arrays that work correctly at runtime
+- **`new Error(msg, { cause })` compiles.** `tsconfig.json` declared no `lib`, so it inherited the `target` default of ES2020, where `ErrorOptions` does not exist. `lib` is now `["ES2022"]`; this also resolves the `Array.at` and `String.replaceAll` errors. Emit is unchanged — `target` is still ES2020. Note `src/skills/sources/url-source.ts:122` was **not** a defect: the `cause` was always passed at runtime, the compiler simply had no type for it
+- **`TeamMemberValue` accepts the callback member form** (`IntentCallback`), which has always worked at runtime and was only rejected by the type
+- **`PlanSchema` no longer erases `~standard.jsonSchema`** from its return type
+
+### Changed
+
+- **`MockModelResponse.usage` is a new `MockUsage` type rather than the emitted `Usage`.** The script is an input, not a result: `MockModel.buildResponse` honours only `input` / `output` / `cachedTokens`, so a fixture declaring `cost` or `reasoningTokens` was silently discarded while the type promised otherwise. `total` is optional and documented as derived, because the mock recomputes it as `input + output` — an existing spec deliberately asserts that a mismatched scripted `total` is overridden
+- **The mock honours `deltas`.** Fixtures already declared the field; the mock ignored it
+- `MockSDK.model()` declares its `MockModel` return type — it always returned one, so `callHistory` is now reachable without a cast. `MockUsage` is exported from the barrel
+
+### Notes
+
+- Typecheck against the package's own TypeScript 6.0.3: **89 → 24 errors, and all 24 remaining are a monorepo-only artifact** (`TS6059`, `@warlock.js/cache` resolved through a `paths` mapping outside `rootDir`). They do not affect the published package, which ships built `exports` and `.d.mts`. In-scope errors are zero
+- Suite: **173 files / 1878 tests passing**, up one from the new regression test
+
 ## 4.12.0
 
 ### Changed

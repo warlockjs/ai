@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { agent } from "../agent/agent";
+import type { AgentContract } from "../contracts/agent/agent.contract";
 import { END } from "../contracts/end.type";
 import type { SupervisorConfig } from "../contracts/supervisor/supervisor-config.type";
+import { MockSDK } from "../mock/mock-sdk";
 import type {
   ResolvedAgentEntry,
   ResolvedCallbackEntry,
@@ -81,9 +84,14 @@ function entriesOf(
   return map;
 }
 
-/** A bare agent-shaped object usable as a `router` / `classifier` value. */
-function agentLike(name: string): { name: string; execute: () => void } {
-  return { name, execute: () => undefined };
+/**
+ * A real agent handle usable as a `router` / `classifier` value.
+ * `computeSignature` only reads `.name` off it, but building a genuine
+ * `AgentContract` keeps the fixture honest — the spec feeds the
+ * fingerprint the same type the factory accepts.
+ */
+function agentLike(name: string): AgentContract<unknown> {
+  return agent({ name, model: MockSDK().model({ name: `${name}-model` }) });
 }
 
 describe("computeSignature (supervisor)", () => {

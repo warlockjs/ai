@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { AgentContract } from "../agent/agent.contract";
 import type { EvaluateContext, EvaluateResult } from "../supervisor/evaluate-context.type";
+import type { IntentCallback } from "../supervisor/intent-entry.type";
 import type { RouterEntry } from "../supervisor/router-entry.type";
 import type { SupervisorConfig, SupervisorEventHandlers } from "../supervisor/supervisor-config.type";
 import type { FlowObserveOption } from "../../observe/resolve-observers";
@@ -9,15 +10,18 @@ import type { SystemPromptContract } from "../system-prompt.contract";
 import type { WorkflowInstance } from "../workflow/workflow.contract";
 
 /**
- * A role member — an agent or a workflow. The same shorthand the
- * supervisor accepts on each `intents` value, narrowed to the two
- * dispatchable unit shapes `team()` forwards verbatim. (Callback /
- * full-entry intent shapes still work when forwarded — this alias is
- * the documented, autocomplete-friendly subset for the common case.)
+ * A role member — an agent, a workflow, or an inline callback. Every
+ * `members` value is forwarded verbatim as a supervisor `intents`
+ * value, so the callback form dispatches exactly like a callback
+ * intent; it is listed here because the runtime has always accepted
+ * it. The richer `IntentEntry` / `IntentRunEntry` object forms are
+ * deliberately left out — `team()` names its roles by key, and the
+ * per-entry overrides belong to `supervisor()`.
  */
 export type TeamMemberValue =
   | AgentContract<unknown>
-  | WorkflowInstance<unknown, unknown>;
+  | WorkflowInstance<unknown, unknown>
+  | IntentCallback;
 
 /**
  * The built-in quality-gate strategies. Each desugars to a concrete

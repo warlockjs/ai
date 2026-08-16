@@ -26,7 +26,15 @@ import { MockTranscriptionModel } from "./mock-transcription-model";
  * const result = await model.complete([{ role: "user", content: "Hi" }]);
  * console.log(result.content); // "Hello from mock!"
  */
-export function MockSDK(config: MockSDKConfig = {}): SDKAdapterContract & {
+export function MockSDK(config: MockSDKConfig = {}): Omit<SDKAdapterContract, "model"> & {
+  /**
+   * Narrower than `SDKAdapterContract.model()` on purpose — the
+   * instance really is a `MockModel`, so tests can reach `.calls` /
+   * `.reset()` straight off the returned model instead of digging it
+   * back out of `models`. Still satisfies the adapter contract:
+   * `MockModel` implements `ModelContract`.
+   */
+  model(modelConfig: ModelConfig): MockModel;
   /** All model instances created by this SDK — for inspecting calls in tests */
   models: MockModel[];
   /** All image-model instances created by this SDK — for inspecting calls in tests */

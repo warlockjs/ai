@@ -1,5 +1,5 @@
 export { mockAgent } from "./mock-agent";
-export type { MockModelResponse, MockSDKConfig } from "./mock-config.type";
+export type { MockModelResponse, MockSDKConfig, MockUsage } from "./mock-config.type";
 export {
   MockImageModel,
   type MockImageCall,

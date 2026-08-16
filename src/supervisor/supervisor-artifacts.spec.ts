@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, it } from "vitest";
 import { agent } from "../agent/agent";
 import { END } from "../contracts/end.type";
+import type { SupervisorIntentValue } from "../contracts/supervisor/intent-entry.type";
 import { SchemaValidationError } from "../errors";
 import { MockSDK } from "../mock/mock-sdk";
 import { tool } from "../tool/tool";
@@ -23,7 +24,7 @@ import { supervisor } from "./supervisor";
  *    callable elsewhere.
  */
 
-const stringInputSchema: StandardSchemaV1<{ query: string }> = schema(value => {
+const stringInputSchema: StandardSchemaV1<{ query: string }> = schema<{ query: string }>(value => {
   if (
     !value ||
     typeof value !== "object" ||
@@ -154,7 +155,7 @@ describe("supervisor — tool ctx artifacts", () => {
     const supervisorInstance = supervisor<
       Record<string, unknown>,
       Record<string, unknown>,
-      Record<string, never>,
+      Record<string, SupervisorIntentValue>,
       { blocks?: Block[] }
     >({
       name: "artifacts-concat",
@@ -281,7 +282,7 @@ describe("supervisor — tool ctx artifacts", () => {
     const supervisorInstance = supervisor<
       Record<string, unknown>,
       Record<string, unknown>,
-      Record<string, never>,
+      Record<string, SupervisorIntentValue>,
       { blocks?: Block[] }
     >({
       name: "artifacts-snapshot",
@@ -408,7 +409,8 @@ describe("supervisor — tool ctx artifacts", () => {
     // The model's second trip carries the tool result back as a
     // `tool` role message. Inspect that content to confirm the
     // artifact key never leaked into the LLM-visible channel.
-    const lastCall = model.calls[model.calls.length - 1];
+    const history = model.callHistory;
+    const lastCall = history[history.length - 1];
     const toolMessages = lastCall.messages.filter(
       message => message.role === "tool",
     );

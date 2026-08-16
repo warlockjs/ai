@@ -1588,37 +1588,18 @@ export class SupervisorExecution<TOutput> {
    * through unchanged so structured inputs work.
    */
   private coerceInlineInput(executable: SupervisableExecutable, input: unknown): unknown {
-    // Agents are the only kind that strictly require string input.
-    // Workflows / supervisors accept arbitrary shapes.
-    const isAgent =
-      !("signature" in executable) &&
-      typeof executable.execute === "function" &&
-      !this.isSupervisor(executable);
+    // `isAnonymous` is the only member unique to `AgentContract`. All
+    // three primitives expose `signature`, `execute`, `stream` and
+    // `resume`, so none of those tells them apart — an earlier
+    // `!("signature" in executable)` check narrowed to `never` and made
+    // this branch permanently dead.
+    const isAgent = "isAnonymous" in executable;
 
     if (isAgent && typeof input !== "string") {
       return safeStringify(input);
     }
 
     return input;
-  }
-
-  /**
-   * Heuristic detection of `SupervisorContract` — the contract carries
-   * a `signature` getter same as workflows, but supervisors expose
-   * `resume()` while workflows expose `resume(runId, options)` too.
-   * Cleanest distinguisher in the public surface: supervisors carry
-   * the `asTool` method name `as` … unfortunately so do workflows.
-   * Use the `streamableType` brand if we add one in v2; for now lean
-   * on a duck-typed check that's good enough for the ctx.run path
-   * (incorrect routing for workflows would still produce a runnable
-   * call — workflow.execute accepts the same args either way).
-   */
-  private isSupervisor(executable: SupervisableExecutable): boolean {
-    return (
-      typeof (executable as { resume?: unknown; signature?: unknown }).resume === "function" &&
-      typeof (executable as { signature?: unknown }).signature === "string" &&
-      typeof (executable as { stream?: unknown }).stream === "function"
-    );
   }
 
   /**

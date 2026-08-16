@@ -3,10 +3,20 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 /**
  * Optional metadata attached to a tool for documentation and tooling.
  *
+ * Free-form: any key is accepted. `label` and `actionLabel` are named
+ * explicitly only so editors suggest them — both are optional, like
+ * every other key.
+ *
  * @example
  * const meta: ToolMeta = { category: "search", version: "1.0" };
  */
-export type ToolMeta = Record<"label" | "actionLabel" | (string & {}), unknown>;
+export type ToolMeta = {
+  /** Human-readable name for the tool in documentation and tooling UIs. */
+  label?: unknown;
+  /** Human-readable name for the action the tool performs. */
+  actionLabel?: unknown;
+  [key: string]: unknown;
+};
 
 /**
  * Discriminated mode controlling whether the tool's result feeds back
@@ -43,6 +53,31 @@ export type ToolMeta = Record<"label" | "actionLabel" | (string & {}), unknown>;
  * → terminate" rule only kicks in when EVERY tool call is silent.
  */
 export type ToolMode = "feedback" | "silent";
+
+/**
+ * Callback form of {@link ToolConfig.action} — turns the model's
+ * arguments into a present-progressive UI string.
+ *
+ * Written as a method inside a wrapper object (then indexed back out)
+ * so TypeScript checks `input` **bivariantly** instead of
+ * contravariantly. That is deliberate, and it is what the runtime
+ * actually does: the dispatch boundary resolves the label from the
+ * model's *raw, pre-validation* arguments, so it hands the callback an
+ * `unknown` while the author declares the shape they expect. Under the
+ * default strict (contravariant) function check a
+ * `ToolContract<{ query: string }, …>` would not be assignable to
+ * `ToolContract<unknown, unknown>`, which is the type every
+ * heterogeneous tool list — `AgentConfig.tools`, supervisor tool
+ * registries — has to use.
+ *
+ * The bivariance is not free: `input` is whatever the model emitted,
+ * not a validated `TInput`. Resolution is wrapped in a try/catch at
+ * the boundary precisely because this callback can throw on malformed
+ * arguments; a throw costs the label, never the dispatch.
+ */
+export type ToolActionResolver<TInput> = {
+  resolveAction(input: TInput): string;
+}["resolveAction"];
 
 /**
  * Per-call context threaded into a tool handler as the optional second
@@ -133,7 +168,7 @@ export interface ToolConfig<TInput = unknown, TOutput = unknown> {
    * Resolved at the framework boundary; consumers receive a
    * pre-resolved string in `ToolEventMeta.action`.
    */
-  action?: string | ((input: TInput) => string);
+  action?: string | ToolActionResolver<TInput>;
   /** Optional metadata for documentation or tooling */
   meta?: ToolMeta;
   /**

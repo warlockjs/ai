@@ -707,7 +707,7 @@ describe("error category — static defaultCategory + AIError-only override", ()
     // This guards the structural-restriction contract: AIErrorOptions
     // is what every subclass forwards via super(...). It must NOT carry
     // a `category` field, otherwise subclass call sites could pass one.
-    const options: Parameters<typeof ProviderRateLimitError.prototype.constructor>[1] = {
+    const options: ConstructorParameters<typeof ProviderRateLimitError>[1] = {
       cause: new Error("x"),
       context: { foo: 1 },
       retryAfter: 100,

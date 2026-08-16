@@ -57,7 +57,7 @@ function fakeRes() {
     res.status = status;
     Object.assign(res.headers, headers ?? {});
     return res;
-  }) as ServerResponse["writeHead"];
+  }) as typeof res.writeHead;
   res.write = ((chunk: string) => {
     res.body += chunk;
     return true;
@@ -65,7 +65,7 @@ function fakeRes() {
   res.end = ((chunk?: string) => {
     if (chunk) res.body += chunk;
     return res;
-  }) as ServerResponse["end"];
+  }) as typeof res.end;
   return res;
 }
 

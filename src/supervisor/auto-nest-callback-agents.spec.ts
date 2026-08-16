@@ -148,7 +148,10 @@ describe("auto-nest agents invoked inside an intent callback", () => {
           // Explicit capture path — must NOT also self-capture via the
           // ambient frame (which would push the report twice).
           const result = await ctx.run(worker, String(ctx.input));
-          return { reply: result.text };
+
+          // `ctx.run` is typed over the whole `SupervisableResult`
+          // union; `text` is the agent arm only.
+          return { reply: "text" in result ? result.text : undefined };
         },
       },
       route: (ctx) => (ctx.iteration === 0 ? "delegate" : END),

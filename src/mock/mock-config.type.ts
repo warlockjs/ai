@@ -1,4 +1,3 @@
-import type { Usage } from "../contracts";
 import type { FinishReason } from "../contracts/finish-reason.type";
 import type { ImageModelPricing } from "../contracts/image-model.contract";
 import type { ModelToolCallRequest } from "../contracts/model-tool-call-request.type";
@@ -10,14 +9,48 @@ import type { MockSpeechResponse } from "./mock-speech-model";
 import type { MockTranscriptionResponse } from "./mock-transcription-model";
 
 /**
+ * Token counts a scripted `MockModelResponse` may declare.
+ *
+ * Deliberately NOT `Usage`. `Usage` is an emitted result — every field
+ * on it is authoritative and `total` is always present. This is script
+ * *input*, and `MockModel.buildResponse()` only honors `input`,
+ * `output` and `cachedTokens`; it always recomputes `total` as
+ * `input + output`, so a scripted `total` can never disagree with the
+ * numbers it is derived from. `reasoningTokens`, `cacheWriteTokens`
+ * and `cost` are omitted because the mock does not forward them —
+ * declaring one here would be silently dropped.
+ */
+export type MockUsage = {
+  /** Prompt tokens the scripted response reports. */
+  input: number;
+  /** Completion tokens the scripted response reports. */
+  output: number;
+  /**
+   * Ignored — `MockModel` always recomputes `total` as
+   * `input + output`. Accepted so existing fixtures that spell it out
+   * still compile.
+   */
+  total?: number;
+  /** Subset of `input` served from the provider's prompt cache. */
+  cachedTokens?: number;
+};
+
+/**
  * Configuration for a single mock model response.
  * Responses are consumed in order — last one repeats if list is exhausted.
  */
 export type MockModelResponse = {
   content: string;
   finishReason?: FinishReason;
-  usage?: Usage;
+  usage?: MockUsage;
   toolCalls?: ModelToolCallRequest[];
+  /**
+   * Exact chunk boundaries `stream()` should emit for `content`.
+   * Omitted = the mock splits `content` on whitespace. Use this when a
+   * test asserts on delta boundaries themselves (partial JSON, prose
+   * fragments) rather than on the assembled text.
+   */
+  deltas?: string[];
   /** Simulate a delay in ms before resolving */
   delay?: number;
   /** Throw this error instead of returning a response */
