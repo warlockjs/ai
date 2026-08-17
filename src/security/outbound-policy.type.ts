@@ -48,6 +48,13 @@ export type OutboundPolicy = {
   /** Per-request timeout in milliseconds. Default `10_000`. */
   timeoutMs?: number;
   /**
+   * Maximum number of redirect hops `guardedFetch` will follow. Every
+   * hop's `Location` is re-validated against this policy (scheme, host
+   * allowlist, private-IP guard) before it is followed — a redirect can
+   * never reach a URL the original request could not have. Default `5`.
+   */
+  maxRedirects?: number;
+  /**
    * Caller `AbortSignal`, merged with the internal timeout — whichever
    * fires first aborts the request.
    */
@@ -67,6 +74,7 @@ export type ResolvedOutboundPolicy = {
   denyPrivateIPsAfterDNS: boolean;
   maxBytes: number;
   timeoutMs: number;
+  maxRedirects: number;
   signal?: AbortSignal;
   fetch: typeof fetch;
 };

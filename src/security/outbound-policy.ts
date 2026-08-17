@@ -11,6 +11,18 @@ import type {
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 /** 10s — default per-request timeout. */
 const DEFAULT_TIMEOUT_MS = 10_000;
+/** Default cap on the number of policy-validated redirect hops. */
+const DEFAULT_MAX_REDIRECTS = 5;
+
+/** 3xx statuses whose `Location` a follow re-issues. */
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+/** Credential headers that must not survive a cross-origin redirect. */
+const CROSS_ORIGIN_STRIP_HEADERS = [
+  "authorization",
+  "cookie",
+  "proxy-authorization",
+];
 
 /**
  * Fill an {@link OutboundPolicy} with strict defaults: https-only,
@@ -26,6 +38,7 @@ export function resolveOutboundPolicy(
     denyPrivateIPsAfterDNS: policy.denyPrivateIPsAfterDNS ?? true,
     maxBytes: policy.maxBytes ?? DEFAULT_MAX_BYTES,
     timeoutMs: policy.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    maxRedirects: policy.maxRedirects ?? DEFAULT_MAX_REDIRECTS,
     signal: policy.signal,
     fetch: policy.fetch ?? globalThis.fetch,
   };
@@ -145,12 +158,32 @@ function mergeSignals(
   return controller.signal;
 }
 
+/** Flatten a headers init into a mutable lower-cased-key record. */
+function headersToRecord(
+  headersInit?: RequestInit["headers"],
+): Record<string, string> {
+  const record: Record<string, string> = {};
+  new Headers(headersInit).forEach((value, key) => {
+    record[key] = value;
+  });
+  return record;
+}
+
 /**
  * Policy-guarded `fetch`: validates the URL ({@link assertUrlAllowed}),
  * then performs the request with the policy's timeout and (optional)
  * caller signal merged. Returns the raw `Response` — read its body via
  * {@link readTextCapped} to enforce `maxBytes`. Throws
  * {@link OutboundPolicyError} on a policy violation or timeout.
+ *
+ * Redirects are NEVER delegated to the platform: every hop is issued
+ * with `redirect: "manual"` and its `Location` is re-run through
+ * {@link assertUrlAllowed} before being followed (capped at
+ * `maxRedirects`), so a 3xx from an allowed host cannot smuggle the
+ * request to a private / metadata / off-allowlist target. Credential
+ * headers are stripped when a hop crosses an origin boundary. Pass
+ * `init.redirect: "manual"` to receive the raw 3xx, or `"error"` to
+ * reject on any redirect.
  */
 export async function guardedFetch(
   rawUrl: string,
@@ -158,7 +191,7 @@ export async function guardedFetch(
   init?: RequestInit,
 ): Promise<Response> {
   const policy = resolveOutboundPolicy(policyInput);
-  const url = await assertUrlAllowed(rawUrl, policy);
+  let url = await assertUrlAllowed(rawUrl, policy);
 
   const timeoutController = new AbortController();
   const timer = setTimeout(() => {
@@ -170,11 +203,85 @@ export async function guardedFetch(
     );
   }, policy.timeoutMs);
 
+  const signal = mergeSignals(timeoutController.signal, policy.signal);
+  const redirectMode = init?.redirect ?? "follow";
+  const headers = headersToRecord(init?.headers);
+  let method = init?.method ?? "GET";
+  let body = init?.body ?? undefined;
+
   try {
-    return await policy.fetch(url, {
-      ...init,
-      signal: mergeSignals(timeoutController.signal, policy.signal),
-    });
+    for (let hop = 0; ; hop++) {
+      const response = await policy.fetch(url, {
+        ...init,
+        method,
+        headers: { ...headers },
+        body,
+        redirect: "manual",
+        signal,
+      });
+
+      const location = response.headers.get("location");
+      if (!REDIRECT_STATUSES.has(response.status) || location === null) {
+        return response;
+      }
+
+      if (redirectMode === "manual") {
+        return response;
+      }
+
+      if (redirectMode === "error") {
+        throw new OutboundPolicyError(
+          `outbound request blocked — redirect received with redirect: "error" (${response.status} → ${location})`,
+          { context: { url: url.toString(), location, status: response.status } },
+        );
+      }
+
+      if (hop >= policy.maxRedirects) {
+        throw new OutboundPolicyError(
+          `outbound request blocked — more than ${policy.maxRedirects} redirects`,
+          { context: { url: rawUrl, maxRedirects: policy.maxRedirects } },
+        );
+      }
+
+      let target: URL;
+      try {
+        target = new URL(location, url);
+      } catch {
+        throw new OutboundPolicyError(
+          `outbound request blocked — invalid redirect Location: ${location}`,
+          { context: { url: url.toString(), location } },
+        );
+      }
+
+      // The redirect target gets the SAME scheme / allowlist / private-IP
+      // validation as the original URL.
+      const next = await assertUrlAllowed(target.toString(), policy);
+
+      // Discard the interim body so the connection can be reused.
+      if (response.body) {
+        await response.body.cancel().catch(() => undefined);
+      }
+
+      if (next.origin !== url.origin) {
+        for (const name of CROSS_ORIGIN_STRIP_HEADERS) {
+          delete headers[name];
+        }
+      }
+
+      // 303 — and the legacy 301/302-on-a-non-GET convention — re-issue
+      // as a bodyless GET, matching platform follow semantics.
+      if (
+        response.status === 303 ||
+        ((response.status === 301 || response.status === 302) &&
+          method !== "GET" &&
+          method !== "HEAD")
+      ) {
+        method = "GET";
+        body = undefined;
+      }
+
+      url = next;
+    }
   } finally {
     clearTimeout(timer);
   }
