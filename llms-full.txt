@@ -440,7 +440,7 @@ Only a *handler bug* — a non-sentinel throw from your handler — propagates, 
 
 ---
 name: attach-ai-middleware
-description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — `@warlock.js/ai/run-ai-agent/SKILL.md`; cache drivers — `@warlock.js/ai/persist-ai-data/SKILL.md`; competing libs `langchain` callbacks.'
+description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — `@warlock.js/ai/run-ai-agent/SKILL.md`; cache drivers — `@warlock.js/ai/persist-ai-data/SKILL.md`; competing libs `langchain` callbacks.'
 ---
 
 # Middleware — agent-level pipeline
@@ -545,6 +545,7 @@ ai.middleware.semanticCache({
   threshold: 0.95,
   ttlMs: 60 * 60 * 1000,
   namespace: "support-faq",
+  // scope: "session" (default) — see below
 });
 ```
 
@@ -557,6 +558,21 @@ ai.middleware.semanticCache({
 - **Writes** happen at `trip.after` on miss.
 - **Trip-zero only** — only first-trip responses are cached. Tool-using loops never serve cached tool-call responses (would infinite-loop).
 - **Never use memory drivers in production** — linear scan per query.
+
+### Session-scoped by default — `scope` (4.15.0)
+
+A `semanticCache` is normally built once at app boot and shared by every end user, and a hit is returned as the model's answer with **no LLM call in between** — so without isolation, user B's merely-*similar* prompt could be served user A's cached answer, personal context included. `SemanticCacheOptions.scope` (default `"session"`) keys every entry off the run's `AgentExecuteOptions.sessionId` (`"session:<id>"`) and re-checks it as exact equality on read — the key alone never authorizes a hit.
+
+```ts
+ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: "shared" }); // opt back into one shared pool
+ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: (ctx) => tenantIdFrom(ctx) }); // custom boundary
+```
+
+- **`"session"`** (default) — isolated per `sessionId`; a run made *without* a `sessionId` shares one unscoped pool (unchanged behavior for those calls). Thread `sessionId` through `agent.execute()` to get the isolation — composite primitives (supervisor, orchestrator) already forward their own.
+- **`"shared"`** — one pool for every caller, regardless of session — the pre-4.15.0 behavior. The explicit opt-in for genuinely public Q&A (docs bot, FAQ) where cross-user hit rate is the point and no response can carry a caller's private context.
+- **`(context) => key | undefined`** — derive your own boundary, e.g. per tenant. Returning `undefined` falls back to the unscoped pool.
+
+Entries written before the upgrade are unscoped and are only read by unscoped (or `"shared"`) runs. The vector lookup overscans before filtering (mirroring the memory tiers) so a noisy foreign scope can't occupy the top-`k` and mask a caller's own hit.
 
 ## Writing your own middleware
 
@@ -3230,6 +3246,8 @@ await kb.index(await ai.rag.loadWeb("https://docs.example.com/guide", {
 
 HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL, `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout, or an over-cap body throws `OutboundPolicyError`.
 
+**Redirects are re-validated per hop, not delegated to the platform (4.15.0).** A page a crawl reaches can `3xx` — `guardedFetch` re-runs each `Location` through the same scheme/host/private-IP checks before following it, capped at `policy.maxRedirects` (default `5`), and strips `authorization`/`cookie`/`proxy-authorization` on a cross-origin hop. So a redirect can never smuggle `loadWeb` into a private/metadata address the original URL couldn't have reached. Full guard detail (including `assertUrlAllowed`, `fetchTextWithPolicy`, and the other call sites sharing it): [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md).
+
 ### `loadPdf` — lazy optional peer, page-precise citations
 
 `pdf-parse` is an **optional** peer, dynamic-imported on the FIRST `loadPdf` call — importing `@warlock.js/ai` never forces it. When it is absent, the curated `PDF_PARSE_INSTALL_INSTRUCTIONS` string is thrown as a plain `Error` (a missing infra peer, not a content problem), never a raw module-resolution stack trace.
@@ -3328,6 +3346,7 @@ The `embedder`'s `dimensions` MUST equal the store's `dimensions` — a mismatch
 
 - [[run-ai-rag]] — the chunk → embed → retrieve → rerank → cite pipeline that **consumes** these loaders and stores (`ai.rag({ embedder, store })`, `index()` / `retrieve()`).
 - [[embed-text]] — the `sdk.embedder` primitive whose `dimensions` must match the store's `vector(N)` width.
+- [[secure-outbound-requests]] — the full `guardedFetch` / `OutboundPolicy` guard `loadWeb` delegates to, including per-hop redirect revalidation and the other consumers sharing it.
 - [`@warlock.js/cache/use-cache-similarity/SKILL.md`](@warlock.js/cache/use-cache-similarity/SKILL.md) — the cache driver `cacheVectorStore` adapts.
 
 
@@ -3753,6 +3772,8 @@ attachments: [
 
 Model must declare `capabilities.vision`. OpenAI adapter auto-infers from name; override with `openai.model({ name, vision: true })`.
 
+A URL *image* attachment is passed to the provider as a URL — the provider fetches it, not the framework, so there's no server-side SSRF surface. A **remote `{ type: "text", source: <url> }` attachment IS fetched server-side** (the adapter needs the raw text inline) and is default-DENY: it throws unless `attachmentPolicy.allowRemoteFetch: true`, and when enabled runs through the shared `guardedFetch` / `OutboundPolicy` guard — see [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md).
+
 ## Pattern — streaming
 
 ```ts
@@ -3865,6 +3886,7 @@ The one field a bare agent config doesn't surface ergonomically is `budget` (`Bu
 - [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — tool wiring + schema validation
 - [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — persona / instruction builders
 - [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `AIError` hierarchy
+- [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md) — the `guardedFetch` / `OutboundPolicy` guard behind a remote text attachment fetch
 
 
 ## run-ai-rag  `@warlock.js/ai/run-ai-rag/SKILL.md`
@@ -4556,10 +4578,13 @@ ai.orchestrator({
     recall: { k: 5, threshold: 0.7, tier: "semantic" },  // k: 0 = write-only memory
     remember: true,                             // false = read-only (recall, never write)
     rememberTier: "semantic",
+    scope: "session",                           // DEFAULT — isolate memories per sessionId
     injectKey: "memories",                      // ctx.context[injectKey] holds RecalledMemory[]
   },
 });
 ```
+
+**Memory is session-scoped by default (4.15.0).** One store instance backs every session of the orchestrator, so `scope` decides what a turn may read: `"session"` (default) keys recall + write-back to the executing `sessionId`, so one user can never recall another's remembered turns. `"shared"` pools every session into one namespace — the pre-4.15.0 behavior, safe only when every session is trusted to see every other's memories. `(sessionId) => key` derives your own boundary (e.g. a tenant id). Memories written before 4.15.0 are unscoped and are only visible under `scope: "shared"`.
 
 Recalled memories land in the per-turn `context` bag under `injectKey` (default `"memories"`) — every route / router / evaluate / dispatch callback reads them at `ctx.context.memories`. Memory never mutates the prompt itself; surfacing it stays explicit. Cancelled / failed turns never remember (they revert), regardless of `remember`. See [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md).
 
@@ -4578,7 +4603,9 @@ const concierge = ai.agent({ model, tools: [supportTool] });
 
 The tool boundary is **opaque**: the parent's `signal` / `context` / events do NOT auto-forward — anything the wrapped orchestrator needs must ride on the `inputSchema` payload. `sessionScope`:
 - **`"fresh"`** (default) — each invocation gets a generated `sessionId` and empty history; no continuity across calls.
-- **`"shared"`** — the parent threads `sessionId` (and optionally `history`) through the validated payload; the orchestrator participates in that session. A missing/blank `sessionId` throws.
+- **`"shared"`** — the orchestrator joins an existing session named by the DEVELOPER through `session`, never by the model: either a literal id fixed at construction (`session: "sess_42"`) or a resolver reading the out-of-band tool context (`session: (ctx) => String(ctx?.artifacts?.supportSessionId)`). Building a `"shared"` tool without `session` throws at construction, and `sessionId` / `history` in the payload are stripped, not honored.
+
+  A `sessionId` is bearer-equivalent to read/write on that session, so it must not be a model-visible `inputSchema` field: before 4.15.0 it was, and a prompt injection reaching the outer agent could make the nested orchestrator resume, mutate, and echo back a *victim's* conversation. `unsafeAllowModelSessionId: true` restores the old payload path — only for a fully trusted outer context where you verify session ownership yourself.
 
 ## Drift detection
 
@@ -4610,7 +4637,7 @@ await orch.execute(input, { sessionId, history, on: { "orchestrator.drift.checke
 
 ---
 name: run-planner
-description: 'Goal-driven planning with ai.planner({...}) — an LLM GENERATES an ordered execution plan over your registered capabilities (agents / workflows / supervisors / tools), then the planner EXECUTES it, threading each step output into the next, and returns the unified {data, report, usage, error} envelope with report.type "planner". Supports DAG scheduling (dag:true + maxConcurrency off dependsOn), adaptive re-planning (replan:{maxReplans} + the onStep continue/abort/replan directive), and plan-only / approval (mode:"plan-only" → status "awaiting-approval" → approvedPlan). A plan step may delegate via ai.spawnSubAgent({...}) — a GENERAL one-shot-agent helper covered in `@warlock.js/ai/run-ai-agent/SKILL.md`; it is not planner-specific. Triggers: `ai.planner`, `planner.execute`, `spawnSubAgent`, `PlannerConfig`, `PlannerCapability`, `PlannerResult`, `PlannerReport`, `PlannerPlan`, `PlannerStep`, `PlannerStepDirective`, `PlannerPlanInvalidError`, `maxSteps`, `dag`, `maxConcurrency`, `dependsOn`, `replan`, `onStep`, `mode`, `approvedPlan`, `awaiting-approval`, `report.plan`, `report.executedSteps`; ''let the model plan the steps'', ''dynamic plan from a goal'', ''run independent steps in parallel'', ''re-plan when a step fails'', ''generate a plan for approval before running it''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a FIXED known pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; routing one input to a specialist each turn — `@warlock.js/ai/run-supervisor/SKILL.md`; a single model + tools call — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: 'Goal-driven planning with ai.planner({...}) — an LLM GENERATES an ordered execution plan over your registered capabilities (agents / workflows / supervisors / tools), then the planner EXECUTES it, threading each step output into the next, and returns the unified {data, report, usage, error} envelope with report.type "planner". Supports DAG scheduling (dag:true + maxConcurrency off dependsOn), adaptive re-planning (replan:{maxReplans} + the onStep continue/abort/replan directive), and plan-only / approval (mode:"plan-only" → status "awaiting-approval" → approvedPlan). A plan step may delegate via ai.spawnSubAgent({...}) — a GENERAL one-shot-agent helper covered in `@warlock.js/ai/run-ai-agent/SKILL.md`; it is not planner-specific. Triggers: `ai.planner`, `planner.execute`, `spawnSubAgent`, `PlannerConfig`, `PlannerCapability`, `PlannerResult`, `PlannerReport`, `PlannerPlan`, `PlannerStep`, `PlannerStepDirective`, `PlannerPlanInvalidError`, `maxSteps`, `dag`, `maxConcurrency`, `dependsOn`, `replan`, `onStep`, `mode`, `approvedPlan`, `awaiting-approval`, `report.plan`, `report.executedSteps`, `parsedStepCeiling`; ''let the model plan the steps'', ''dynamic plan from a goal'', ''run independent steps in parallel'', ''re-plan when a step fails'', ''generate a plan for approval before running it''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a FIXED known pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; routing one input to a specialist each turn — `@warlock.js/ai/run-supervisor/SKILL.md`; a single model + tools call — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
 ---
 
 # `ai.planner()` — LLM-generated, then executed, plans
@@ -4640,7 +4667,7 @@ const research = ai.planner({
     { name: "summarize", description: "Summarize text into bullet points", executable: summarizer },
     { name: "write", description: "Draft a final report", executable: writerAgent },
   ],
-  maxSteps: 6, // hard cap; steps beyond it are recorded as "skipped"
+  maxSteps: 6, // soft cap; steps beyond it are recorded as "skipped" — see the parse-time ceiling below
 });
 
 const { data, report, usage, error } = await research.execute("Compare React vs Vue in 2026");
@@ -4662,6 +4689,10 @@ for (const step of report.executedSteps) {  // forensic, in execution order
 3. **Finalize** — when `output` is set (factory or per-call), the LAST completed step's structured output is validated into `result.data`. A capability that should feed typed output to the planner's `output` should declare its own `output` schema (the planner reads `data`, falling back to an agent's raw `text`).
 
 `report.type === "planner"`; `report.children[]` carries every dispatched capability report (plus the planning trip), with usage rolled up. `report.executedSteps` is the authoritative per-step record (`PlannerStepSnapshot[]`). Lazy capability loading is **deferred** — every capability is fully constructed up front.
+
+### Parse-time step ceiling (4.15.0)
+
+`maxSteps` can't be expressed in the strict-mode JSON Schema the planning model is given (no `maxItems`), so a provider/proxy that ignores the prompt's step budget could make the planner deserialize an arbitrarily long `steps[]` array before `PlannerRun`'s tail-truncation logic ever ran — `maxSteps` only trimmed *after* the whole array was already parsed and normalized. Plan validation now enforces a hard **parse-time** ceiling of `maxSteps * 4` (or `100` when the schema is built without a `maxSteps`) and **rejects** — rather than truncates — a plan that exceeds it, surfacing `PlannerPlanInvalidError`. The 4× slack keeps the normal case (a model overshooting "at most N steps" slightly) working exactly as before — that overshoot is still truncated to `skipped` steps at execution time, not rejected at parse time. A plan several times its budget is treated as a malfunction worth surfacing, not a prefix worth silently executing.
 
 ## DAG scheduling — `dag: true` + `maxConcurrency`
 
@@ -4729,7 +4760,7 @@ const final = await planner.execute(goal, { approvedPlan: draft.plan! });
 
 `execute()` never throws — failures surface on `result.error`:
 
-- **`PlannerPlanInvalidError`** (`PLANNER_PLAN_INVALID`, category `schema`) — empty plan, a step naming an unknown capability, a DAG cycle, a `dependsOn` naming an unknown step, a stale `approvedPlan`, or a final-output validation failure.
+- **`PlannerPlanInvalidError`** (`PLANNER_PLAN_INVALID`, category `schema`) — empty plan, a step naming an unknown capability, a DAG cycle, a `dependsOn` naming an unknown step, a stale `approvedPlan`, a final-output validation failure, or (4.15.0) a plan exceeding the parse-time step ceiling (`maxSteps * 4`, default `100`).
 - **`PlannerCancelledError`** (`PLANNER_CANCELLED`, category `cancelled`) — the `AbortSignal` fired. `report.status === "cancelled"`, `report.cancelledAt` set; remaining steps are `skipped`.
 - A child capability's own error (agent / tool / provider) flows through unchanged on the failing step's snapshot and as `result.error`. The planner stops at the first failed step and marks the rest `skipped`.
 - **`PlannerFailedError`** is the base for the `PLANNER_*` family.
@@ -4855,6 +4886,16 @@ ai.supervisor({
 
 Each key references the same underlying unit; the description defaults to the unit's. Override the key base with `{ keyPrefix }` and the per-entry text with `{ description }`.
 
+#### `maxFanOut` — width cap (default `10`)
+
+`maxIterations` bounds how DEEP a run goes; `maxFanOut` bounds how WIDE one decision goes. Duplicate intent names in a fan-out array are collapsed silently (branch results are indexed by intent — duplicates only burn tokens); if the DEDUPED list is still longer than the cap, the decision is rejected with `SupervisorRoutingError` (`SUPERVISOR_INVALID_ROUTE`), same as an unknown intent name. Applies to every dispatch source: `router`, `route`, `evaluate.reassignTo`, `intent.next`.
+
+```ts
+ai.supervisor({ intents: { ...ai.fanOut(writer, 20), vote }, maxFanOut: 20, route });
+```
+
+Raise it deliberately when you fan out wider than 10. Why it exists: the router's per-turn prompt embeds supervisor `state` and prior branch outputs, so text injected into a tool result can push an LLM router to emit a very wide `next` array — every element a real agent/workflow run, all inside the allowlist.
+
 ## The `intents` map — five accepted shapes
 
 ```ts
@@ -4902,7 +4943,7 @@ const refundSupervisor = ai.supervisor<RefundOutput>({
 });
 ```
 
-Each branch's output strip-merges into state per its declared `output` schema. Last-write-wins on fan-out conflict (warning logged).
+Each branch's output strip-merges into state per its declared `output` schema. Last-write-wins on fan-out conflict (warning logged). Keys named `__proto__` / `constructor` / `prototype` are dropped from every merged slice (branch output, `ack`, classifier, `refine`, artifacts) and logged as `state.merge.unsafe-key` — a permissive `output` schema would otherwise let a model-supplied key repoint the run state's prototype.
 
 ## Per-intent `next` — skip the router
 
@@ -5122,6 +5163,95 @@ const escalationAgent = ai.agent({ model, tools: [supportTool] });
 - [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — tool artifacts side-channel
 
 
+## secure-outbound-requests  `@warlock.js/ai/secure-outbound-requests/SKILL.md`
+
+---
+name: secure-outbound-requests
+description: 'The shared SSRF / resource-exhaustion guard every server-side outbound HTTP request in the framework goes through — `guardedFetch(url, policy, init?)`, `OutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`. Scheme allowlist (https-only default), host allowlist, post-DNS private/loopback/link-local/metadata-address deny, byte cap, timeout, and (4.15.0) per-hop redirect revalidation with a `maxRedirects` cap and cross-origin credential stripping. Consumed by `ai.rag.loadWeb`, remote text attachments (`prepareAttachmentPart`), and the skills `urlSource` manifest fetch — never a raw `fetch()` on a caller-influenced URL. Triggers: `guardedFetch`, `OutboundPolicy`, `ResolvedOutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`, `resolveOutboundPolicy`, `OutboundPolicyError`, `maxRedirects`, `denyPrivateIPsAfterDNS`, `hostAllowlist`, `allowedSchemes`, `maxBytes`, `SSRF`, `redirect: "manual"`, `redirect: "error"`; ''SSRF-safe fetch'', ''block a redirect into a private IP'', ''fetch a URL an agent gave me'', ''cap outbound response size'', ''allowlist hosts for outbound requests'', ''strip auth headers on a cross-origin redirect''; typical import `import { guardedFetch, assertUrlAllowed } from "@warlock.js/ai"` (also re-exported per call site). Skip: the RAG loader that wraps this for `loadWeb` — `@warlock.js/ai/rag-loaders-and-stores/SKILL.md`; the skills manifest source that wraps this for `urlSource` — `@warlock.js/ai/use-runtime-skills/SKILL.md`; prompt-injection / content guardrails (a different trust boundary) — `@warlock.js/ai/guard-input-output/SKILL.md` (ai-guard package).'
+---
+
+# Outbound request policy — the SSRF guard
+
+One `OutboundPolicy` + `guardedFetch` backs **every** server-side HTTP request the framework makes on behalf of user/model-controlled input: `ai.rag.loadWeb`, the remote-text branch of `prepareAttachmentPart` (agent `attachments`), and the skills catalog `urlSource` manifest fetch. A single audited guard instead of N ad-hoc `fetch()` call sites.
+
+```ts
+import { guardedFetch, fetchTextWithPolicy, assertUrlAllowed, OutboundPolicyError } from "@warlock.js/ai";
+
+const response = await guardedFetch("https://docs.example.com/page", {
+  hostAllowlist: ["docs.example.com"],
+  maxBytes: 2_000_000,
+  timeoutMs: 5_000,
+});
+```
+
+## Strict-by-default policy
+
+Every field is optional; `resolveOutboundPolicy` fills safe defaults, so an untuned call is already hardened:
+
+| Field | Default | Guards against |
+| --- | --- | --- |
+| `allowedSchemes` | `["https"]` | plaintext / `file:` / `data:` exfil — `http` must be opted in |
+| `hostAllowlist` | unset (any host) | pinning outbound targets to known hosts, e.g. `docs.example.com` allows `a.docs.example.com` |
+| `denyPrivateIPsAfterDNS` | `true` | **the SSRF guard itself** — resolves the host through DNS and rejects loopback / private / link-local / unique-local / cloud-metadata (`169.254.169.254`) addresses; a public hostname that resolves inward is caught |
+| `maxRedirects` | `5` | a redirect chain used to bypass the checks above (4.15.0 — see below) |
+| `maxBytes` | `5_242_880` (5 MiB) | unbounded response bodies |
+| `timeoutMs` | `10_000` | a hung/slow endpoint tying up the request |
+| `signal` | unset | caller-supplied `AbortSignal`, merged with the internal timeout |
+| `fetch` | global `fetch` | inject a stub for tests, or a wrapper enforcing your own app-level rules |
+
+Every violation throws `OutboundPolicyError` with `context` carrying the offending URL/host/address — never a silent fallback.
+
+## Redirects are never delegated to the platform (4.15.0)
+
+Before 4.15.0, `assertUrlAllowed` validated only the *initial* URL, then handed the request to `fetch` with automatic redirect following — so a URL that passed validation could `3xx` into a private/metadata address or an off-allowlist host with no re-check.
+
+`guardedFetch` now issues **every hop** with `redirect: "manual"` and re-runs the `Location` header through the exact same `assertUrlAllowed` (scheme, host allowlist, post-DNS private-IP deny) before following it:
+
+- Capped at `policy.maxRedirects` (default `5`) — the `(maxRedirects + 1)`th hop throws `OutboundPolicyError`.
+- **Credential headers stripped cross-origin.** `authorization`, `cookie`, `proxy-authorization` are dropped the moment a hop's target origin differs from the current one — a redirect can't exfiltrate credentials meant for the original host.
+- **Method/body semantics match platform behavior.** `303` — and the legacy convention of `301`/`302` on a non-`GET`/`HEAD` method — re-issue the next hop as a bodyless `GET`.
+- Pass `init.redirect: "manual"` to get the raw 3xx response back (no following, no throw); `init.redirect: "error"` rejects on any redirect.
+- The net effect: a redirect can never reach a URL the original request could not have reached directly.
+
+```ts
+// A caller that wants to inspect redirects itself, unfollowed:
+const res = await guardedFetch(url, policy, { redirect: "manual" });
+if (res.status >= 300 && res.status < 400) {
+  console.log(res.headers.get("location"));
+}
+```
+
+## Reading the body — `readTextCapped` / `fetchTextWithPolicy`
+
+`guardedFetch` returns the raw `Response`; read its body through `readTextCapped(response, maxBytes)` to enforce the cap (a declared `content-length` over the cap fails fast, otherwise the stream is read chunk-by-chunk and aborted the moment the running total exceeds it). `fetchTextWithPolicy(url, policy, init?)` is the one-call convenience — `guardedFetch` + `readTextCapped`, returning `{ ok, status, statusText, text }` (body only read when `ok`).
+
+```ts
+const { ok, status, text } = await fetchTextWithPolicy(url, { hostAllowlist: ["api.example.com"] });
+if (!ok) throw new Error(`fetch failed: ${status}`);
+```
+
+## Who consumes this
+
+| Call site | Entry point | Notes |
+| --- | --- | --- |
+| RAG web loader | `ai.rag.loadWeb(url, { policy })` | [`@warlock.js/ai/rag-loaders-and-stores/SKILL.md`](@warlock.js/ai/rag-loaders-and-stores/SKILL.md) |
+| Remote text attachment | `prepareAttachmentPart` via `agent.execute({ attachments })` | default-DENY — requires `attachmentPolicy.allowRemoteFetch: true`; policy travels as `attachmentPolicy.outbound`. URL *image* attachments are handed to the provider as a URL and never fetched server-side, so they carry no SSRF surface here |
+| Skills catalog manifest | `ai.skills({ sources: [urlSource(url, { policy })] })` | [`@warlock.js/ai/use-runtime-skills/SKILL.md`](@warlock.js/ai/use-runtime-skills/SKILL.md) — the fetched manifest is also runtime-validated record-by-record before being trusted |
+
+Each call site passes its own `policy` (or `{}` for the strict defaults) — there is no global policy singleton, so tune per source (e.g. `hostAllowlist` for a known-good docs domain vs. an open web crawl).
+
+## Testing
+
+Inject a stubbed `policy.fetch` (`(url, init) => Response`) instead of hitting the network — every consumer above accepts `policy.fetch` all the way through. Regression coverage lives in `src/security/outbound-policy.spec.ts` (redirect-to-metadata/loopback/private block, off-allowlist redirect block, hop cap, credential stripping, clean-redirect follow).
+
+## See also
+
+- [`@warlock.js/ai/rag-loaders-and-stores/SKILL.md`](@warlock.js/ai/rag-loaders-and-stores/SKILL.md) — `loadWeb`, the primary consumer
+- [`@warlock.js/ai/use-runtime-skills/SKILL.md`](@warlock.js/ai/use-runtime-skills/SKILL.md) — `urlSource`'s manifest fetch
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `attachments`, including the remote-text fetch path
+- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `OutboundPolicyError`
+
+
 ## transcribe-audio  `@warlock.js/ai/transcribe-audio/SKILL.md`
 
 ---
@@ -5287,14 +5417,14 @@ Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the neve
 
 ---
 name: use-ai-memory
-description: 'Agent memory with ai.memory({...}) — a provider-neutral store with FOUR tiers: WORKING (in-run scratch, recalled by recency), SEMANTIC (durable facts by cosine similarity over a @warlock.js/cache vector driver via .similar()), EPISODIC (durable events, similarity blended with recency), and PROCEDURAL (durable how-tos, similarity blended with reinforcement). remember() / recall() / clear(); wire it into ai.orchestrator({ memory }). Triggers: `ai.memory`, `memory.remember`, `memory.recall`, `memory.clear`, `MemoryContract`, `MemoryConfig`, `MemoryItem`, `RecalledMemory`, `MemoryTier`, `SemanticMemoryConfig`, `EpisodicMemoryConfig`, `ProceduralMemoryConfig`, `working`, `semantic`, `episodic`, `procedural`, `defaultTier`, `threshold`, `recencyWeight`, `halfLifeMs`, `reinforcementWeight`, `injectKey`; ''give the agent memory'', ''remember user preferences'', ''semantic recall'', ''per-session working memory'', ''episodic / event memory'', ''procedural / how-to memory'', ''recency-weighted recall'', ''reinforce a procedure''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator wiring of the memory — `@warlock.js/ai/run-orchestrator/SKILL.md`; the vector cache driver itself — `@warlock.js/cache/cache-basics/SKILL.md`; embeddings primitive — `@warlock.js/ai/embed-text/SKILL.md`; competing libs `mem0`, `langchain` memory.'
+description: 'Agent memory with ai.memory({...}) — a provider-neutral store with FOUR tiers: WORKING (in-run scratch, recalled by recency), SEMANTIC (durable facts by cosine similarity over a @warlock.js/cache vector driver via .similar()), EPISODIC (durable events, similarity blended with recency), and PROCEDURAL (durable how-tos, similarity blended with reinforcement). remember() / recall() / clear(); wire it into ai.orchestrator({ memory }). Triggers: `ai.memory`, `memory.remember`, `memory.recall`, `memory.clear`, `MemoryContract`, `MemoryConfig`, `MemoryItem`, `RecalledMemory`, `MemoryTier`, `SemanticMemoryConfig`, `EpisodicMemoryConfig`, `ProceduralMemoryConfig`, `working`, `semantic`, `episodic`, `procedural`, `defaultTier`, `threshold`, `recencyWeight`, `halfLifeMs`, `reinforcementWeight`, `injectKey`, `maxItems`, `scope`, `RecallOptions.scope`; ''give the agent memory'', ''remember user preferences'', ''semantic recall'', ''per-session working memory'', ''episodic / event memory'', ''procedural / how-to memory'', ''recency-weighted recall'', ''reinforce a procedure'', ''cap working memory size'', ''isolate memory per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator wiring of the memory — `@warlock.js/ai/run-orchestrator/SKILL.md`; the vector cache driver itself — `@warlock.js/cache/cache-basics/SKILL.md`; embeddings primitive — `@warlock.js/ai/embed-text/SKILL.md`; competing libs `mem0`, `langchain` memory.'
 ---
 
 # `ai.memory()` — agent memory store
 
 A single provider-neutral store that holds and retrieves what an agent / orchestrator should remember across turns. Four tiers ship in 4.3.0:
 
-- **working** — in-run scratch threaded across turns of one session. Volatile, unscored, recalled in insertion order (recency). On by default.
+- **working** — in-run scratch threaded across turns of one session. Volatile, unscored, recalled in insertion order (recency). On by default, size-bounded (`working: { maxItems }`, default `1000` — see below).
 - **semantic** — durable *facts* stored as embeddings in a `@warlock.js/cache` driver, retrieved by cosine similarity via the driver's native `.similar()` — the same delegation the `semanticCache` middleware uses. Activates only when you pass `semantic` config.
 - **episodic** — durable *events*: a timestamped log retrieved by similarity **blended with recency** (recent episodes rank higher). Embedder-backed like semantic; tune with `recencyWeight` + `halfLifeMs`.
 - **procedural** — durable *how-tos*: learned procedures retrieved by similarity **blended with reinforcement** — re-remembering a procedure increments its use count so well-worn procedures rank higher. Tune with `reinforcementWeight`.
@@ -5364,7 +5494,7 @@ await mem.remember({ text: "User is on the Enterprise plan.", tier: "semantic", 
 await mem.remember([{ text: "a" }, { text: "b", tier: "working" }]);   // batch
 ```
 
-A `MemoryItem` is `{ text, tier?, id?, metadata? }`. `text` is the only required field — it's what gets embedded (semantic) and surfaced back on recall. `tier` defaults to the factory `defaultTier`. Semantic items are embedded + indexed; working items append to the in-run buffer. **Re-remembering an item whose id (explicit or text-derived) already exists overwrites in place rather than duplicating.** `metadata` is an opaque bag round-tripped verbatim onto the recalled memory.
+A `MemoryItem` is `{ text, tier?, id?, scope?, metadata? }`. `text` is the only required field — it's what gets embedded (semantic) and surfaced back on recall. `tier` defaults to the factory `defaultTier`. Semantic items are embedded + indexed; working items append to the in-run buffer. **Re-remembering an item whose id (explicit or text-derived) already exists overwrites in place rather than duplicating.** `metadata` is an opaque bag round-tripped verbatim onto the recalled memory. `scope` is the ISOLATION key — see below.
 
 ### `recall(query, options?)`
 
@@ -5373,6 +5503,7 @@ const hits = await mem.recall("which plan is the user on?", {
   k: 5,              // cap result count (defaults to factory k)
   threshold: 0.75,   // raise the semantic floor for this call
   tier: "semantic",  // restrict to one tier; omit to query every enabled tier
+  scope: "tenant-42", // isolation key — only memories remembered under this exact scope
 });
 
 for (const hit of hits) {
@@ -5383,6 +5514,38 @@ for (const hit of hits) {
 Returns `RecalledMemory[]` scored and ordered by descending relevance. By default queries every enabled tier and merges. `score` is in `[0,1]` for **every** tier — cosine similarity (semantic), a recency proxy (working, most-recent = 1), similarity×recency (episodic), or similarity×reinforcement (procedural) — so a mixed recall set sorts on one field without special-casing the tier. Returns `[]` when nothing clears the threshold — never throws on "no hits".
 
 **Memory never mutates the prompt.** `recall()` hands you scored entries; surfacing the recalled text (system prefix, a synthesized "what you remember" block, …) is YOUR call so the injection point stays explicit.
+
+### Isolation — `scope` (4.15.0)
+
+One store instance is normally shared by many callers (built once at boot, passed into `ai.orchestrator({ memory })`), so `scope` is what keeps one caller's memories out of another's recall:
+
+```ts
+await mem.remember({ text: "User A's account email is a@example.com", scope: "user-a" });
+
+await mem.recall("what is my email?", { scope: "user-b" });   // [] — never sees user A
+await mem.recall("what is my email?", { scope: "user-a" });   // user A's own memories
+await mem.recall("what is my email?");                        // only the UNSCOPED pool
+```
+
+- The match is **exact equality**, enforced inside every tier (`working` / `semantic` / `episodic` / `procedural`) before hits are scored, merged, or sliced — not something the caller filters afterward.
+- Omitting `scope` is **not** a wildcard: an unscoped recall reads only unscoped entries. There is no "all scopes" query.
+- Identical text under two scopes stays two independent entries (including the procedural tier's reinforcement counter).
+- `ai.orchestrator({ memory })` sets this automatically from the turn's `sessionId` — see [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md).
+- `clear(tier?)` is scope-agnostic: it drops the tier for every scope.
+
+### Working-memory cap — `working: { maxItems }` (4.15.0)
+
+```ts
+const mem = ai.memory({
+  working: { maxItems: 2_000 },   // default 1000; bare `working: true` also works
+});
+```
+
+The working tier holds everything it's told in **process** memory for the lifetime of the `memory()` instance — which `ai.orchestrator({ memory })` resolves once and reuses for every session. Before 4.15.0 it had no cap, so a memory-backed orchestrator on the open internet was a cheap memory-exhaustion path: one permanent entry per request, forever.
+
+The buffer now evicts on overflow, **FIFO over insertion order, not LRU** — recall on this tier is a pure recency proxy (newest `k`, never reordered), so the oldest entries are exactly the ones a bounded recall would never have returned anyway. `maxItems` is validated as an integer `>= 1` at construction; there is no unbounded setting — "no cap" was the vulnerability, not a configuration choice. Raise it deliberately for a long-lived single-tenant process, and put durable recall in the semantic / episodic tiers (which delegate retention to a `CacheDriver`, not process memory).
+
+The bound is **global**, not per-scope — a busy session can push another session's older entries out. That's a recall-quality degradation on a volatile scratch tier, never a disclosure (the `scope` isolation filter above still applies).
 
 ### `clear(tier?)`
 
@@ -5456,7 +5619,7 @@ const lib = ai.skills({
 ### Sources — `SkillSource` (discriminated by `type`, never `kind`)
 
 - `{ type: "directory", path }` — reads `path/<folder>/SKILL.md` off disk (lazy `node:fs/promises`).
-- `{ type: "url", url, headers? }` — `fetch()`es a JSON manifest of skills.
+- `{ type: "url", url, headers?, policy?, cacheTtlMs? }` — `urlSource(url, options)` fetches a JSON manifest of skills through the shared `guardedFetch` / `OutboundPolicy` guard (scheme/host allowlist, post-DNS private-IP deny, byte cap, timeout, per-hop redirect revalidation) — never a raw `fetch()`. A remote skill source is a prompt supply chain (bodies flow straight into model context), so every fetched record is also runtime-validated before it can be served. `policy` tunes the guard (e.g. `hostAllowlist`); see [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md). The result is cached for the source's lifetime, or `cacheTtlMs` when set.
 - `{ type: "store", store }` — any `SkillsStoreContract`, e.g. `MockSkillsStore`.
 
 Sources merge in order; a later source wins on a name collision.
@@ -5519,6 +5682,7 @@ The optional `analytics` sink fires `catalogued` / `loaded` / `used` / `saved` /
 - [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — static persona / instruction blocks (vs. dynamic loaded skills)
 - [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md) — the procedural memory tier `proceduralSkillStore` unifies with
 - [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the agent the `skills` option attaches to
+- [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md) — the `guardedFetch` / `OutboundPolicy` guard the `url` source's manifest fetch runs through
 
 
 ## write-system-prompt  `@warlock.js/ai/write-system-prompt/SKILL.md`

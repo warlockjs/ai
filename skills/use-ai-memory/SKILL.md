@@ -1,13 +1,13 @@
 ---
 name: use-ai-memory
-description: 'Agent memory with ai.memory({...}) — a provider-neutral store with FOUR tiers: WORKING (in-run scratch, recalled by recency), SEMANTIC (durable facts by cosine similarity over a @warlock.js/cache vector driver via .similar()), EPISODIC (durable events, similarity blended with recency), and PROCEDURAL (durable how-tos, similarity blended with reinforcement). remember() / recall() / clear(); wire it into ai.orchestrator({ memory }). Triggers: `ai.memory`, `memory.remember`, `memory.recall`, `memory.clear`, `MemoryContract`, `MemoryConfig`, `MemoryItem`, `RecalledMemory`, `MemoryTier`, `SemanticMemoryConfig`, `EpisodicMemoryConfig`, `ProceduralMemoryConfig`, `working`, `semantic`, `episodic`, `procedural`, `defaultTier`, `threshold`, `recencyWeight`, `halfLifeMs`, `reinforcementWeight`, `injectKey`; ''give the agent memory'', ''remember user preferences'', ''semantic recall'', ''per-session working memory'', ''episodic / event memory'', ''procedural / how-to memory'', ''recency-weighted recall'', ''reinforce a procedure''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator wiring of the memory — `@warlock.js/ai/run-orchestrator/SKILL.md`; the vector cache driver itself — `@warlock.js/cache/cache-basics/SKILL.md`; embeddings primitive — `@warlock.js/ai/embed-text/SKILL.md`; competing libs `mem0`, `langchain` memory.'
+description: 'Agent memory with ai.memory({...}) — a provider-neutral store with FOUR tiers: WORKING (in-run scratch, recalled by recency), SEMANTIC (durable facts by cosine similarity over a @warlock.js/cache vector driver via .similar()), EPISODIC (durable events, similarity blended with recency), and PROCEDURAL (durable how-tos, similarity blended with reinforcement). remember() / recall() / clear(); wire it into ai.orchestrator({ memory }). Triggers: `ai.memory`, `memory.remember`, `memory.recall`, `memory.clear`, `MemoryContract`, `MemoryConfig`, `MemoryItem`, `RecalledMemory`, `MemoryTier`, `SemanticMemoryConfig`, `EpisodicMemoryConfig`, `ProceduralMemoryConfig`, `working`, `semantic`, `episodic`, `procedural`, `defaultTier`, `threshold`, `recencyWeight`, `halfLifeMs`, `reinforcementWeight`, `injectKey`, `maxItems`, `scope`, `RecallOptions.scope`; ''give the agent memory'', ''remember user preferences'', ''semantic recall'', ''per-session working memory'', ''episodic / event memory'', ''procedural / how-to memory'', ''recency-weighted recall'', ''reinforce a procedure'', ''cap working memory size'', ''isolate memory per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator wiring of the memory — `@warlock.js/ai/run-orchestrator/SKILL.md`; the vector cache driver itself — `@warlock.js/cache/cache-basics/SKILL.md`; embeddings primitive — `@warlock.js/ai/embed-text/SKILL.md`; competing libs `mem0`, `langchain` memory.'
 ---
 
 # `ai.memory()` — agent memory store
 
 A single provider-neutral store that holds and retrieves what an agent / orchestrator should remember across turns. Four tiers ship in 4.3.0:
 
-- **working** — in-run scratch threaded across turns of one session. Volatile, unscored, recalled in insertion order (recency). On by default.
+- **working** — in-run scratch threaded across turns of one session. Volatile, unscored, recalled in insertion order (recency). On by default, size-bounded (`working: { maxItems }`, default `1000` — see below).
 - **semantic** — durable *facts* stored as embeddings in a `@warlock.js/cache` driver, retrieved by cosine similarity via the driver's native `.similar()` — the same delegation the `semanticCache` middleware uses. Activates only when you pass `semantic` config.
 - **episodic** — durable *events*: a timestamped log retrieved by similarity **blended with recency** (recent episodes rank higher). Embedder-backed like semantic; tune with `recencyWeight` + `halfLifeMs`.
 - **procedural** — durable *how-tos*: learned procedures retrieved by similarity **blended with reinforcement** — re-remembering a procedure increments its use count so well-worn procedures rank higher. Tune with `reinforcementWeight`.
@@ -115,6 +115,20 @@ await mem.recall("what is my email?");                        // only the UNSCOP
 - Identical text under two scopes stays two independent entries (including the procedural tier's reinforcement counter).
 - `ai.orchestrator({ memory })` sets this automatically from the turn's `sessionId` — see [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md).
 - `clear(tier?)` is scope-agnostic: it drops the tier for every scope.
+
+### Working-memory cap — `working: { maxItems }` (4.15.0)
+
+```ts
+const mem = ai.memory({
+  working: { maxItems: 2_000 },   // default 1000; bare `working: true` also works
+});
+```
+
+The working tier holds everything it's told in **process** memory for the lifetime of the `memory()` instance — which `ai.orchestrator({ memory })` resolves once and reuses for every session. Before 4.15.0 it had no cap, so a memory-backed orchestrator on the open internet was a cheap memory-exhaustion path: one permanent entry per request, forever.
+
+The buffer now evicts on overflow, **FIFO over insertion order, not LRU** — recall on this tier is a pure recency proxy (newest `k`, never reordered), so the oldest entries are exactly the ones a bounded recall would never have returned anyway. `maxItems` is validated as an integer `>= 1` at construction; there is no unbounded setting — "no cap" was the vulnerability, not a configuration choice. Raise it deliberately for a long-lived single-tenant process, and put durable recall in the semantic / episodic tiers (which delegate retention to a `CacheDriver`, not process memory).
+
+The bound is **global**, not per-scope — a busy session can push another session's older entries out. That's a recall-quality degradation on a volatile scratch tier, never a disclosure (the `scope` isolation filter above still applies).
 
 ### `clear(tier?)`
 

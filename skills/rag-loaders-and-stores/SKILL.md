@@ -63,6 +63,8 @@ await kb.index(await ai.rag.loadWeb("https://docs.example.com/guide", {
 
 HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL, `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout, or an over-cap body throws `OutboundPolicyError`.
 
+**Redirects are re-validated per hop, not delegated to the platform (4.15.0).** A page a crawl reaches can `3xx` — `guardedFetch` re-runs each `Location` through the same scheme/host/private-IP checks before following it, capped at `policy.maxRedirects` (default `5`), and strips `authorization`/`cookie`/`proxy-authorization` on a cross-origin hop. So a redirect can never smuggle `loadWeb` into a private/metadata address the original URL couldn't have reached. Full guard detail (including `assertUrlAllowed`, `fetchTextWithPolicy`, and the other call sites sharing it): [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md).
+
 ### `loadPdf` — lazy optional peer, page-precise citations
 
 `pdf-parse` is an **optional** peer, dynamic-imported on the FIRST `loadPdf` call — importing `@warlock.js/ai` never forces it. When it is absent, the curated `PDF_PARSE_INSTALL_INSTRUCTIONS` string is thrown as a plain `Error` (a missing infra peer, not a content problem), never a raw module-resolution stack trace.
@@ -161,4 +163,5 @@ The `embedder`'s `dimensions` MUST equal the store's `dimensions` — a mismatch
 
 - [[run-ai-rag]] — the chunk → embed → retrieve → rerank → cite pipeline that **consumes** these loaders and stores (`ai.rag({ embedder, store })`, `index()` / `retrieve()`).
 - [[embed-text]] — the `sdk.embedder` primitive whose `dimensions` must match the store's `vector(N)` width.
+- [[secure-outbound-requests]] — the full `guardedFetch` / `OutboundPolicy` guard `loadWeb` delegates to, including per-hop redirect revalidation and the other consumers sharing it.
 - [`@warlock.js/cache/use-cache-similarity/SKILL.md`](@warlock.js/cache/use-cache-similarity/SKILL.md) — the cache driver `cacheVectorStore` adapts.

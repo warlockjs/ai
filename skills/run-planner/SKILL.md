@@ -1,6 +1,6 @@
 ---
 name: run-planner
-description: 'Goal-driven planning with ai.planner({...}) — an LLM GENERATES an ordered execution plan over your registered capabilities (agents / workflows / supervisors / tools), then the planner EXECUTES it, threading each step output into the next, and returns the unified {data, report, usage, error} envelope with report.type "planner". Supports DAG scheduling (dag:true + maxConcurrency off dependsOn), adaptive re-planning (replan:{maxReplans} + the onStep continue/abort/replan directive), and plan-only / approval (mode:"plan-only" → status "awaiting-approval" → approvedPlan). A plan step may delegate via ai.spawnSubAgent({...}) — a GENERAL one-shot-agent helper covered in `@warlock.js/ai/run-ai-agent/SKILL.md`; it is not planner-specific. Triggers: `ai.planner`, `planner.execute`, `spawnSubAgent`, `PlannerConfig`, `PlannerCapability`, `PlannerResult`, `PlannerReport`, `PlannerPlan`, `PlannerStep`, `PlannerStepDirective`, `PlannerPlanInvalidError`, `maxSteps`, `dag`, `maxConcurrency`, `dependsOn`, `replan`, `onStep`, `mode`, `approvedPlan`, `awaiting-approval`, `report.plan`, `report.executedSteps`; ''let the model plan the steps'', ''dynamic plan from a goal'', ''run independent steps in parallel'', ''re-plan when a step fails'', ''generate a plan for approval before running it''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a FIXED known pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; routing one input to a specialist each turn — `@warlock.js/ai/run-supervisor/SKILL.md`; a single model + tools call — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: 'Goal-driven planning with ai.planner({...}) — an LLM GENERATES an ordered execution plan over your registered capabilities (agents / workflows / supervisors / tools), then the planner EXECUTES it, threading each step output into the next, and returns the unified {data, report, usage, error} envelope with report.type "planner". Supports DAG scheduling (dag:true + maxConcurrency off dependsOn), adaptive re-planning (replan:{maxReplans} + the onStep continue/abort/replan directive), and plan-only / approval (mode:"plan-only" → status "awaiting-approval" → approvedPlan). A plan step may delegate via ai.spawnSubAgent({...}) — a GENERAL one-shot-agent helper covered in `@warlock.js/ai/run-ai-agent/SKILL.md`; it is not planner-specific. Triggers: `ai.planner`, `planner.execute`, `spawnSubAgent`, `PlannerConfig`, `PlannerCapability`, `PlannerResult`, `PlannerReport`, `PlannerPlan`, `PlannerStep`, `PlannerStepDirective`, `PlannerPlanInvalidError`, `maxSteps`, `dag`, `maxConcurrency`, `dependsOn`, `replan`, `onStep`, `mode`, `approvedPlan`, `awaiting-approval`, `report.plan`, `report.executedSteps`, `parsedStepCeiling`; ''let the model plan the steps'', ''dynamic plan from a goal'', ''run independent steps in parallel'', ''re-plan when a step fails'', ''generate a plan for approval before running it''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a FIXED known pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; routing one input to a specialist each turn — `@warlock.js/ai/run-supervisor/SKILL.md`; a single model + tools call — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
 ---
 
 # `ai.planner()` — LLM-generated, then executed, plans
@@ -30,7 +30,7 @@ const research = ai.planner({
     { name: "summarize", description: "Summarize text into bullet points", executable: summarizer },
     { name: "write", description: "Draft a final report", executable: writerAgent },
   ],
-  maxSteps: 6, // hard cap; steps beyond it are recorded as "skipped"
+  maxSteps: 6, // soft cap; steps beyond it are recorded as "skipped" — see the parse-time ceiling below
 });
 
 const { data, report, usage, error } = await research.execute("Compare React vs Vue in 2026");
@@ -52,6 +52,10 @@ for (const step of report.executedSteps) {  // forensic, in execution order
 3. **Finalize** — when `output` is set (factory or per-call), the LAST completed step's structured output is validated into `result.data`. A capability that should feed typed output to the planner's `output` should declare its own `output` schema (the planner reads `data`, falling back to an agent's raw `text`).
 
 `report.type === "planner"`; `report.children[]` carries every dispatched capability report (plus the planning trip), with usage rolled up. `report.executedSteps` is the authoritative per-step record (`PlannerStepSnapshot[]`). Lazy capability loading is **deferred** — every capability is fully constructed up front.
+
+### Parse-time step ceiling (4.15.0)
+
+`maxSteps` can't be expressed in the strict-mode JSON Schema the planning model is given (no `maxItems`), so a provider/proxy that ignores the prompt's step budget could make the planner deserialize an arbitrarily long `steps[]` array before `PlannerRun`'s tail-truncation logic ever ran — `maxSteps` only trimmed *after* the whole array was already parsed and normalized. Plan validation now enforces a hard **parse-time** ceiling of `maxSteps * 4` (or `100` when the schema is built without a `maxSteps`) and **rejects** — rather than truncates — a plan that exceeds it, surfacing `PlannerPlanInvalidError`. The 4× slack keeps the normal case (a model overshooting "at most N steps" slightly) working exactly as before — that overshoot is still truncated to `skipped` steps at execution time, not rejected at parse time. A plan several times its budget is treated as a malfunction worth surfacing, not a prefix worth silently executing.
 
 ## DAG scheduling — `dag: true` + `maxConcurrency`
 
@@ -119,7 +123,7 @@ const final = await planner.execute(goal, { approvedPlan: draft.plan! });
 
 `execute()` never throws — failures surface on `result.error`:
 
-- **`PlannerPlanInvalidError`** (`PLANNER_PLAN_INVALID`, category `schema`) — empty plan, a step naming an unknown capability, a DAG cycle, a `dependsOn` naming an unknown step, a stale `approvedPlan`, or a final-output validation failure.
+- **`PlannerPlanInvalidError`** (`PLANNER_PLAN_INVALID`, category `schema`) — empty plan, a step naming an unknown capability, a DAG cycle, a `dependsOn` naming an unknown step, a stale `approvedPlan`, a final-output validation failure, or (4.15.0) a plan exceeding the parse-time step ceiling (`maxSteps * 4`, default `100`).
 - **`PlannerCancelledError`** (`PLANNER_CANCELLED`, category `cancelled`) — the `AbortSignal` fired. `report.status === "cancelled"`, `report.cancelledAt` set; remaining steps are `skipped`.
 - A child capability's own error (agent / tool / provider) flows through unchanged on the failing step's snapshot and as `result.error`. The planner stops at the first failed step and marks the rest `skipped`.
 - **`PlannerFailedError`** is the base for the `PLANNER_*` family.

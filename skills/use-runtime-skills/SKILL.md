@@ -41,7 +41,7 @@ const lib = ai.skills({
 ### Sources — `SkillSource` (discriminated by `type`, never `kind`)
 
 - `{ type: "directory", path }` — reads `path/<folder>/SKILL.md` off disk (lazy `node:fs/promises`).
-- `{ type: "url", url, headers? }` — `fetch()`es a JSON manifest of skills.
+- `{ type: "url", url, headers?, policy?, cacheTtlMs? }` — `urlSource(url, options)` fetches a JSON manifest of skills through the shared `guardedFetch` / `OutboundPolicy` guard (scheme/host allowlist, post-DNS private-IP deny, byte cap, timeout, per-hop redirect revalidation) — never a raw `fetch()`. A remote skill source is a prompt supply chain (bodies flow straight into model context), so every fetched record is also runtime-validated before it can be served. `policy` tunes the guard (e.g. `hostAllowlist`); see [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md). The result is cached for the source's lifetime, or `cacheTtlMs` when set.
 - `{ type: "store", store }` — any `SkillsStoreContract`, e.g. `MockSkillsStore`.
 
 Sources merge in order; a later source wins on a name collision.
@@ -104,3 +104,4 @@ The optional `analytics` sink fires `catalogued` / `loaded` / `used` / `saved` /
 - [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — static persona / instruction blocks (vs. dynamic loaded skills)
 - [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md) — the procedural memory tier `proceduralSkillStore` unifies with
 - [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the agent the `skills` option attaches to
+- [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md) — the `guardedFetch` / `OutboundPolicy` guard the `url` source's manifest fetch runs through

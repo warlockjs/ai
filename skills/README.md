@@ -102,7 +102,11 @@ Goal-driven planning with ai.planner({...}) — an LLM GENERATES an ordered plan
 
 ### [`run-supervisor/`](./run-supervisor/SKILL.md)
 
-Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback (iter 1+), intents as agents / workflows / callbacks, fan-out, evaluate quality loop, ack receptionist, ctx.intents.X.execute composition, and sub-agent trace nesting (a callback that calls agent.execute() directly auto-nests agent → tool under the callback span with cost rolled up — same for team members + orchestrator turns). Load when routing one user input across a fixed roster of specialists, or when a callback sub-agent shows as a lone $0 span instead of nesting.
+Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback (iter 1+), intents as agents / workflows / callbacks, fan-out (+ the maxFanOut width cap), evaluate quality loop, ack receptionist, ctx.intents.X.execute composition, and sub-agent trace nesting (a callback that calls agent.execute() directly auto-nests agent → tool under the callback span with cost rolled up — same for team members + orchestrator turns). Load when routing one user input across a fixed roster of specialists, bounding how wide a router can fan out, or when a callback sub-agent shows as a lone $0 span instead of nesting.
+
+### [`secure-outbound-requests/`](./secure-outbound-requests/SKILL.md)
+
+The shared SSRF / resource-exhaustion guard — guardedFetch(url, policy, init?) + OutboundPolicy: scheme/host allowlist, post-DNS private/loopback/link-local/metadata-address deny, byte cap, timeout, and per-hop redirect revalidation (maxRedirects, default 5) with cross-origin credential stripping. Consumed by ai.rag.loadWeb, remote text attachments, and the skills urlSource manifest fetch. Load when fetching a URL an agent or user supplied, allowlisting outbound hosts, or investigating an OutboundPolicyError.
 
 ### [`use-ai-memory/`](./use-ai-memory/SKILL.md)
 
