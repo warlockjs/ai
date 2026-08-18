@@ -24,6 +24,7 @@ export type {
 export type {
   OrchestratorConfig,
   OrchestratorMemoryConfig,
+  OrchestratorMemoryScope,
   SummarizeCallback,
   SummarizeConfig,
 } from "./orchestrator-config.type";

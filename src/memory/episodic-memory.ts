@@ -16,6 +16,8 @@ type StoredEpisode = {
   id: string;
   text: string;
   ts: number;
+  /** Isolation key the episode was written under; absent = the shared pool. */
+  scope?: string;
   metadata?: Record<string, unknown>;
 };
 
@@ -70,10 +72,11 @@ export class EpisodicMemory {
       id,
       text: item.text,
       ts: this.now(),
+      scope: item.scope,
       metadata: item.metadata,
     };
 
-    await this.store.set(this.keyFor(id), value, { vector });
+    await this.store.set(this.keyFor(id, item.scope), value, { vector });
   }
 
   /**
@@ -82,11 +85,17 @@ export class EpisodicMemory {
    * returning the top `k`. The similarity floor still gates relevance —
    * recency only reorders episodes that already cleared it, it never
    * surfaces an irrelevant-but-recent one.
+   *
+   * Episodes written under a different `scope` (another tenant /
+   * session) are dropped here, before scoring and slicing, so they can
+   * neither leak nor consume a slot. An unscoped recall reads only
+   * unscoped episodes.
    */
   public async recall(
     query: string,
     k: number,
     threshold: number,
+    scope?: string,
   ): Promise<RecalledMemory[]> {
     const { vector } = await this.embedder.embed(query);
 
@@ -99,8 +108,9 @@ export class EpisodicMemory {
     const now = this.now();
 
     return hits
-      .filter((hit: CacheSimilarHit<StoredEpisode>) =>
-        hit.key.startsWith(prefix),
+      .filter(
+        (hit: CacheSimilarHit<StoredEpisode>) =>
+          hit.key.startsWith(prefix) && hit.value?.scope === scope,
       )
       .map((hit: CacheSimilarHit<StoredEpisode>) => ({
         id: hit.value.id,
@@ -135,9 +145,13 @@ export class EpisodicMemory {
   /**
    * Namespaced key for an entry. Mirrors the semantic tier's dot
    * separator so the prefix used here matches the `hit.key` the driver
-   * returns from `similar()`.
+   * returns from `similar()`, and its hashed scope segment so two
+   * scopes never overwrite one another's identical text. Unscoped keys
+   * keep their pre-4.15.0 shape.
    */
-  private keyFor(id: string): string {
-    return `${this.namespace}.${id}`;
+  private keyFor(id: string, scope?: string): string {
+    return scope === undefined
+      ? `${this.namespace}.${id}`
+      : `${this.namespace}.${deriveMemoryId(scope)}.${id}`;
   }
 }

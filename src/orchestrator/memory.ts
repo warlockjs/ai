@@ -3,12 +3,24 @@ import type {
   MemoryItem,
   RecalledMemory,
 } from "../contracts/memory/memory-item.type";
-import type { OrchestratorMemoryConfig } from "../contracts/orchestrator/orchestrator-config.type";
+import type {
+  OrchestratorMemoryConfig,
+  OrchestratorMemoryScope,
+} from "../contracts/orchestrator/orchestrator-config.type";
 import type { TurnSnapshot } from "../contracts/result/orchestrator-result.type";
 import type { SupervisorInput } from "../contracts/supervisor/supervisor-input.type";
 
 /** Default key the recalled memories are injected under in the context bag. */
 const DEFAULT_INJECT_KEY = "memories";
+
+/**
+ * Default isolation boundary: a turn recalls only what its own session
+ * remembered. Cross-session pooling is opt-in (`scope: "shared"`) — the
+ * default must not leak one user's remembered turns into another's
+ * context, since one memory store backs every session of an
+ * orchestrator instance.
+ */
+const DEFAULT_SCOPE = "session" as const;
 
 /**
  * Memory wiring resolved once per turn from `OrchestratorConfig.memory`
@@ -30,6 +42,12 @@ export type ResolvedOrchestratorMemory = {
   remember: boolean;
   /** Tier the remembered outcome lands in. Omit for the memory's `defaultTier`. */
   rememberTier?: ResolvedTier;
+  /**
+   * Isolation boundary for recall + write-back. Default `"session"` —
+   * the turn's `sessionId` keys every read and write, so one session
+   * cannot recall another's memories out of the shared store.
+   */
+  scope: OrchestratorMemoryScope;
   /** Context-bag key the recalled memories are injected under. */
   injectKey: string;
 };
@@ -65,6 +83,7 @@ export function resolveOrchestratorMemory(
     return {
       store: memory,
       remember: true,
+      scope: DEFAULT_SCOPE,
       injectKey: DEFAULT_INJECT_KEY,
     };
   }
@@ -76,8 +95,48 @@ export function resolveOrchestratorMemory(
     tier: memory.recall?.tier,
     remember: memory.remember ?? true,
     rememberTier: memory.rememberTier,
+    scope: memory.scope ?? DEFAULT_SCOPE,
     injectKey: memory.injectKey ?? DEFAULT_INJECT_KEY,
   };
+}
+
+/**
+ * Resolve the isolation key a turn reads and writes memories under
+ * (4.15.0 — security fix for cross-session recall).
+ *
+ * The memory store is resolved once per orchestrator instance and reused
+ * by every session, so this — not the store — is what keeps one session's
+ * remembered turns out of another's recall. It is derived from the
+ * execute-time `sessionId` by the engine and handed to every tier as an
+ * exact-match filter; the model, the tool payload, and the per-call
+ * `context` bag have no say in it.
+ *
+ * `"shared"` resolves to `undefined`, i.e. the store's unscoped pool —
+ * the explicit opt-in back to pre-4.15.0 cross-session behavior, which
+ * also keeps memories written before this release readable.
+ */
+export function memoryScopeFor(
+  memory: ResolvedOrchestratorMemory,
+  sessionId: string,
+): string | undefined {
+  if (memory.scope === "shared") {
+    return undefined;
+  }
+
+  if (typeof memory.scope === "function") {
+    return memory.scope(sessionId);
+  }
+
+  return sessionMemoryScope(sessionId);
+}
+
+/**
+ * The default `"session"` scope key: the session id under a reserved
+ * prefix, so a custom `scope` callback returning a bare tenant id can
+ * never accidentally collide with a session-scoped pool.
+ */
+export function sessionMemoryScope(sessionId: string): string {
+  return `session:${sessionId}`;
 }
 
 /**
@@ -98,10 +157,15 @@ export function memoryQueryFromInput(input: SupervisorInput): string {
  * `memory.injectKey`. Returns an empty array — never throws on "no hits"
  * — and short-circuits when `k === 0` (recall disabled / write-only
  * memory) so a write-only config never round-trips the embedder.
+ *
+ * The recall is confined to the calling session's scope (see
+ * {@link memoryScopeFor}) — `sessionId` is required, not optional, so a
+ * new call site cannot silently recall across every session.
  */
 export async function recallForTurn(
   memory: ResolvedOrchestratorMemory,
   input: SupervisorInput,
+  sessionId: string,
 ): Promise<RecalledMemory[]> {
   if (memory.k === 0) {
     return [];
@@ -111,6 +175,7 @@ export async function recallForTurn(
     k: memory.k,
     threshold: memory.threshold,
     tier: memory.tier,
+    scope: memoryScopeFor(memory, sessionId),
   });
 }
 
@@ -147,11 +212,16 @@ export function injectMemories(
  * The remembered text is the turn input followed by the model's textual
  * outcome when one is available, so a later `recall` keyed on a similar
  * input surfaces both the prior question and its answer.
+ *
+ * The write is tagged with the calling session's scope (see
+ * {@link memoryScopeFor}) so only that session recalls it later —
+ * turn text routinely contains one user's private content.
  */
 export async function rememberTurnOutcome(
   memory: ResolvedOrchestratorMemory,
   input: SupervisorInput,
   outcomeText: string | undefined,
+  sessionId: string,
 ): Promise<void> {
   if (!memory.remember) {
     return;
@@ -163,7 +233,11 @@ export async function rememberTurnOutcome(
     return;
   }
 
-  const item: MemoryItem = { text, tier: memory.rememberTier };
+  const item: MemoryItem = {
+    text,
+    tier: memory.rememberTier,
+    scope: memoryScopeFor(memory, sessionId),
+  };
 
   await memory.store.remember(item);
 }

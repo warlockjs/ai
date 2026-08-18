@@ -35,6 +35,12 @@ export type MemoryTier = "working" | "semantic" | "episodic" | "procedural";
  * `metadata` is an opaque bag round-tripped verbatim onto the recalled
  * memory — use it for source ids, timestamps, tags, or anything the
  * consumer wants back alongside the text.
+ *
+ * `scope` is the ISOLATION key (4.15.0). It is not metadata: every tier
+ * enforces an exact-equality match between an item's `scope` and the
+ * `scope` on the `recall()` call BEFORE hits are scored and merged, so
+ * an item written under one scope can never surface in another scope's
+ * recall. Omit it for the shared/global pool.
  */
 export type MemoryItem = {
   /** Natural-language content. Embedded for semantic recall; surfaced verbatim on retrieval. */
@@ -43,6 +49,14 @@ export type MemoryItem = {
   tier?: MemoryTier;
   /** Caller-owned identifier for overwrite / dedup. Derived from `text` when omitted. */
   id?: string;
+  /**
+   * Isolation key — an opaque tenant / session / user boundary. Enforced
+   * by every tier as an exact-equality filter at recall time, and folded
+   * into the stored key so two scopes writing identical text never
+   * overwrite each other. Omit for the shared/global pool (which only an
+   * equally unscoped `recall()` can read).
+   */
+  scope?: string;
   /** Opaque metadata round-tripped onto the recalled memory unchanged. */
   metadata?: Record<string, unknown>;
 };

@@ -7,6 +7,14 @@ import type {
 import { deriveMemoryId } from "./derive-id";
 
 /**
+ * Extra candidates pulled from `similar()` on a SCOPED recall before the
+ * scope filter runs — the driver's ranking spans every scope in the
+ * index, so a bare top-`k` can come back entirely foreign. Mirrors the
+ * episodic / procedural tiers' overscan constant.
+ */
+const RECALL_OVERSCAN = 5;
+
+/**
  * Shape persisted per semantic memory in the cache driver. The vector
  * itself is stored by the driver's own index (passed via
  * `set({ vector })`), so it is not duplicated in the value.
@@ -14,6 +22,8 @@ import { deriveMemoryId } from "./derive-id";
 type StoredMemory = {
   id: string;
   text: string;
+  /** Isolation key the entry was written under; absent = the shared pool. */
+  scope?: string;
   metadata?: Record<string, unknown>;
 };
 
@@ -54,35 +64,43 @@ export class SemanticMemory {
     const value: StoredMemory = {
       id,
       text: item.text,
+      scope: item.scope,
       metadata: item.metadata,
     };
 
-    await this.store.set(this.keyFor(id), value, { vector });
+    await this.store.set(this.keyFor(id, item.scope), value, { vector });
   }
 
   /**
    * Embed `query`, ask the driver for the `k` nearest entries clearing
-   * `threshold`, and return those within this instance's namespace as
-   * scored {@link RecalledMemory}. Hits indexed under a different
-   * namespace (a shared driver) are filtered out.
+   * `threshold`, and return those within this instance's namespace AND
+   * this call's `scope` as scored {@link RecalledMemory}. Hits indexed
+   * under a different namespace (a shared driver) or a different scope
+   * (another tenant / session) are filtered out here, before the caller
+   * ever sees them — an unscoped recall reads only unscoped entries.
    */
   public async recall(
     query: string,
     k: number,
     threshold: number,
+    scope?: string,
   ): Promise<RecalledMemory[]> {
     const { vector } = await this.embedder.embed(query);
 
+    // A scoped recall overscans: the driver ranks across every scope in
+    // the index, so a plain top-`k` could be filled entirely by foreign
+    // scopes and starve this one. Pull extra candidates, filter, then cap.
     const hits = await this.store.similar<StoredMemory>(vector, {
-      topK: k,
+      topK: scope === undefined ? k : Math.max(k * RECALL_OVERSCAN, k),
       threshold,
     });
 
     const prefix = `${this.namespace}.`;
 
     return hits
-      .filter((hit: CacheSimilarHit<StoredMemory>) =>
-        hit.key.startsWith(prefix),
+      .filter(
+        (hit: CacheSimilarHit<StoredMemory>) =>
+          hit.key.startsWith(prefix) && hit.value?.scope === scope,
       )
       .map((hit: CacheSimilarHit<StoredMemory>) => ({
         id: hit.value.id,
@@ -90,7 +108,8 @@ export class SemanticMemory {
         tier: "semantic" as const,
         score: hit.score,
         metadata: hit.value.metadata,
-      }));
+      }))
+      .slice(0, Math.max(0, k));
   }
 
   /** Drop every semantic entry written under this instance's namespace. */
@@ -102,8 +121,17 @@ export class SemanticMemory {
    * Namespaced key for an entry. The cache's `parseKey` normalizes `:`
    * to `.`, so a dot separator keeps the prefix used here aligned with
    * the `hit.key` the driver returns from `similar()`.
+   *
+   * A scoped entry gets an extra hashed segment so two scopes writing
+   * identical text (same derived id) don't overwrite each other; the
+   * unscoped key shape is unchanged, so entries written before 4.15.0
+   * still resolve. The hash is a write-separation device only — recall
+   * authorization is the exact `value.scope` equality check, so even a
+   * hash collision cannot widen what a scope can read.
    */
-  private keyFor(id: string): string {
-    return `${this.namespace}.${id}`;
+  private keyFor(id: string, scope?: string): string {
+    return scope === undefined
+      ? `${this.namespace}.${id}`
+      : `${this.namespace}.${deriveMemoryId(scope)}.${id}`;
   }
 }

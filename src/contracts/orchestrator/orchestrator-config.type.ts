@@ -56,6 +56,18 @@ export type SummarizeCallback = (
 ) => Promise<CompactionResult> | CompactionResult;
 
 /**
+ * Isolation boundary for the orchestrator's memory recall / write-back
+ * (4.15.0). `"session"` (the default) confines a turn to the memories
+ * remembered under the same `sessionId`; `"shared"` opts every session of
+ * this orchestrator into one common pool; a function derives a custom key
+ * (a tenant id, a user id) from the executing session.
+ */
+export type OrchestratorMemoryScope =
+  | "session"
+  | "shared"
+  | ((sessionId: string) => string);
+
+/**
  * Per-turn memory wiring for `OrchestratorConfig.memory` (memory core
  * M2). The `store` is the {@link MemoryContract} the orchestrator
  * recalls from before each dispatch and remembers into after each turn
@@ -71,10 +83,34 @@ export type SummarizeCallback = (
  * `ctx.context[injectKey]` — memory never mutates the prompt itself, the
  * surfacing point stays explicit (the same contract `MemoryContract`
  * documents).
+ *
+ * **Isolation (4.15.0).** The store is resolved ONCE per orchestrator
+ * instance and reused by every session, so `scope` decides what a turn
+ * may read: it defaults to `"session"`, which confines both recall and
+ * write-back to the executing `sessionId`. Cross-session pooling is
+ * available but must be asked for (`scope: "shared"`).
  */
 export type OrchestratorMemoryConfig = {
   /** The memory store recalled-from before dispatch and remembered-into after. */
   store: MemoryContract;
+  /**
+   * Isolation boundary applied to every recall and write-back
+   * (4.15.0 — security fix).
+   *
+   * - `"session"` (DEFAULT) — memories are keyed to the turn's
+   *   `sessionId`. One session can never recall another's remembered
+   *   turns, even though the store instance is shared by the whole
+   *   orchestrator.
+   * - `"shared"` — every session reads and writes ONE pool. This is the
+   *   pre-4.15.0 behavior and is only safe when every session of this
+   *   orchestrator is trusted to see every other session's memories
+   *   (e.g. a single-tenant assistant, or a curated knowledge base).
+   * - `(sessionId) => string` — derive the key yourself, e.g. map a
+   *   session to its tenant (`(id) => tenantOf(id)`) so a tenant's users
+   *   share memory but tenants stay isolated. The returned string is
+   *   opaque; equal strings share memories.
+   */
+  scope?: OrchestratorMemoryScope;
   /**
    * Pre-dispatch recall tuning. `k` caps the injected count (0 disables
    * recall — write-only memory); `threshold` raises the semantic
@@ -225,6 +261,11 @@ export type OrchestratorConfig<
    * the existing behavior — orchestrators without memory are unchanged.
    * Accepts a bare {@link MemoryContract} (recall + remember with
    * defaults) or an {@link OrchestratorMemoryConfig} for finer control.
+   *
+   * Either form is SESSION-SCOPED by default (4.15.0): the store is
+   * shared by the whole orchestrator instance, but each turn only recalls
+   * what its own `sessionId` remembered. Opt into cross-session pooling
+   * explicitly with `{ store, scope: "shared" }`.
    */
   memory?: MemoryContract | OrchestratorMemoryConfig;
 

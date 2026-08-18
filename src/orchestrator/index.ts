@@ -21,7 +21,9 @@ export { OrchestratorEmitter } from "./emitter";
 export {
   injectMemories as injectOrchestratorMemories,
   memoryQueryFromInput as orchestratorMemoryQueryFromInput,
+  memoryScopeFor as orchestratorMemoryScopeFor,
   outcomeTextFromTurn as orchestratorOutcomeTextFromTurn,
+  sessionMemoryScope as orchestratorSessionMemoryScope,
   recallForTurn as recallOrchestratorMemory,
   rememberTurnOutcome as rememberOrchestratorTurnOutcome,
   resolveOrchestratorMemory,

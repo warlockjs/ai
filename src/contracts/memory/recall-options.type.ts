@@ -26,4 +26,16 @@ export type RecallOptions = {
    * which has no vector index.
    */
   threshold?: number;
+  /**
+   * Isolation key (4.15.0) — only memories remembered under the SAME
+   * `scope` are eligible. The match is exact equality, enforced inside
+   * every tier before hits are scored and merged, never bolted on by the
+   * caller afterward.
+   *
+   * Omitting `scope` does NOT mean "every scope": an unscoped recall
+   * reads only the unscoped (shared/global) pool. That is the fail-closed
+   * default — reading another tenant's memories always requires naming
+   * their scope explicitly.
+   */
+  scope?: string;
 };

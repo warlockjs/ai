@@ -26,6 +26,15 @@ import type { RecallOptions } from "./recall-options.type";
  * itself; surfacing the recalled text is the consumer's call so the
  * injection point stays explicit.
  *
+ * **Isolation (4.15.0).** Every item may carry a `scope` — an opaque
+ * tenant / session / user key — and every `recall()` may name one. The
+ * match is exact equality, enforced *inside* each tier before hits are
+ * scored and merged, so one scope's memories can never surface in
+ * another's recall. Unscoped items form a shared pool readable only by an
+ * equally unscoped `recall()`; there is no "read every scope" query.
+ * `ai.orchestrator({ memory })` sets this automatically from the turn's
+ * `sessionId` (see `OrchestratorMemoryConfig.scope`).
+ *
  * **Still deferred.** Decay / forgetting (TTL-based relevance falloff,
  * eviction policies) is not yet implemented; the four tiers above are the
  * full 4.3.0 surface. The `episodic` and `procedural` tiers were added in
@@ -62,7 +71,9 @@ export interface MemoryContract {
    * appended to the in-run buffer.
    *
    * Re-remembering an item whose id (explicit or text-derived) already
-   * exists overwrites it in place rather than duplicating.
+   * exists overwrites it in place rather than duplicating — within the
+   * item's `scope`. Identical text under two different scopes stays two
+   * independent entries.
    */
   remember(items: MemoryItem | MemoryItem[]): Promise<void>;
 
@@ -70,7 +81,9 @@ export interface MemoryContract {
    * Retrieve the memories most relevant to `query`, scored and ordered
    * by descending relevance. Queries every enabled tier by default;
    * `options.tier` narrows to one. `options.k` caps the result count,
-   * `options.threshold` raises the semantic-similarity floor.
+   * `options.threshold` raises the semantic-similarity floor, and
+   * `options.scope` restricts the eligible set to the memories written
+   * under that exact scope (omit it to read the unscoped pool only).
    *
    * Returns an empty array when nothing clears the threshold — never
    * throws on "no hits".

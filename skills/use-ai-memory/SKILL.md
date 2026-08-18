@@ -77,7 +77,7 @@ await mem.remember({ text: "User is on the Enterprise plan.", tier: "semantic", 
 await mem.remember([{ text: "a" }, { text: "b", tier: "working" }]);   // batch
 ```
 
-A `MemoryItem` is `{ text, tier?, id?, metadata? }`. `text` is the only required field — it's what gets embedded (semantic) and surfaced back on recall. `tier` defaults to the factory `defaultTier`. Semantic items are embedded + indexed; working items append to the in-run buffer. **Re-remembering an item whose id (explicit or text-derived) already exists overwrites in place rather than duplicating.** `metadata` is an opaque bag round-tripped verbatim onto the recalled memory.
+A `MemoryItem` is `{ text, tier?, id?, scope?, metadata? }`. `text` is the only required field — it's what gets embedded (semantic) and surfaced back on recall. `tier` defaults to the factory `defaultTier`. Semantic items are embedded + indexed; working items append to the in-run buffer. **Re-remembering an item whose id (explicit or text-derived) already exists overwrites in place rather than duplicating.** `metadata` is an opaque bag round-tripped verbatim onto the recalled memory. `scope` is the ISOLATION key — see below.
 
 ### `recall(query, options?)`
 
@@ -86,6 +86,7 @@ const hits = await mem.recall("which plan is the user on?", {
   k: 5,              // cap result count (defaults to factory k)
   threshold: 0.75,   // raise the semantic floor for this call
   tier: "semantic",  // restrict to one tier; omit to query every enabled tier
+  scope: "tenant-42", // isolation key — only memories remembered under this exact scope
 });
 
 for (const hit of hits) {
@@ -96,6 +97,24 @@ for (const hit of hits) {
 Returns `RecalledMemory[]` scored and ordered by descending relevance. By default queries every enabled tier and merges. `score` is in `[0,1]` for **every** tier — cosine similarity (semantic), a recency proxy (working, most-recent = 1), similarity×recency (episodic), or similarity×reinforcement (procedural) — so a mixed recall set sorts on one field without special-casing the tier. Returns `[]` when nothing clears the threshold — never throws on "no hits".
 
 **Memory never mutates the prompt.** `recall()` hands you scored entries; surfacing the recalled text (system prefix, a synthesized "what you remember" block, …) is YOUR call so the injection point stays explicit.
+
+### Isolation — `scope` (4.15.0)
+
+One store instance is normally shared by many callers (built once at boot, passed into `ai.orchestrator({ memory })`), so `scope` is what keeps one caller's memories out of another's recall:
+
+```ts
+await mem.remember({ text: "User A's account email is a@example.com", scope: "user-a" });
+
+await mem.recall("what is my email?", { scope: "user-b" });   // [] — never sees user A
+await mem.recall("what is my email?", { scope: "user-a" });   // user A's own memories
+await mem.recall("what is my email?");                        // only the UNSCOPED pool
+```
+
+- The match is **exact equality**, enforced inside every tier (`working` / `semantic` / `episodic` / `procedural`) before hits are scored, merged, or sliced — not something the caller filters afterward.
+- Omitting `scope` is **not** a wildcard: an unscoped recall reads only unscoped entries. There is no "all scopes" query.
+- Identical text under two scopes stays two independent entries (including the procedural tier's reinforcement counter).
+- `ai.orchestrator({ memory })` sets this automatically from the turn's `sessionId` — see [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md).
+- `clear(tier?)` is scope-agnostic: it drops the tier for every scope.
 
 ### `clear(tier?)`
 

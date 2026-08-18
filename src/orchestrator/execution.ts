@@ -477,8 +477,12 @@ export async function runTurn<TOutput, TState>(
 
     let turnContext = options.context;
 
+    // Recall is scoped to THIS session (`memory.scope`, default
+    // `"session"`): the store is shared by every session of this
+    // orchestrator instance, so the scope — not the store — is what keeps
+    // another session's remembered turns out of this turn's context.
     if (ctx.memory) {
-      const recalled = await recallForTurn(ctx.memory, input);
+      const recalled = await recallForTurn(ctx.memory, input, sessionId);
       turnContext = injectMemories(turnContext, ctx.memory, recalled);
     }
 
@@ -547,6 +551,7 @@ export async function runTurn<TOutput, TState>(
         ctx.memory,
         input,
         outcomeTextFromTurn(result.data, turnSnapshot),
+        sessionId,
       );
     }
 

@@ -1,8 +1,10 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { ToolContract } from "../../tool/tool";
+import type { Message } from "../conversation-message.type";
 import type { OrchestratorResult } from "../result/orchestrator-result.type";
 import type { StreamContract } from "../stream/stream.contract";
 import type { SupervisorInput } from "../supervisor/supervisor-input.type";
+import type { ToolContext } from "../tool.contract";
 import type { OrchestratorCommands } from "./orchestrator-commands.type";
 import type {
   OrchestratorEvent,
@@ -20,11 +22,52 @@ import type {
  *
  * - `"fresh"` (default) — every tool invocation gets a brand-new
  *   `sessionId`; no continuity across calls. Safe default.
- * - `"shared"` — the wrapped orchestrator participates in the parent's
- *   session; the `sessionId` is supplied via the tool's `inputSchema`
- *   payload. Expert escape hatch for nested-conversation use cases.
+ * - `"shared"` — the wrapped orchestrator participates in an existing
+ *   session. The target `sessionId` comes from the DEVELOPER, via
+ *   `OrchestratorAsToolOptions.session` (a fixed id bound at
+ *   construction, or a resolver reading the out-of-band
+ *   {@link ToolContext}) — never from the model's tool-call arguments.
+ *   Expert escape hatch for nested-conversation use cases.
  */
 export type OrchestratorSessionScope = "fresh" | "shared";
+
+/**
+ * Where a `sessionScope: "shared"` tool call gets its session from
+ * (4.15.0 — security fix).
+ *
+ * A `sessionId` is bearer-equivalent: whoever names one gets read/write
+ * access to that session's persisted state and history. It must
+ * therefore be bound OUTSIDE the model-visible `inputSchema` — either as
+ * a literal string fixed at `asTool()` construction, or as a resolver
+ * that reads the invocation's {@link ToolContext} (the same out-of-band
+ * channel `signal` and `artifacts` travel on, which an LLM cannot write
+ * to). Returning `history` lets the developer thread prior turns the
+ * same way.
+ *
+ * @example
+ * // Bound per request: the app puts the authenticated user's session on
+ * // the tool-call artifacts bag; the model never sees or picks it.
+ * const tool = support.asTool({
+ *   inputSchema: v.object({ message: v.string() }),
+ *   sessionScope: "shared",
+ *   session: (ctx) => String(ctx?.artifacts?.supportSessionId ?? ""),
+ * });
+ */
+export type OrchestratorToolSession =
+  | string
+  | ((ctx: ToolContext | undefined) =>
+      | string
+      | OrchestratorToolSessionBinding
+      | undefined
+      | Promise<string | OrchestratorToolSessionBinding | undefined>);
+
+/** Resolved session binding for a shared-scope tool call. */
+export type OrchestratorToolSessionBinding = {
+  /** Session the nested orchestrator joins. Must be non-empty. */
+  sessionId: string;
+  /** Prior turns to seed the nested run with. Defaults to `[]`. */
+  history?: Message[];
+};
 
 /**
  * Context overrides for a specific session.
@@ -55,6 +98,37 @@ export type OrchestratorAsToolOptions<TToolInput = string> = {
   inputSchema: StandardSchemaV1<TToolInput>;
   /** Session continuity for tool calls. Default `"fresh"`. */
   sessionScope?: OrchestratorSessionScope;
+  /**
+   * Which session a `sessionScope: "shared"` call joins — REQUIRED for
+   * that scope (4.15.0), and ignored for `"fresh"`.
+   *
+   * Bind it at construction (a literal id) or per call from the
+   * {@link ToolContext} (a resolver). Both channels are invisible to the
+   * model, which is the point: the previous release read `sessionId`
+   * straight off the validated tool payload, so a prompt-injected outer
+   * agent could name a VICTIM's session and have the nested orchestrator
+   * load, mutate, and echo back their conversation.
+   *
+   * Constructing a `"shared"` tool with neither this nor
+   * {@link unsafeAllowModelSessionId} throws.
+   */
+  session?: OrchestratorToolSession;
+  /**
+   * DANGEROUS opt-in: restore the pre-4.15.0 behavior of reading
+   * `sessionId` / `history` out of the model-generated tool payload.
+   *
+   * The value is a **bearer token for that session** — anything that can
+   * influence the calling model's output (an injected document, a web
+   * page it summarized, a poisoned tool result) can name any session id
+   * it can guess or has seen, and the nested orchestrator will load that
+   * session's state, run a turn against it, and return its content to
+   * the outer transcript.
+   *
+   * Only set this when the outer agent's context is fully trusted AND
+   * your `execute` path independently verifies the model-chosen
+   * `sessionId` belongs to the current caller. Prefer {@link session}.
+   */
+  unsafeAllowModelSessionId?: boolean;
 };
 
 /**

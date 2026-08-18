@@ -23,38 +23,61 @@ import { deriveMemoryId } from "./derive-id";
  */
 export class WorkingMemory {
   /**
-   * Id → text/metadata. A `Map` preserves insertion order, so iteration
+   * Scoped key → entry. A `Map` preserves insertion order, so iteration
    * yields oldest-first; recall reverses it for most-recent-first.
+   *
+   * The map key folds in the item's `scope` so two scopes remembering
+   * identical text (same derived id) stay two independent entries
+   * instead of clobbering one another; the entry keeps its logical `id`
+   * and its `scope` so recall can filter and still report the id the
+   * caller knows.
    */
   private readonly entries = new Map<
     string,
-    { text: string; metadata?: Record<string, unknown> }
+    {
+      id: string;
+      text: string;
+      scope?: string;
+      metadata?: Record<string, unknown>;
+    }
   >();
 
   /**
    * Append an item to the buffer (or overwrite the entry sharing its
-   * id). Re-inserting an existing id keeps its original position; delete
-   * + set would move it to the end and lie about recency, so the value
-   * is updated in place.
+   * id *within the same scope*). Re-inserting an existing key keeps its
+   * original position; delete + set would move it to the end and lie
+   * about recency, so the value is updated in place.
    */
   public remember(item: MemoryItem): void {
     const id = item.id ?? deriveMemoryId(item.text);
 
-    this.entries.set(id, { text: item.text, metadata: item.metadata });
+    this.entries.set(scopedKey(item.scope, id), {
+      id,
+      text: item.text,
+      scope: item.scope,
+      metadata: item.metadata,
+    });
   }
 
   /**
-   * Return up to `k` most-recently-remembered items, newest first. The
-   * `score` is a linear recency proxy: the newest item scores `1`, the
-   * oldest of the returned slice trends toward `0`. Working memory
+   * Return up to `k` most-recently-remembered items *within `scope`*,
+   * newest first. The scope match is exact equality (an unscoped recall
+   * sees only unscoped entries) and is applied BEFORE the slice, so a
+   * foreign scope's entries can never consume a slot or leak out.
+   *
+   * The `score` is a linear recency proxy: the newest item scores `1`,
+   * the oldest of the returned slice trends toward `0`. Working memory
    * ignores any similarity threshold — it has no vector to compare.
    */
-  public recall(k: number): RecalledMemory[] {
-    const ordered = [...this.entries.entries()].reverse();
+  public recall(k: number, scope?: string): RecalledMemory[] {
+    const ordered = [...this.entries.values()]
+      .reverse()
+      .filter((entry) => entry.scope === scope);
+
     const slice = ordered.slice(0, Math.max(0, k));
 
-    return slice.map(([id, entry], index) => ({
-      id,
+    return slice.map((entry, index) => ({
+      id: entry.id,
       text: entry.text,
       tier: "working" as const,
       score: slice.length <= 1 ? 1 : 1 - index / slice.length,
@@ -62,8 +85,19 @@ export class WorkingMemory {
     }));
   }
 
-  /** Drop every working-tier entry. */
+  /** Drop every working-tier entry, across every scope. */
   public clear(): void {
     this.entries.clear();
   }
+}
+
+/**
+ * Map key for a buffer entry: the isolation `scope` (empty for the
+ * unscoped pool) length-prefixed and joined to the logical id. The
+ * length prefix makes the encoding injective — no crafted scope/id pair
+ * can collide with a different scope's entry the way a plain `:` join
+ * would allow.
+ */
+function scopedKey(scope: string | undefined, id: string): string {
+  return `${scope?.length ?? 0}:${scope ?? ""}:${id}`;
 }

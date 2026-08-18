@@ -41,6 +41,14 @@ const DEFAULT_REINFORCEMENT_WEIGHT = 0.3;
  *
  * Decay / forgetting (TTL-based falloff, eviction) remains deferred.
  *
+ * **Isolation (4.15.0).** `remember({ scope })` / `recall(query, { scope })`
+ * carry an opaque tenant / session key that every tier enforces as an
+ * exact-equality filter before scoring — one scope's memories never
+ * surface in another's recall, and identical text under two scopes stays
+ * two entries. Unscoped writes form a shared pool that only an unscoped
+ * recall can read; there is no "all scopes" query. `ai.orchestrator()`
+ * derives this from the turn's `sessionId` automatically.
+ *
  * @example
  * import { ai } from "@warlock.js/ai";
  * import { MemoryCacheDriver } from "@warlock.js/cache";
@@ -137,19 +145,24 @@ export function memory(config: MemoryConfig = {}): MemoryContract {
       const wants = (tier: MemoryTier): boolean =>
         !options.tier || options.tier === tier;
 
+      // `options.scope` is the isolation key — each tier applies it as an
+      // exact-equality filter internally, BEFORE its own scoring and
+      // slicing, so nothing outside the scope reaches this merge.
+      const scope = options.scope;
+
       const [workingHits, semanticHits, episodicHits, proceduralHits] =
         await Promise.all([
           working && wants("working")
-            ? Promise.resolve(working.recall(k))
+            ? Promise.resolve(working.recall(k, scope))
             : Promise.resolve([] as RecalledMemory[]),
           semantic && wants("semantic")
-            ? semantic.recall(query, k, threshold)
+            ? semantic.recall(query, k, threshold, scope)
             : Promise.resolve([] as RecalledMemory[]),
           episodic && wants("episodic")
-            ? episodic.recall(query, k, threshold)
+            ? episodic.recall(query, k, threshold, scope)
             : Promise.resolve([] as RecalledMemory[]),
           procedural && wants("procedural")
-            ? procedural.recall(query, k, threshold)
+            ? procedural.recall(query, k, threshold, scope)
             : Promise.resolve([] as RecalledMemory[]),
         ]);
 

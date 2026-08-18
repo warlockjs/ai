@@ -109,7 +109,24 @@ describe("orchestrator.asTool()", () => {
     expect(calls[0].input).toEqual({ message: "help me" });
   });
 
-  it('"shared" scope extracts sessionId + history and forwards the rest as input', async () => {
+  it('"shared" scope uses the construction-bound session and forwards the payload as input', async () => {
+    const { orchestrator, calls } = mockOrchestrator();
+
+    const tool = asTool(orchestrator, {
+      name: "handle_support",
+      inputSchema: passthroughObject,
+      sessionScope: "shared",
+      session: "sess_42",
+    });
+
+    await tool.invoke({ message: "continue" });
+
+    expect(calls[0].options.sessionId).toBe("sess_42");
+    expect(calls[0].options.history).toEqual([]);
+    expect(calls[0].input).toEqual({ message: "continue" });
+  });
+
+  it('"shared" scope resolves the session (and history) from the ToolContext', async () => {
     const { orchestrator, calls } = mockOrchestrator();
     const history: Message[] = [{ role: "user", content: "earlier" }];
 
@@ -117,6 +134,99 @@ describe("orchestrator.asTool()", () => {
       name: "handle_support",
       inputSchema: passthroughObject,
       sessionScope: "shared",
+      session: (ctx) => ({
+        sessionId: String(
+          (ctx?.artifacts as { supportSession?: string } | undefined)
+            ?.supportSession,
+        ),
+        history,
+      }),
+    });
+
+    await tool.invoke(
+      { message: "continue" },
+      { artifacts: { supportSession: "sess_ctx" } },
+    );
+
+    expect(calls[0].options.sessionId).toBe("sess_ctx");
+    expect(calls[0].options.history).toEqual(history);
+    expect(calls[0].input).toEqual({ message: "continue" });
+  });
+
+  it('"shared" scope throws at construction when no session binding is supplied', () => {
+    const { orchestrator } = mockOrchestrator();
+
+    expect(() =>
+      asTool(orchestrator, {
+        name: "handle_support",
+        inputSchema: passthroughObject,
+        sessionScope: "shared",
+      }),
+    ).toThrow(/requires a `session` binding/);
+  });
+
+  it("SECURITY: a model-supplied sessionId in the payload cannot select the session", async () => {
+    const { orchestrator, calls } = mockOrchestrator();
+
+    // Session A is what the application authorized for this caller.
+    const tool = asTool(orchestrator, {
+      name: "handle_support",
+      inputSchema: passthroughObject,
+      sessionScope: "shared",
+      session: "session_A",
+    });
+
+    // A prompt-injected outer agent emits the victim's session id (and a
+    // forged history) as tool arguments.
+    const victimHistory: Message[] = [{ role: "user", content: "victim turn" }];
+
+    await tool.invoke({
+      sessionId: "session_B_victim",
+      history: victimHistory,
+      message: "continue session_B_victim",
+    });
+
+    // The bound session wins; the payload's session id is stripped, never
+    // forwarded, and the victim's history is not honored.
+    expect(calls[0].options.sessionId).toBe("session_A");
+    expect(calls[0].options.history).toEqual([]);
+    expect(calls[0].input).toEqual({ message: "continue session_B_victim" });
+  });
+
+  it("SECURITY: a session resolver returning an empty id fails the call instead of falling back to the payload", async () => {
+    const { orchestrator, calls } = mockOrchestrator();
+
+    const tool = asTool(orchestrator, {
+      name: "handle_support",
+      inputSchema: passthroughObject,
+      sessionScope: "shared",
+      // Simulates an unauthenticated request: nothing on the context.
+      session: (ctx) =>
+        (ctx?.artifacts as { supportSession?: string } | undefined)
+          ?.supportSession,
+    });
+
+    const invocation = await tool.invoke({
+      sessionId: "session_B_victim",
+      message: "continue",
+    });
+
+    expect(invocation.error?.code).toBe("TOOL_EXEC_FAILED");
+    expect((invocation.error as { cause?: unknown }).cause).toBeInstanceOf(
+      SupervisorFailedError,
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  it("unsafeAllowModelSessionId opts back into the legacy model-chosen session", async () => {
+    const { orchestrator, calls } = mockOrchestrator();
+    const history: Message[] = [{ role: "user", content: "earlier" }];
+
+    const tool = asTool(orchestrator, {
+      name: "handle_support",
+      inputSchema: passthroughObject,
+      sessionScope: "shared",
+      unsafeAllowModelSessionId: true,
     });
 
     await tool.invoke({ sessionId: "sess_42", history, message: "continue" });
@@ -126,13 +236,14 @@ describe("orchestrator.asTool()", () => {
     expect(calls[0].input).toEqual({ message: "continue" });
   });
 
-  it('"shared" scope without a sessionId surfaces SupervisorFailedError as the tool cause', async () => {
+  it("unsafeAllowModelSessionId without a payload sessionId surfaces SupervisorFailedError as the tool cause", async () => {
     const { orchestrator } = mockOrchestrator();
 
     const tool = asTool(orchestrator, {
       name: "handle_support",
       inputSchema: passthroughObject,
       sessionScope: "shared",
+      unsafeAllowModelSessionId: true,
     });
 
     const invocation = await tool.invoke({ message: "no session here" });

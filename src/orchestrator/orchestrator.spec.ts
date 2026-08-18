@@ -488,18 +488,62 @@ describe("ai.orchestrator() — asTool() session scope (§13)", () => {
   it('"shared" scope continues the same session across invocations', async () => {
     const orchestrator = buildEcho();
 
+    // The session is bound at construction — outside the model-visible
+    // inputSchema — so continuity is the developer's decision, not the
+    // model's (4.15.0).
     const tool = orchestrator.asTool<Record<string, unknown>>({
       name: "echo_tool",
       description: "echoes",
       inputSchema: objectSchema,
       sessionScope: "shared",
+      session: "shared-1",
     });
 
-    await tool.invoke({ sessionId: "shared-1", message: "one" });
-    const second = await tool.invoke({ sessionId: "shared-1", message: "two" });
+    await tool.invoke({ message: "one" });
+    const second = await tool.invoke({ message: "two" });
 
     // Shared scope threads one sessionId, so state carries across calls.
     expect((second.data as CounterState).count).toBe(2);
+  });
+
+  it('"shared" scope ignores a model-supplied sessionId in the payload', async () => {
+    const orchestrator = buildEcho();
+
+    const tool = orchestrator.asTool<Record<string, unknown>>({
+      name: "echo_tool",
+      description: "echoes",
+      inputSchema: objectSchema,
+      sessionScope: "shared",
+      session: "bound-session",
+    });
+
+    // Turn 1 of the BOUND session.
+    await tool.invoke({ message: "one" });
+
+    // A prompt-injected model tries to jump into another session; the
+    // binding wins, so this is still turn 2 of "bound-session" and the
+    // victim's session is never touched.
+    const hijack = await tool.invoke({
+      sessionId: "victim-session",
+      message: "two",
+    });
+
+    expect(hijack.error).toBeUndefined();
+    expect((hijack.data as CounterState).count).toBe(2);
+
+    // The victim's session was never created / advanced: a tool bound to
+    // it starts at turn 1.
+    const victimTool = orchestrator.asTool<Record<string, unknown>>({
+      name: "echo_tool",
+      description: "echoes",
+      inputSchema: objectSchema,
+      sessionScope: "shared",
+      session: "victim-session",
+    });
+
+    const victim = await victimTool.invoke({ message: "hello" });
+
+    expect((victim.data as CounterState).count).toBe(1);
   });
 });
 

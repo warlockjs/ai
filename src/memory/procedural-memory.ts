@@ -16,6 +16,8 @@ type StoredProcedure = {
   id: string;
   text: string;
   uses: number;
+  /** Isolation key the procedure was written under; absent = the shared pool. */
+  scope?: string;
   metadata?: Record<string, unknown>;
 };
 
@@ -67,17 +69,19 @@ export class ProceduralMemory {
     const id = item.id ?? deriveMemoryId(item.text);
     const { vector } = await this.embedder.embed(item.text);
 
-    const existing = await this.store.get<StoredProcedure>(this.keyFor(id));
+    const key = this.keyFor(id, item.scope);
+    const existing = await this.store.get<StoredProcedure>(key);
     const uses = (existing?.uses ?? 0) + 1;
 
     const value: StoredProcedure = {
       id,
       text: item.text,
       uses,
+      scope: item.scope,
       metadata: item.metadata ?? existing?.metadata,
     };
 
-    await this.store.set(this.keyFor(id), value, { vector });
+    await this.store.set(key, value, { vector });
   }
 
   /**
@@ -85,11 +89,17 @@ export class ProceduralMemory {
    * `threshold`, then re-rank each by a reinforcement-blended score and
    * return the top `k`. The similarity floor still gates relevance;
    * reinforcement only reorders procedures that already cleared it.
+   *
+   * Procedures written under a different `scope` (another tenant /
+   * session) are dropped here, before scoring and slicing, so they can
+   * neither leak nor consume a slot. An unscoped recall reads only
+   * unscoped procedures.
    */
   public async recall(
     query: string,
     k: number,
     threshold: number,
+    scope?: string,
   ): Promise<RecalledMemory[]> {
     const { vector } = await this.embedder.embed(query);
 
@@ -101,8 +111,9 @@ export class ProceduralMemory {
     const prefix = `${this.namespace}.`;
 
     return hits
-      .filter((hit: CacheSimilarHit<StoredProcedure>) =>
-        hit.key.startsWith(prefix),
+      .filter(
+        (hit: CacheSimilarHit<StoredProcedure>) =>
+          hit.key.startsWith(prefix) && hit.value?.scope === scope,
       )
       .map((hit: CacheSimilarHit<StoredProcedure>) => ({
         id: hit.value.id,
@@ -136,8 +147,16 @@ export class ProceduralMemory {
     );
   }
 
-  /** Namespaced key for an entry — dot separator, matching `similar()` keys. */
-  private keyFor(id: string): string {
-    return `${this.namespace}.${id}`;
+  /**
+   * Namespaced key for an entry — dot separator, matching `similar()`
+   * keys, plus a hashed scope segment so reinforcement counters never
+   * cross a scope boundary (one tenant re-affirming a procedure must not
+   * strengthen — or overwrite — another tenant's identical text).
+   * Unscoped keys keep their pre-4.15.0 shape.
+   */
+  private keyFor(id: string, scope?: string): string {
+    return scope === undefined
+      ? `${this.namespace}.${id}`
+      : `${this.namespace}.${deriveMemoryId(scope)}.${id}`;
   }
 }

@@ -390,3 +390,152 @@ describe("memory — procedural tier", () => {
     ).toHaveLength(0);
   });
 });
+
+/**
+ * Scope-isolation suite for the 4.15.0 security fix (audit HIGH —
+ * "memory has no session or tenant isolation"). One store instance is
+ * shared by many callers by design, so `scope` is the only thing keeping
+ * one caller's memories out of another's recall. Every tier must enforce
+ * it INSIDE the tier, before hits are scored, merged and sliced — which
+ * is what these tests pin, tier by tier.
+ */
+describe("memory — scope isolation (security)", () => {
+  it("working tier: a scope never recalls another scope's entries", async () => {
+    const mem = memory();
+
+    await mem.remember({ text: "session A secret", scope: "session:a" });
+    await mem.remember({ text: "session B secret", scope: "session:b" });
+
+    const aHits = await mem.recall("secret", { scope: "session:a" });
+    const bHits = await mem.recall("secret", { scope: "session:b" });
+
+    expect(aHits.map((hit) => hit.text)).toEqual(["session A secret"]);
+    expect(bHits.map((hit) => hit.text)).toEqual(["session B secret"]);
+  });
+
+  it("semantic tier: a scope never recalls another scope's entries", async () => {
+    const mem = memory({
+      working: false,
+      defaultTier: "semantic",
+      semantic: { embedder: new DeterministicEmbedder(), store: makeStore() },
+      threshold: 0.1,
+    });
+
+    await mem.remember({ text: "the user lives in Cairo", scope: "tenant-a" });
+
+    const foreign = await mem.recall("where does the user live?", {
+      scope: "tenant-b",
+    });
+    const own = await mem.recall("where does the user live?", {
+      scope: "tenant-a",
+    });
+
+    expect(foreign).toHaveLength(0);
+    expect(own.map((hit) => hit.text)).toEqual(["the user lives in Cairo"]);
+  });
+
+  it("episodic tier: a scope never recalls another scope's entries", async () => {
+    const mem = memory({
+      working: false,
+      defaultTier: "episodic",
+      episodic: { embedder: new DeterministicEmbedder(), store: makeStore() },
+      threshold: 0.1,
+    });
+
+    await mem.remember({ text: "deployed the billing service", scope: "tenant-a" });
+
+    expect(
+      await mem.recall("deployed the billing service", { scope: "tenant-b" }),
+    ).toHaveLength(0);
+    expect(
+      await mem.recall("deployed the billing service", { scope: "tenant-a" }),
+    ).toHaveLength(1);
+  });
+
+  it("procedural tier: a scope never recalls another scope's entries", async () => {
+    const mem = memory({
+      working: false,
+      defaultTier: "procedural",
+      procedural: { embedder: new DeterministicEmbedder(), store: makeStore() },
+      threshold: 0.1,
+    });
+
+    await mem.remember({ text: "escalate refunds over $500", scope: "tenant-a" });
+
+    expect(
+      await mem.recall("escalate refunds over $500", { scope: "tenant-b" }),
+    ).toHaveLength(0);
+    expect(
+      await mem.recall("escalate refunds over $500", { scope: "tenant-a" }),
+    ).toHaveLength(1);
+  });
+
+  it("an unscoped recall reads only the unscoped pool — it is not a wildcard", async () => {
+    const mem = memory({
+      semantic: { embedder: new DeterministicEmbedder(), store: makeStore() },
+      threshold: 0.1,
+    });
+
+    await mem.remember({ text: "scoped fact", tier: "semantic", scope: "tenant-a" });
+    await mem.remember({ text: "scoped note", scope: "tenant-a" });
+    await mem.remember({ text: "global fact", tier: "semantic" });
+    await mem.remember({ text: "global note" });
+
+    const hits = await mem.recall("fact", { k: 10 });
+
+    expect(hits.map((hit) => hit.text).sort()).toEqual([
+      "global fact",
+      "global note",
+    ]);
+  });
+
+  it("identical text under two scopes stays two independent entries in every tier", async () => {
+    const shared = makeStore();
+    const embedder = new DeterministicEmbedder();
+
+    const mem = memory({
+      semantic: { embedder, store: shared, namespace: "iso.sem" },
+      episodic: { embedder, store: shared, namespace: "iso.epi" },
+      procedural: { embedder, store: shared, namespace: "iso.proc" },
+      threshold: 0.1,
+    });
+
+    const text = "the same exact sentence";
+
+    for (const tier of ["working", "semantic", "episodic", "procedural"] as const) {
+      await mem.remember({ text, tier, scope: "tenant-a" });
+      // A second scope writing identical text derives the same id — it
+      // must not overwrite (or reinforce) tenant A's entry.
+      await mem.remember({ text, tier, scope: "tenant-b" });
+
+      expect(await mem.recall(text, { tier, scope: "tenant-a" })).toHaveLength(1);
+      expect(await mem.recall(text, { tier, scope: "tenant-b" })).toHaveLength(1);
+    }
+  });
+
+  it("scoped recall is not starved by another scope filling the driver's top-k", async () => {
+    const mem = memory({
+      working: false,
+      defaultTier: "semantic",
+      semantic: { embedder: new DeterministicEmbedder(), store: makeStore() },
+      threshold: 0.1,
+    });
+
+    // Near-identical foreign entries would occupy every slot of a naive
+    // top-k before the scope filter ran. The tier overscans (5x k) to
+    // absorb that — a mitigation for noisy-neighbor starvation, not an
+    // unbounded guarantee, so this stays within the overscan window.
+    for (let index = 0; index < 4; index++) {
+      await mem.remember({ text: `noisy neighbor note ${index}`, scope: "tenant-b" });
+    }
+
+    await mem.remember({ text: "noisy neighbor note X", scope: "tenant-a" });
+
+    const hits = await mem.recall("noisy neighbor note", {
+      scope: "tenant-a",
+      k: 1,
+    });
+
+    expect(hits.map((hit) => hit.text)).toEqual(["noisy neighbor note X"]);
+  });
+});

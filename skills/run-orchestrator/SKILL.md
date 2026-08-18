@@ -150,10 +150,13 @@ ai.orchestrator({
     recall: { k: 5, threshold: 0.7, tier: "semantic" },  // k: 0 = write-only memory
     remember: true,                             // false = read-only (recall, never write)
     rememberTier: "semantic",
+    scope: "session",                           // DEFAULT — isolate memories per sessionId
     injectKey: "memories",                      // ctx.context[injectKey] holds RecalledMemory[]
   },
 });
 ```
+
+**Memory is session-scoped by default (4.15.0).** One store instance backs every session of the orchestrator, so `scope` decides what a turn may read: `"session"` (default) keys recall + write-back to the executing `sessionId`, so one user can never recall another's remembered turns. `"shared"` pools every session into one namespace — the pre-4.15.0 behavior, safe only when every session is trusted to see every other's memories. `(sessionId) => key` derives your own boundary (e.g. a tenant id). Memories written before 4.15.0 are unscoped and are only visible under `scope: "shared"`.
 
 Recalled memories land in the per-turn `context` bag under `injectKey` (default `"memories"`) — every route / router / evaluate / dispatch callback reads them at `ctx.context.memories`. Memory never mutates the prompt itself; surfacing it stays explicit. Cancelled / failed turns never remember (they revert), regardless of `remember`. See [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md).
 
@@ -172,7 +175,9 @@ const concierge = ai.agent({ model, tools: [supportTool] });
 
 The tool boundary is **opaque**: the parent's `signal` / `context` / events do NOT auto-forward — anything the wrapped orchestrator needs must ride on the `inputSchema` payload. `sessionScope`:
 - **`"fresh"`** (default) — each invocation gets a generated `sessionId` and empty history; no continuity across calls.
-- **`"shared"`** — the parent threads `sessionId` (and optionally `history`) through the validated payload; the orchestrator participates in that session. A missing/blank `sessionId` throws.
+- **`"shared"`** — the orchestrator joins an existing session named by the DEVELOPER through `session`, never by the model: either a literal id fixed at construction (`session: "sess_42"`) or a resolver reading the out-of-band tool context (`session: (ctx) => String(ctx?.artifacts?.supportSessionId)`). Building a `"shared"` tool without `session` throws at construction, and `sessionId` / `history` in the payload are stripped, not honored.
+
+  A `sessionId` is bearer-equivalent to read/write on that session, so it must not be a model-visible `inputSchema` field: before 4.15.0 it was, and a prompt injection reaching the outer agent could make the nested orchestrator resume, mutate, and echo back a *victim's* conversation. `unsafeAllowModelSessionId: true` restores the old payload path — only for a fully trusted outer context where you verify session ownership yourself.
 
 ## Drift detection
 
