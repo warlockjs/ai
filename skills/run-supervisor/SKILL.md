@@ -108,6 +108,16 @@ ai.supervisor({
 
 Each key references the same underlying unit; the description defaults to the unit's. Override the key base with `{ keyPrefix }` and the per-entry text with `{ description }`.
 
+#### `maxFanOut` — width cap (default `10`)
+
+`maxIterations` bounds how DEEP a run goes; `maxFanOut` bounds how WIDE one decision goes. Duplicate intent names in a fan-out array are collapsed silently (branch results are indexed by intent — duplicates only burn tokens); if the DEDUPED list is still longer than the cap, the decision is rejected with `SupervisorRoutingError` (`SUPERVISOR_INVALID_ROUTE`), same as an unknown intent name. Applies to every dispatch source: `router`, `route`, `evaluate.reassignTo`, `intent.next`.
+
+```ts
+ai.supervisor({ intents: { ...ai.fanOut(writer, 20), vote }, maxFanOut: 20, route });
+```
+
+Raise it deliberately when you fan out wider than 10. Why it exists: the router's per-turn prompt embeds supervisor `state` and prior branch outputs, so text injected into a tool result can push an LLM router to emit a very wide `next` array — every element a real agent/workflow run, all inside the allowlist.
+
 ## The `intents` map — five accepted shapes
 
 ```ts
@@ -155,7 +165,7 @@ const refundSupervisor = ai.supervisor<RefundOutput>({
 });
 ```
 
-Each branch's output strip-merges into state per its declared `output` schema. Last-write-wins on fan-out conflict (warning logged).
+Each branch's output strip-merges into state per its declared `output` schema. Last-write-wins on fan-out conflict (warning logged). Keys named `__proto__` / `constructor` / `prototype` are dropped from every merged slice (branch output, `ack`, classifier, `refine`, artifacts) and logged as `state.merge.unsafe-key` — a permissive `output` schema would otherwise let a model-supplied key repoint the run state's prototype.
 
 ## Per-intent `next` — skip the router
 

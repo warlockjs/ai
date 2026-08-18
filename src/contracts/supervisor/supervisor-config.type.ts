@@ -237,6 +237,30 @@ export type SupervisorConfig<
   maxIterations?: number;
 
   /**
+   * Hard cap on fan-out WIDTH — how many intents a single dispatch
+   * decision may run in parallel. Default: `10`.
+   *
+   * Routing decisions arrive as `string[]` from an LLM `router`, a
+   * `route` callback, `evaluate.reassignTo`, or per-intent `next`
+   * directives. Duplicate names in that array are collapsed before
+   * dispatch (they were pure wasted spend — `indexByIntent` already
+   * kept only one result per intent); if the DEDUPED list is still
+   * longer than this cap, the decision is rejected with
+   * `SupervisorRoutingError` (`SUPERVISOR_INVALID_ROUTE`), the same
+   * way an unknown intent key is.
+   *
+   * Security note: the router's per-turn prompt embeds supervisor
+   * `state` and prior branch outputs, so a prompt injection carried
+   * in tool output can coax the router into emitting a very wide
+   * `next` array — one iteration then launches that many real
+   * agent/workflow runs (cost + compute amplification). This cap is
+   * the width bound that `maxIterations` (a depth bound) doesn't
+   * provide. Raise it deliberately when a supervisor legitimately
+   * fans out wide (e.g. `ai.fanOut(writer, 20)`).
+   */
+  maxFanOut?: number;
+
+  /**
    * When set, turn 0 dispatches this intent directly and skips the
    * first router/route call. Must be a key in `intents`.
    */

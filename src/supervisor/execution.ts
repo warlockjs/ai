@@ -56,13 +56,14 @@ import {
   SupervisorCancelledError,
   SupervisorFailedError,
 } from "../errors";
+import { assignSafeKey, isUnsafeMergeKey, mergeSafely } from "../security/safe-merge";
 import { mergeUsage, stampReportLineage, withoutRunFrame, withRunFrame } from "../utils";
 import type { AgentMiddleware } from "../contracts/middleware/middleware.contract";
 import type { MiddlewareSupervisorContext } from "../contracts/middleware/middleware-context.type";
 import type { MiddlewareState } from "../contracts/middleware/middleware-state.type";
 import { runPipeline } from "../middleware/pipeline";
 import { createCancelledError } from "./cancellation";
-import { decide, type DispatchDecision } from "./decide";
+import { capFanOut, decide, resolveMaxFanOut, type DispatchDecision } from "./decide";
 import type { SupervisorEmitter } from "./emitter";
 import type { ResolvedCallbackEntry, ResolvedIntentEntry } from "./entries";
 import { isAgentResult, isWorkflowResult } from "./entries";
@@ -869,11 +870,20 @@ export class SupervisorExecution<TOutput> {
    * branch errors don't abort siblings — they're recorded on the
    * branch snapshot and let evaluate (or default termination logic)
    * decide the response.
+   *
+   * `capFanOut` runs here as well as in `decide.ts` — this is the one
+   * chokepoint every dispatch source funnels through (router/route
+   * decisions, `evaluate.reassignTo`, classifier picks, per-intent
+   * `next` unions), so the width bound holds even for the paths that
+   * build a `DispatchDecision` without going through `normalize()`.
+   * Idempotent for already-normalized decisions.
    */
   private async dispatchBranches(
     decision: DispatchDecision & { kind: "dispatch" },
   ): Promise<AgentBranchSnapshot[]> {
-    const branches = await Promise.all(decision.intents.map((intent) => this.dispatchOne(intent)));
+    const intents = capFanOut(decision.intents, this.entries, resolveMaxFanOut(this.config));
+
+    const branches = await Promise.all(intents.map((intent) => this.dispatchOne(intent)));
 
     return branches;
   }
@@ -2110,9 +2120,37 @@ export class SupervisorExecution<TOutput> {
 
     const slice = ackOutcome.output as Record<string, unknown>;
 
-    for (const [key, value] of Object.entries(slice)) {
-      this.state[key] = value;
-    }
+    this.mergeIntoState(slice, "ack");
+  }
+
+  /**
+   * Single funnel for "shallow-merge a model-influenced slice into
+   * `this.state`". Wraps the shared {@link mergeSafely} guard so no
+   * merge site can assign `__proto__` / `constructor` / `prototype`
+   * onto the run's state object, and logs when something tried.
+   *
+   * Every slice reaching state is model- or tool-influenced (agent
+   * outputs validated against a DEVELOPER-supplied schema, which may
+   * legitimately be permissive: `z.record()`, `.passthrough()`,
+   * `z.any()`), so the key names are untrusted input even when the
+   * values are shaped.
+   */
+  private mergeIntoState(slice: Record<string, unknown>, origin: string): void {
+    const skipped = mergeSafely(this.state, slice);
+
+    this.warnOnUnsafeKeys(skipped, origin);
+  }
+
+  /** Shared logging for refused prototype-tampering keys. */
+  private warnOnUnsafeKeys(skipped: string[], origin: string): void {
+    if (skipped.length === 0) return;
+
+    this.logger.warn(
+      this.logModule,
+      "state.merge.unsafe-key",
+      `dropped prototype-tampering key(s) from "${origin}" merge: ${skipped.join(", ")}`,
+      { origin, keys: skipped },
+    );
   }
 
   /**
@@ -2280,9 +2318,7 @@ export class SupervisorExecution<TOutput> {
       // can augment state (e.g. detected language) regardless of
       // override-vs-keep decision.
       if (interpretation.sliceToMerge) {
-        for (const [key, value] of Object.entries(interpretation.sliceToMerge)) {
-          this.state[key] = value;
-        }
+        this.mergeIntoState(interpretation.sliceToMerge, "classifier.refine");
       }
     }
 
@@ -2290,9 +2326,7 @@ export class SupervisorExecution<TOutput> {
     // remaining fields into state — universal locked fields (intent,
     // reasoning, confidence) plus any dev-extended fields. Subject
     // to the supervisor's `output` schema validation at finalize.
-    for (const [key, value] of Object.entries(final)) {
-      this.state[key] = value;
-    }
+    this.mergeIntoState(final as unknown as Record<string, unknown>, "classifier");
 
     this.classifierSnapshot = {
       intent: halted ? undefined : final.intent,
@@ -2605,7 +2639,10 @@ export class SupervisorExecution<TOutput> {
     for (const [key, value] of Object.entries(record)) {
       if (key === "intent") continue;
 
-      slice[key] = value;
+      // `refine` is a dev callback, but its return is routinely built
+      // from the classifier model's output — guard the key names here
+      // too so a tampered slice never even exists.
+      assignSafeKey(slice, key, value);
     }
 
     const final: ClassifierOutput = {
@@ -2718,6 +2755,14 @@ export class SupervisorExecution<TOutput> {
       }
 
       for (const [key, value] of Object.entries(slice as Record<string, unknown>)) {
+        // Branch outputs are validated against a DEVELOPER-supplied
+        // schema, which may be permissive enough to pass a key named
+        // `__proto__` straight through — refuse before assigning.
+        if (isUnsafeMergeKey(key)) {
+          this.warnOnUnsafeKeys([key], `intent "${intent}"`);
+          continue;
+        }
+
         const previousOwner = mergedKeys.get(key);
         if (previousOwner !== undefined && previousOwner !== intent) {
           this.logger.warn(
@@ -2801,19 +2846,20 @@ export class SupervisorExecution<TOutput> {
       // Mutate in place so external references to `this.state`
       // (snapshot copies, evaluate ctx) stay coherent. Drop keys
       // the finalize callback removed; overwrite the rest.
+      //
+      // `Object.hasOwn` rather than `key in merged`: `in` walks the
+      // prototype chain, so a `merged` whose prototype was tampered
+      // upstream (tool-written artifact key named `__proto__`) would
+      // make removed keys look present and silently keep stale state.
       for (const key of Object.keys(this.state)) {
-        if (!(key in merged)) {
+        if (!Object.hasOwn(merged, key)) {
           delete this.state[key];
         }
       }
 
-      for (const [key, value] of Object.entries(merged)) {
-        this.state[key] = value;
-      }
+      this.mergeIntoState(merged, "finalizeArtifacts");
     } else {
-      for (const [key, value] of Object.entries(artifacts)) {
-        this.state[key] = value;
-      }
+      this.mergeIntoState(artifacts, "artifacts");
     }
 
     this.currentArtifacts = {};

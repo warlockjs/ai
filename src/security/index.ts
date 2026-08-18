@@ -18,6 +18,12 @@ export {
 } from "./outbound-policy";
 export { isPrivateOrReservedIp } from "./private-ip";
 export {
+  assignSafeKey,
+  isUnsafeMergeKey,
+  mergeSafely,
+  UNSAFE_MERGE_KEYS,
+} from "./safe-merge";
+export {
   DEFAULT_SENSITIVE_KEYS,
   redact,
   redactError,

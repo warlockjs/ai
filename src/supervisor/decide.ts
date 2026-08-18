@@ -159,7 +159,7 @@ async function decideViaCallback(params: DecideParams): Promise<DispatchDecision
 
   const durationMs = performance.now() - started;
 
-  return normalize(raw, params.entries, "route", durationMs);
+  return normalize(raw, params.entries, "route", durationMs, resolveMaxFanOut(params.config));
 }
 
 async function decideViaRouter(params: DecideParams): Promise<DispatchDecision> {
@@ -249,7 +249,13 @@ async function decideViaRouter(params: DecideParams): Promise<DispatchDecision> 
     });
   }
 
-  const decision = normalize(rawNext as Next, params.entries, "router", durationMs);
+  const decision = normalize(
+    rawNext as Next,
+    params.entries,
+    "router",
+    durationMs,
+    resolveMaxFanOut(params.config),
+  );
 
   return {
     ...decision,
@@ -314,6 +320,7 @@ function normalize(
   entries: Map<string, ResolvedIntentEntry>,
   source: "route" | "router",
   durationMs: number,
+  maxFanOut: number,
 ): DispatchDecision {
   if (isEnd(raw)) {
     return { kind: "end", source, raw, durationMs };
@@ -352,7 +359,7 @@ function normalize(
 
     return {
       kind: "dispatch",
-      intents: raw,
+      intents: capFanOut(raw as string[], entries, maxFanOut),
       source,
       raw,
       durationMs,
@@ -363,6 +370,64 @@ function normalize(
     `router returned an unsupported value — expected a string, string[], or END`,
     { returned: raw, availableKeys: [...entries.keys()] },
   );
+}
+
+/**
+ * Default fan-out WIDTH ceiling — how many intents one dispatch
+ * decision may run in parallel. `maxIterations` bounds depth; this
+ * bounds width, so total work per run is bounded by the product
+ * instead of by iterations alone.
+ */
+export const DEFAULT_MAX_FAN_OUT = 10;
+
+/**
+ * Resolve the configured width ceiling. Factory validation
+ * (`supervisor.ts`) rejects non-integer / `< 1` values at authoring
+ * time, so this only has to apply the default.
+ */
+export function resolveMaxFanOut(config: Pick<SupervisorConfig<never>, "maxFanOut">): number {
+  return config.maxFanOut ?? DEFAULT_MAX_FAN_OUT;
+}
+
+/**
+ * Dedupe + width-cap a fan-out intent list before it reaches
+ * `Promise.all(...dispatchOne)`.
+ *
+ * Duplicates are collapsed silently: running the same intent twice in
+ * one decision is pure wasted spend (branch results are indexed by
+ * intent downstream, so the extras can't change the outcome), and a
+ * router that repeats itself is sloppy rather than hostile.
+ *
+ * Exceeding the cap *after* dedupe THROWS rather than truncating.
+ * Truncation would silently hand an attacker-chosen subset of the
+ * decision to the executor and hide the anomaly from the operator;
+ * every other routing violation in this file (unknown key, empty
+ * array, non-string element) already fails loudly as
+ * `SupervisorRoutingError`, so a width violation surfaces in the same
+ * place, with the same code, carrying the offending array.
+ *
+ * Threat model: the router's prompt embeds supervisor `state` and
+ * prior branch outputs, both of which can carry attacker-controlled
+ * text from tool results. Without a width bound, one injected
+ * "always return this 200-element `next` array" turns a single
+ * iteration into 200 real agent/workflow executions — no unknown
+ * intent name required, so the existing allowlist check never fires.
+ */
+export function capFanOut(
+  intents: string[],
+  entries: Map<string, ResolvedIntentEntry>,
+  maxFanOut: number,
+): string[] {
+  const unique = [...new Set(intents)];
+
+  if (unique.length > maxFanOut) {
+    throw new SupervisorRoutingError(
+      `routing decision fanned out to ${unique.length} intents — exceeds maxFanOut=${maxFanOut}. Raise \`maxFanOut\` if this width is intended.`,
+      { returned: intents, availableKeys: [...entries.keys()] },
+    );
+  }
+
+  return unique;
 }
 
 function validateKey(intent: string, entries: Map<string, ResolvedIntentEntry>): void {

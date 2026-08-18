@@ -289,6 +289,19 @@ function validateFactoryConfig<T>(config: SupervisorConfig<T>): void {
       { context: { authoring: true, maxIterations: config.maxIterations } },
     );
   }
+
+  // Width bound on parallel dispatch (see `maxFanOut` docs). Same
+  // authoring-error shape as `maxIterations`, but integer-only — a
+  // fractional cap would silently reject legitimate widths.
+  if (
+    config.maxFanOut !== undefined &&
+    (!Number.isInteger(config.maxFanOut) || config.maxFanOut < 1)
+  ) {
+    throw new SupervisorFailedError(
+      `ai.supervisor("${config.name}"): \`maxFanOut\` must be an integer >= 1`,
+      { context: { authoring: true, maxFanOut: config.maxFanOut } },
+    );
+  }
 }
 
 function generateRunId(): string {
