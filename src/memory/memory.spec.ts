@@ -539,3 +539,90 @@ describe("memory — scope isolation (security)", () => {
     expect(hits.map((hit) => hit.text)).toEqual(["noisy neighbor note X"]);
   });
 });
+
+/**
+ * Working-tier size bound (4.15.0 security fix — unbounded process-memory
+ * growth). The buffer is process-resident for the life of the `memory()`
+ * instance, which composites resolve ONCE and reuse for every session, so
+ * before the cap an attacker driving distinct text through a long-lived
+ * orchestrator grew it without limit. Eviction is FIFO over insertion
+ * order: recall returns newest-first, so the evicted end is the one a
+ * bounded recall would never have reached.
+ */
+describe("memory — working tier size bound (security)", () => {
+  it("caps the buffer at maxItems, evicting oldest-written first", async () => {
+    const mem = memory({ working: { maxItems: 3 } });
+
+    for (let index = 0; index < 10; index++) {
+      await mem.remember({ text: `note ${index}` });
+    }
+
+    const hits = await mem.recall("query", { k: 100 });
+
+    expect(hits.map((hit) => hit.text)).toEqual(["note 9", "note 8", "note 7"]);
+  });
+
+  it("bounds a flood of distinct text — the memory-exhaustion vector", async () => {
+    const mem = memory({ working: { maxItems: 50 } });
+
+    // Distinct text derives a distinct id, so nothing dedups: this is
+    // exactly the shape of the DoS the cap exists for.
+    for (let index = 0; index < 5000; index++) {
+      await mem.remember({ text: `attacker turn ${index}` });
+    }
+
+    const hits = await mem.recall("query", { k: 10_000 });
+
+    expect(hits).toHaveLength(50);
+    expect(hits[0].text).toBe("attacker turn 4999");
+  });
+
+  it("counts every scope against one bound, and eviction never crosses the scope filter", async () => {
+    const mem = memory({ working: { maxItems: 2 } });
+
+    await mem.remember({ text: "A one", scope: "session:a" });
+    await mem.remember({ text: "B one", scope: "session:b" });
+    await mem.remember({ text: "B two", scope: "session:b" });
+
+    // The bound is global, so A's older entry is the one evicted — but a
+    // scoped recall still only ever sees its own scope.
+    expect(await mem.recall("query", { scope: "session:a" })).toHaveLength(0);
+    expect(
+      (await mem.recall("query", { scope: "session:b" })).map((hit) => hit.text),
+    ).toEqual(["B two", "B one"]);
+  });
+
+  it("overwriting an existing id keeps its slot instead of consuming a new one", async () => {
+    const mem = memory({ working: { maxItems: 2 } });
+
+    await mem.remember({ id: "u1", text: "first" });
+    await mem.remember({ id: "u1", text: "first revised" });
+    await mem.remember({ id: "u2", text: "second" });
+
+    const hits = await mem.recall("query", { k: 10 });
+
+    expect(hits.map((hit) => hit.text)).toEqual(["second", "first revised"]);
+  });
+
+  it("defaults to a 1000-entry bound when `working` is left at true", async () => {
+    const mem = memory();
+
+    for (let index = 0; index < 1200; index++) {
+      await mem.remember({ text: `note ${index}` });
+    }
+
+    expect(await mem.recall("query", { k: 10_000 })).toHaveLength(1000);
+  });
+
+  it("rejects a non-positive / non-integer maxItems at construction", () => {
+    expect(() => memory({ working: { maxItems: 0 } })).toThrow(
+      /`maxItems` must be an integer >= 1/,
+    );
+    expect(() => memory({ working: { maxItems: -5 } })).toThrow(
+      /`maxItems` must be an integer >= 1/,
+    );
+    expect(() => memory({ working: { maxItems: 1.5 } })).toThrow(
+      /`maxItems` must be an integer >= 1/,
+    );
+  });
+});

@@ -3,6 +3,32 @@ import type { EmbedderContract } from "../embedder.contract";
 import type { MemoryTier } from "./memory-item.type";
 
 /**
+ * Working-tier wiring for `memory(config)`.
+ *
+ * The working tier is a plain in-process buffer with no durability and
+ * no vector index — it lives for the lifetime of the `memory()` instance,
+ * which composite primitives (`ai.orchestrator({ memory })`) resolve once
+ * and reuse across every session. Its only knob is the size bound that
+ * keeps that lifetime from turning into unbounded process-memory growth.
+ */
+export type WorkingMemoryConfig = {
+  /**
+   * Maximum number of entries the working buffer holds, across every
+   * `scope`. On overflow the oldest-written entry is evicted (FIFO —
+   * recall returns newest-first, so the evicted end is the one a bounded
+   * recall would never reach). Default `1000`.
+   *
+   * Must be an integer `>= 1`; there is no unbounded setting. Raise it
+   * deliberately for a long-running single-tenant process that recalls
+   * deep history from the working tier, and remember every entry is
+   * retained in process memory until evicted or `clear()`ed. Durable
+   * recall belongs in the semantic / episodic tiers, which delegate
+   * storage to a `CacheDriver`.
+   */
+  maxItems?: number;
+};
+
+/**
  * Semantic-tier wiring for `memory(config)`.
  *
  * Mirrors the `semanticCache` middleware's delegation model: memory does
@@ -117,9 +143,10 @@ export type MemoryConfig = {
   name?: string;
   /**
    * Enable the in-run working tier. Default `true`. Set `false` to build
-   * a semantic-only memory.
+   * a semantic-only memory, or pass a {@link WorkingMemoryConfig} to tune
+   * its size bound (`{ maxItems }`, default `1000`).
    */
-  working?: boolean;
+  working?: boolean | WorkingMemoryConfig;
   /**
    * Enable + wire the semantic recall tier. Omit for a working-only
    * memory.

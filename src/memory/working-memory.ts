@@ -18,10 +18,27 @@ import { deriveMemoryId } from "./derive-id";
  * first, each scored on a `[0, 1]` recency proxy so a caller can merge
  * working hits with semantic hits and sort on one `score` field.
  *
+ * **Bounded (4.15.0).** The buffer holds at most `maxItems` entries
+ * across every scope; the oldest-written entry is evicted on overflow
+ * (FIFO). The tier lives in process memory for the lifetime of the
+ * `memory()` instance — which the orchestrator resolves once and reuses
+ * for every session — so an unbounded buffer was a memory-exhaustion
+ * vector for any long-lived, internet-reachable deployment.
+ *
  * Internal to the `memory()` factory — never exported on the package
  * surface.
  */
 export class WorkingMemory {
+  /**
+   * Hard ceiling on buffered entries, across all scopes. Enforced on
+   * every `remember()`; see {@link evictOverflow} for the policy.
+   */
+  private readonly maxItems: number;
+
+  public constructor(maxItems: number) {
+    this.maxItems = maxItems;
+  }
+
   /**
    * Scoped key → entry. A `Map` preserves insertion order, so iteration
    * yields oldest-first; recall reverses it for most-recent-first.
@@ -47,6 +64,9 @@ export class WorkingMemory {
    * id *within the same scope*). Re-inserting an existing key keeps its
    * original position; delete + set would move it to the end and lie
    * about recency, so the value is updated in place.
+   *
+   * Overflowing `maxItems` evicts from the front — see
+   * {@link evictOverflow}.
    */
   public remember(item: MemoryItem): void {
     const id = item.id ?? deriveMemoryId(item.text);
@@ -57,6 +77,42 @@ export class WorkingMemory {
       scope: item.scope,
       metadata: item.metadata,
     });
+
+    this.evictOverflow();
+  }
+
+  /**
+   * Enforce the size bound by dropping oldest-written entries first
+   * (FIFO over the `Map`'s insertion order).
+   *
+   * **Why FIFO, not LRU.** Recall here is a pure recency proxy — it
+   * reverses insertion order and slices the newest `k` — and never
+   * reorders anything, so the front of the buffer is by construction the
+   * region recall reaches last. FIFO therefore evicts exactly the
+   * entries a bounded recall would never have returned. True LRU would
+   * need read-time reordering, which would also rewrite the `score`
+   * every recall reports (a re-read entry would masquerade as freshly
+   * remembered), trading a real correctness property for no gain.
+   *
+   * **Known limitation (documented, not a regression).** The bound is
+   * global, not per-scope: a session writing heavily can push another
+   * session's older entries out of the buffer. That is a recall-quality
+   * degradation on a volatile scratch tier, never a disclosure — the
+   * scope filter in {@link recall} still applies — and a per-scope quota
+   * would not help anyway, since an attacker holding many sessions
+   * evicts through the global bound regardless. Durable recall belongs
+   * in the semantic / episodic tiers.
+   */
+  private evictOverflow(): void {
+    while (this.entries.size > this.maxItems) {
+      const oldest = this.entries.keys().next();
+
+      if (oldest.done) {
+        return;
+      }
+
+      this.entries.delete(oldest.value);
+    }
   }
 
   /**

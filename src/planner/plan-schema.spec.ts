@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planSchema } from "./plan-schema";
+import { parsedStepCeiling, planSchema } from "./plan-schema";
 
 /** Pull the JSON Schema form the planning agent's structured-output path consumes. */
 function jsonSchemaOf(schema: ReturnType<typeof planSchema>): Record<string, unknown> {
@@ -66,5 +66,57 @@ describe("planSchema", () => {
     const result = schema["~standard"].validate({ steps: [] });
 
     expect("issues" in result).toBe(true);
+  });
+});
+
+/**
+ * Parse-time step ceiling (4.15.0 security hardening). Strict-mode JSON
+ * Schema can't carry `maxItems`, so nothing on the wire stopped a
+ * provider from returning an arbitrarily long `steps[]`; the runtime
+ * loop's tail truncation only runs AFTER the whole array has been
+ * normalized and stored. The bound now holds at parse time, and rejects
+ * rather than silently trimming — an over-long plan is a malfunction
+ * worth surfacing, not a prefix worth executing.
+ */
+describe("planSchema — parsed step ceiling (security)", () => {
+  const stepsOf = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      capability: "search",
+      input: `step ${index}`,
+    }));
+
+  it("exposes a ceiling of maxSteps * 4, and 100 when maxSteps is absent", () => {
+    expect(parsedStepCeiling(3)).toBe(12);
+    expect(parsedStepCeiling(10)).toBe(40);
+    expect(parsedStepCeiling()).toBe(100);
+  });
+
+  it("rejects a plan longer than the ceiling instead of truncating it", async () => {
+    const schema = planSchema(["search"], 3);
+    const result = await schema["~standard"].validate({ steps: stepsOf(13) });
+
+    expect("issues" in result).toBe(true);
+    if ("issues" in result && result.issues) {
+      expect(result.issues[0].message).toMatch(
+        /`steps` must not exceed 12 entries \(received 13\)/,
+      );
+    }
+  });
+
+  it("rejects a pathological plan built without a maxSteps", async () => {
+    const schema = planSchema(["search"]);
+    const result = await schema["~standard"].validate({ steps: stepsOf(5000) });
+
+    expect("issues" in result).toBe(true);
+  });
+
+  it("still accepts an over-maxSteps plan within the ceiling — the runtime truncates the tail", async () => {
+    const schema = planSchema(["search"], 3);
+    const result = await schema["~standard"].validate({ steps: stepsOf(12) });
+
+    expect("issues" in result).toBe(false);
+    if (!("issues" in result)) {
+      expect(result.value.steps).toHaveLength(12);
+    }
   });
 });

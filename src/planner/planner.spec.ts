@@ -367,6 +367,37 @@ describe("ai.planner — failure paths", () => {
     expect(result.report.executedSteps[1].status).toBe("skipped");
     expect(result.report.executedSteps[2].status).toBe("skipped");
   });
+
+  /**
+   * 4.15.0 security hardening: the tail truncation above bounds what
+   * EXECUTES, but it runs after the whole `steps[]` has been parsed and
+   * stored — a provider ignoring the prompt's step budget could make the
+   * planner deserialize an arbitrarily long array first. The plan schema
+   * now rejects anything past `maxSteps * 4` at parse time, which the
+   * planner surfaces as its typed invalid-plan error.
+   */
+  it("rejects a wildly over-long plan at parse time rather than truncating it", async () => {
+    const a = mockAgent({ name: "a", responses: [{ content: "ok", finishReason: "stop" }] });
+
+    const plan: PlannerPlan = {
+      steps: Array.from({ length: 500 }, (_, index) => ({
+        capability: "a",
+        input: `${index}`,
+      })),
+    };
+
+    const instance = planner({
+      name: "over-long",
+      model: planModel(plan),
+      maxSteps: 2,
+      capabilities: [{ name: "a", description: "a", executable: a }],
+    });
+
+    const result = await instance.execute("go");
+
+    expect(result.error).toBeInstanceOf(PlannerPlanInvalidError);
+    expect(result.report.executedSteps).toHaveLength(0);
+  });
 });
 
 describe("ai.planner — cancellation", () => {

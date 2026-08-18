@@ -16,9 +16,9 @@ import type { PlannerPlan, PlannerStep } from "../contracts/planner/planner-plan
  * `PlannerPlanInvalidError`, with the full forensic context, rather
  * than as an opaque schema issue here.
  *
- * `maxSteps`, when provided, is emitted as the `steps` array's
- * `maxItems` so capable providers refuse to over-produce up front
- * (the planner still truncates the tail to `skipped` defensively).
+ * `maxSteps` cannot be expressed on the wire (strict mode rejects
+ * `maxItems`), so `validate()` enforces a hard parse-time ceiling
+ * derived from it — see {@link parsedStepCeiling}.
  */
 export type PlanSchema = StandardSchemaV1<PlannerPlan> & {
   "~standard": {
@@ -30,15 +30,49 @@ export type PlanSchema = StandardSchemaV1<PlannerPlan> & {
   };
 };
 
+/**
+ * Slack allowed over `maxSteps` before a returned plan is rejected
+ * outright. A model that overshoots the prompt's "at most N steps" by a
+ * little is normal and the runtime truncates the tail to `skipped`;
+ * one that returns several times the budget is malfunctioning (or the
+ * provider/proxy is not the one we think it is), and parsing it is
+ * unbounded work on attacker-adjacent input.
+ */
+const STEP_CEILING_FACTOR = 4;
+
+/**
+ * Ceiling used when `planSchema` is built without a `maxSteps` — direct
+ * callers outside `PlannerRun`, which has no runtime truncation of its
+ * own to fall back on.
+ */
+const DEFAULT_STEP_CEILING = 100;
+
+/**
+ * Hard upper bound on the number of steps `validate()` will parse.
+ *
+ * Strict-mode JSON Schema can't carry `maxItems`, so nothing on the wire
+ * stops a provider from returning an arbitrarily long `steps[]`; before
+ * 4.15.0 the whole array was parsed, normalized and stored, and only the
+ * execution loop truncated it. This is the parse-time backstop that
+ * makes the bound hold regardless of what the provider honors.
+ */
+export function parsedStepCeiling(maxSteps?: number): number {
+  if (maxSteps === undefined) {
+    return DEFAULT_STEP_CEILING;
+  }
+
+  return Math.max(1, Math.ceil(maxSteps)) * STEP_CEILING_FACTOR;
+}
+
 export function planSchema(capabilityNames: string[], maxSteps?: number): PlanSchema {
   // OpenAI strict `json_schema` mode (and other native structured-output
   // providers) require EVERY property to appear in `required` — with truly
   // optional fields expressed as nullable — and reject array `minItems` /
   // `maxItems`. So the schema is strict-shaped: all keys required, the
-  // optional ones nullable, no item-count bounds. A non-empty plan is
-  // enforced in `validate()`, and `maxSteps` by the runtime's tail
-  // truncation, so neither bound is needed on the wire.
-  void maxSteps;
+  // optional ones nullable, no item-count bounds on the wire. Both bounds
+  // live in `validate()` instead: non-empty below, and the over-long
+  // ceiling that `maxItems` would have expressed.
+  const stepCeiling = parsedStepCeiling(maxSteps);
 
   const jsonSchema = {
     type: "object",
@@ -73,6 +107,24 @@ export function planSchema(capabilityNames: string[], maxSteps?: number): PlanSc
 
         if (!Array.isArray(record.steps) || record.steps.length === 0) {
           return { issues: [{ message: "plan `steps` must be a non-empty array" }] };
+        }
+
+        // Reject an over-long plan HERE, before a single step is
+        // normalized — the runtime's tail truncation runs after the whole
+        // array has been parsed and stored, so it bounds execution but
+        // not the parsing cost of a pathological response. Rejecting
+        // rather than truncating is deliberate: a plan several times its
+        // budget is a malfunction worth surfacing as
+        // `PlannerPlanInvalidError`, not something to silently trim into
+        // a plausible-looking prefix.
+        if (record.steps.length > stepCeiling) {
+          return {
+            issues: [
+              {
+                message: `plan \`steps\` must not exceed ${stepCeiling} entries (received ${record.steps.length})`,
+              },
+            ],
+          };
         }
 
         const steps: PlannerStep[] = [];

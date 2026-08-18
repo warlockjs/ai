@@ -16,6 +16,7 @@ export type {
   MemoryConfig,
   ProceduralMemoryConfig,
   SemanticMemoryConfig,
+  WorkingMemoryConfig,
 } from "../contracts/memory/memory-config.type";
 export type {
   MemoryItem,

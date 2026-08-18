@@ -1,5 +1,8 @@
 import { resolveDefaultStore } from "../config";
-import type { MemoryConfig } from "../contracts/memory/memory-config.type";
+import type {
+  MemoryConfig,
+  WorkingMemoryConfig,
+} from "../contracts/memory/memory-config.type";
 import type {
   MemoryItem,
   MemoryTier,
@@ -23,6 +26,15 @@ const DEFAULT_HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_REINFORCEMENT_WEIGHT = 0.3;
 
 /**
+ * Entries the in-process working buffer holds before it starts evicting
+ * its oldest (4.15.0 — security fix for unbounded growth). Sized to hold
+ * a deep multi-session scratch history while capping the tier's worst
+ * case at a few MB of resident text rather than "everything this process
+ * has ever been told."
+ */
+const DEFAULT_WORKING_MAX_ITEMS = 1000;
+
+/**
  * Create an agent memory store (memory core M2).
  *
  * Wires up to four tiers behind the {@link MemoryContract}: **working**
@@ -39,7 +51,11 @@ const DEFAULT_REINFORCEMENT_WEIGHT = 0.3;
  * no `ai.config({ defaultStore })` throws now; enabling no tier at all
  * throws now.
  *
- * Decay / forgetting (TTL-based falloff, eviction) remains deferred.
+ * TTL-based decay / forgetting remains deferred. The working tier is
+ * size-bounded (`working: { maxItems }`, default `1000`, oldest-written
+ * evicted first) because it is the one tier that holds everything it is
+ * told in process memory for the life of the instance; the durable tiers
+ * delegate retention to their `CacheDriver`.
  *
  * **Isolation (4.15.0).** `remember({ scope })` / `recall(query, { scope })`
  * carry an opaque tenant / session key that every tier enforces as an
@@ -66,11 +82,14 @@ const DEFAULT_REINFORCEMENT_WEIGHT = 0.3;
  */
 export function memory(config: MemoryConfig = {}): MemoryContract {
   const name = config.name ?? DEFAULT_NAME;
-  const workingEnabled = config.working ?? true;
+  const workingConfig = config.working ?? true;
   const defaultK = config.k ?? DEFAULT_K;
   const defaultThreshold = config.threshold ?? DEFAULT_THRESHOLD;
 
-  const working = workingEnabled ? new WorkingMemory() : undefined;
+  const working =
+    workingConfig === false
+      ? undefined
+      : new WorkingMemory(resolveWorkingMaxItems(workingConfig, name));
 
   const semantic = config.semantic
     ? buildSemanticTier(config.semantic, name)
@@ -206,6 +225,32 @@ type Tiers = {
   episodic: EpisodicMemory | undefined;
   procedural: ProceduralMemory | undefined;
 };
+
+/**
+ * Resolve the working tier's size bound from the `working` config
+ * (`true` / a `{ maxItems }` object), validating it at construction the
+ * same way every other tier's wiring fails loud-and-now rather than on
+ * first use. There is deliberately no unbounded setting — the buffer is
+ * process-resident for the life of the memory instance, so "no cap" is
+ * a memory-exhaustion vector, not a configuration choice.
+ */
+function resolveWorkingMaxItems(
+  workingConfig: true | WorkingMemoryConfig,
+  name: string,
+): number {
+  const maxItems =
+    workingConfig === true
+      ? DEFAULT_WORKING_MAX_ITEMS
+      : (workingConfig.maxItems ?? DEFAULT_WORKING_MAX_ITEMS);
+
+  if (!Number.isInteger(maxItems) || maxItems < 1) {
+    throw new Error(
+      `memory("${name}"): working tier \`maxItems\` must be an integer >= 1 — received ${String(maxItems)}`,
+    );
+  }
+
+  return maxItems;
+}
 
 /**
  * Resolve the semantic tier's store (explicit `store` wins, else the

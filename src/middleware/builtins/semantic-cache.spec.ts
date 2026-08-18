@@ -463,3 +463,238 @@ describe("semanticCache — multi-trip / tool-using agents", () => {
     expect(mockModel.callCount).toBe(2);
   });
 });
+
+/**
+ * Per-session scoping (4.15.0 security fix — cross-user cache poisoning
+ * and leakage). One `semanticCache` instance is normally built at boot
+ * and shared by every end user, and a hit is returned as the model's
+ * answer with no LLM call in between — so before this fix user B's
+ * near-enough prompt was served user A's cached response verbatim, and
+ * an attacker could seed an entry near a predictable future query.
+ * Entries are now keyed off the run's `sessionId` and a lookup only
+ * sees entries written under the same key.
+ */
+describe("semanticCache — session scoping (security)", () => {
+  it("does not serve one session's cached answer to another session", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "user A private answer", finishReason: "stop" },
+        { content: "user B answer", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const mockModel = sdk.models[sdk.models.length - 1];
+    const { driver: store } = makeStore();
+
+    const ai = agent({
+      model,
+      middleware: [
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store,
+          // Low threshold: the vector path WOULD match across sessions
+          // if the scope filter were not applied.
+          threshold: 0.1,
+        }),
+      ],
+    });
+
+    await ai.execute("what is my account balance", { sessionId: "user-a" });
+    const bRun = await ai.execute("what is my account balance", {
+      sessionId: "user-b",
+    });
+
+    expect(bRun.text).toBe("user B answer");
+    expect(bRun.usage.total).toBeGreaterThan(0);
+    expect(mockModel.callCount).toBe(2);
+  });
+
+  it("still serves a hit back to the same session", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "cached answer", finishReason: "stop" },
+        { content: "should not be reached", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const mockModel = sdk.models[sdk.models.length - 1];
+    const { driver: store } = makeStore();
+
+    const ai = agent({
+      model,
+      middleware: [
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store,
+          threshold: 0.5,
+        }),
+      ],
+    });
+
+    await ai.execute("what is the meaning of life?", { sessionId: "user-a" });
+
+    // Exact-match path.
+    const exact = await ai.execute("what is the meaning of life?", {
+      sessionId: "user-a",
+    });
+    // Vector path — different text, same session.
+    const near = await ai.execute("Explain the meaning of life please", {
+      sessionId: "user-a",
+    });
+
+    expect(exact.text).toBe("cached answer");
+    expect(near.text).toBe("cached answer");
+    expect(near.usage.total).toBe(0);
+    expect(mockModel.callCount).toBe(1);
+  });
+
+  it("a foreign session's near-identical entries cannot starve a scoped hit", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "noise 0", finishReason: "stop" },
+        { content: "noise 1", finishReason: "stop" },
+        { content: "noise 2", finishReason: "stop" },
+        { content: "mine", finishReason: "stop" },
+        { content: "should not be reached", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const mockModel = sdk.models[sdk.models.length - 1];
+    const { driver: store } = makeStore();
+
+    const ai = agent({
+      model,
+      middleware: [
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store,
+          threshold: 0.1,
+        }),
+      ],
+    });
+
+    // One session each, so the seeded entries don't hit one another —
+    // three foreign entries land in the driver's index ranked near the
+    // victim's future query.
+    for (let index = 0; index < 3; index++) {
+      await ai.execute(`shared topic question ${index}`, {
+        sessionId: `attacker-${index}`,
+      });
+    }
+
+    await ai.execute("shared topic question mine", { sessionId: "victim" });
+    expect(mockModel.callCount).toBe(4);
+
+    // The driver ranks across every scope, so a naive top-1 would come
+    // back as an attacker entry and mask the victim's own. The overscan
+    // + scope filter keeps the legitimate hit reachable.
+    const repeat = await ai.execute("shared topic question mine", {
+      sessionId: "victim",
+    });
+
+    expect(repeat.text).toBe("mine");
+    expect(repeat.usage.total).toBe(0);
+    expect(mockModel.callCount).toBe(4);
+  });
+
+  it("scope: \"shared\" opts back into one pool across sessions", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "public FAQ answer", finishReason: "stop" },
+        { content: "should not be reached", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const mockModel = sdk.models[sdk.models.length - 1];
+    const { driver: store } = makeStore();
+
+    const ai = agent({
+      model,
+      middleware: [
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store,
+          threshold: 0.5,
+          scope: "shared",
+        }),
+      ],
+    });
+
+    await ai.execute("what are your opening hours", { sessionId: "user-a" });
+    const bRun = await ai.execute("what are your opening hours", {
+      sessionId: "user-b",
+    });
+
+    expect(bRun.text).toBe("public FAQ answer");
+    expect(bRun.usage.total).toBe(0);
+    expect(mockModel.callCount).toBe(1);
+  });
+
+  it("a scope resolver isolates by tenant instead of by session", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "tenant one answer", finishReason: "stop" },
+        { content: "tenant two answer", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const mockModel = sdk.models[sdk.models.length - 1];
+    const { driver: store } = makeStore();
+
+    const tenantOf = (sessionId: string | undefined): string =>
+      sessionId?.startsWith("t1-") ? "tenant-1" : "tenant-2";
+
+    const ai = agent({
+      model,
+      middleware: [
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store,
+          threshold: 0.5,
+          scope: (context) => tenantOf(context.options?.sessionId),
+        }),
+      ],
+    });
+
+    await ai.execute("shared question", { sessionId: "t1-alice" });
+
+    // Same tenant, different session → hit.
+    const sibling = await ai.execute("shared question", { sessionId: "t1-bob" });
+    // Different tenant → miss.
+    const foreign = await ai.execute("shared question", { sessionId: "t2-eve" });
+
+    expect(sibling.text).toBe("tenant one answer");
+    expect(sibling.usage.total).toBe(0);
+    expect(foreign.text).toBe("tenant two answer");
+    expect(mockModel.callCount).toBe(2);
+  });
+
+  it("an unscoped run reads only the unscoped pool — a session entry is not visible to it", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "session answer", finishReason: "stop" },
+        { content: "anonymous answer", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const mockModel = sdk.models[sdk.models.length - 1];
+    const { driver: store } = makeStore();
+
+    const ai = agent({
+      model,
+      middleware: [
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store,
+          threshold: 0.1,
+        }),
+      ],
+    });
+
+    await ai.execute("same question", { sessionId: "user-a" });
+    const anonymous = await ai.execute("same question");
+
+    expect(anonymous.text).toBe("anonymous answer");
+    expect(mockModel.callCount).toBe(2);
+  });
+});

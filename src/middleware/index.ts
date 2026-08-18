@@ -19,6 +19,7 @@ export {
 export {
   semanticCache,
   type SemanticCacheOptions,
+  type SemanticCacheScope,
 } from "./builtins/semantic-cache";
 export { composeMiddleware, forTool } from "./helpers";
 export { runPipeline } from "./pipeline";
