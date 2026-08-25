@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai",
-  "version": "4.16.0",
+  "version": "5.0.0",
   "type": "module",
   "description": "Core @warlock.js AI framework — contracts, agent, workflow, supervisor",
   "main": "./src/index.ts",
@@ -27,7 +27,7 @@
     "@standard-schema/spec": "^1.0.0"
   },
   "devDependencies": {
-    "typescript": "^6.0.3",
+    "typescript": "^5.9.3",
     "vitest": "4.1.10"
   },
   "peerDependencies": {
