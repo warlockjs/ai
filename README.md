@@ -8,6 +8,10 @@ yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 
 > `@warlock.js/seal` is the recommended schema library — it provides Standard Schema V1 interop and JSON Schema export used by the OpenAI adapter for native structured output. Any other Standard Schema library (Zod, Valibot, …) works too.
 
+## Server-only
+
+`@warlock.js/ai`'s entire runtime surface is server-only — its `package.json` declares `"warlock": { "environment": "server" }`. `@warlock.js/web`'s build treats this as a boundary: app client code cannot value-import this package (type-only imports are still allowed), while server loaders/controllers/modules can import it freely.
+
 ## What it gives you
 
 - **Agents** — bounded trip loop, automatic tool dispatch, capability-aware (vision, structured output)
