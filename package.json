@@ -6,6 +6,9 @@
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "typings": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
