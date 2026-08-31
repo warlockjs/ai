@@ -60,7 +60,11 @@ function loadPdfParse(): Promise<void> {
       // Literal specifier so `vi.mock("pdf-parse")` can intercept it in tests.
       // Typed via the ambient `pdf-parse` shim in this directory, so the bare
       // import resolves even though the OPTIONAL peer is not a dependency.
-      const mod = (await import("pdf-parse")) as {
+      // Through `unknown`: with the optional peer actually installed, the real
+      // pdf-parse types resolve and TS refuses the direct cast as non-overlapping.
+      // The narrowing below is a genuine RUNTIME shape check across the CJS/ESM
+      // interop shapes, which is exactly the case `unknown` exists for.
+      const mod = (await import("pdf-parse")) as unknown as {
         default?: PdfParseFn;
       } & Partial<PdfParseFn>;
       // pdf-parse ships CommonJS — the callable is `module.exports`, surfaced
