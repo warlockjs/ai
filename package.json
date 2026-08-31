@@ -30,6 +30,9 @@
     "@standard-schema/spec": "^1.0.0"
   },
   "devDependencies": {
+    "@warlock.js/ai-openai": "workspace:^",
+    "@warlock.js/cache": "workspace:^",
+    "@warlock.js/logger": "workspace:^",
     "typescript": "^5.9.3",
     "vitest": "4.1.10"
   },
@@ -62,5 +65,6 @@
     "redis": {
       "optional": true
     }
-  }
+  },
+  "packageManager": "pnpm@11.24.0"
 }
