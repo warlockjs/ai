@@ -1,4 +1,4 @@
-import { ClassifierAgentEntry, ClassifierRunEntry } from "../contracts";
+import { type ClassifierAgentEntry, type ClassifierRunEntry } from "../contracts";
 import type { SupervisorConfig } from "../contracts/supervisor/supervisor-config.type";
 import type { ResolvedIntentEntry } from "./entries";
 

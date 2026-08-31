@@ -1,5 +1,5 @@
 import type { AIError } from "../../errors/ai-error";
-import { Usage } from "../result";
+import { type Usage } from "../result";
 import type { SupervisorResult } from "../result/supervisor-result.type";
 import type {
   EvaluateResult,

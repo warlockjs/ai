@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { FlowObserveOption } from "../../observe/resolve-observers";
 import type { SnapshotStore } from "../orchestrator/snapshot-store.contract";
 import type { AgentContract } from "../agent/agent.contract";
-import { Message } from "../conversation-message.type";
+import { type Message } from "../conversation-message.type";
 import type { AgentMiddleware } from "../middleware/middleware.contract";
 import type { SupervisorEventMap } from "../events/event-map.type";
 import type { SystemPromptContract } from "../system-prompt.contract";
