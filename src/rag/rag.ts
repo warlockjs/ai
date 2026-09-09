@@ -1,4 +1,5 @@
 import { resolveDefaultStore } from "../config";
+import { EmbeddingVectorCountMismatchError } from "../errors";
 import { chunk as chunkText } from "./chunk/chunk";
 import type { ChunkOptions } from "./contracts/chunk-options.type";
 import type { RetrieveOptions, RetrieveResult } from "./contracts/citation.type";
@@ -153,14 +154,36 @@ export function rag(config: RagConfig): Rag {
           batch.map((record) => record.text),
         );
 
+        if (vectors.length !== batch.length) {
+          const missingRecord = batch[vectors.length];
+
+          throw new EmbeddingVectorCountMismatchError({
+            provider: embedder.provider,
+            expectedCount: batch.length,
+            receivedCount: vectors.length,
+            record: missingRecord?.key ?? "none",
+          });
+        }
+
         if (indexedDimensions === undefined && dimensions !== 0) {
           indexedDimensions = dimensions;
         }
 
         await Promise.all(
-          batch.map((record, position) =>
-            store.upsert(record.key, record.value, vectors[position], record.tags),
-          ),
+          batch.map((record, position) => {
+            const vector = vectors[position];
+
+            if (vector === undefined) {
+              throw new EmbeddingVectorCountMismatchError({
+                provider: embedder.provider,
+                expectedCount: batch.length,
+                receivedCount: vectors.length,
+                record: record.key,
+              });
+            }
+
+            return store.upsert(record.key, record.value, vector, record.tags);
+          }),
         );
       }
 

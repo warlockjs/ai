@@ -7,6 +7,7 @@ import {
   BudgetExceededError,
   ContentFilterError,
   ContextLengthExceededError,
+  EmbeddingVectorCountMismatchError,
   GuardrailViolationError,
   InvalidRequestError,
   MaxIterationsError,
@@ -236,6 +237,22 @@ describe("ProviderError + subclasses", () => {
 
     expect(error.code).toBe("PROVIDER_ERROR");
     expect(error).toBeInstanceOf(AIError);
+    expect(error).toBeInstanceOf(ProviderError);
+  });
+
+  it("EmbeddingVectorCountMismatchError names the provider, counts, and vectorless record", () => {
+    const error = new EmbeddingVectorCountMismatchError({
+      provider: "short-provider",
+      expectedCount: 2,
+      receivedCount: 1,
+      record: "missing",
+    });
+
+    expect(error.code).toBe("PROVIDER_EMBEDDING_VECTOR_COUNT_MISMATCH");
+    expect(error.message).toBe(
+      "Embedding provider \"short-provider\" returned 1 vectors for 2 records; record \"missing\" was left without a vector.",
+    );
+    expect(error).toMatchObject({ provider: "short-provider", expectedCount: 2, receivedCount: 1, record: "missing" });
     expect(error).toBeInstanceOf(ProviderError);
   });
 

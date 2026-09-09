@@ -5,6 +5,7 @@ import type {
   EmbeddingBatchResult,
   EmbeddingResult,
 } from "../contracts/embedder.contract";
+import { EmbeddingVectorCountMismatchError } from "../errors";
 import { rag } from "./rag";
 import { FakeEmbedder, makeDocs } from "./test-support/make-docs";
 
@@ -48,6 +49,39 @@ describe("rag — index → retrieve", () => {
 
     expect(embedder.embedManyCalls).toBe(1);
     expect(embedder.embedCalls).toBe(0);
+  });
+
+  it("rejects a provider response that leaves a record without a vector", async () => {
+    const embedder: EmbedderContract = {
+      name: "short-embedder",
+      provider: "short-provider",
+      dimensions: 0,
+      async embed(input): Promise<EmbeddingResult> {
+        return new FakeEmbedder().embed(input);
+      },
+      async embedMany(inputs): Promise<EmbeddingBatchResult> {
+        const result = await new FakeEmbedder().embedMany(inputs);
+
+        return { ...result, vectors: result.vectors.slice(0, -1) };
+      },
+    };
+    const kb = rag({ name: "docs", embedder, store: makeStore(), chunk: { size: 1000 } });
+
+    try {
+      await kb.index(makeDocs([
+        { id: "first", text: "first document" },
+        { id: "missing", text: "missing document" },
+      ]));
+      throw new Error("Expected index() to reject a short embedding response");
+    } catch (error) {
+      expect(error).toBeInstanceOf(EmbeddingVectorCountMismatchError);
+      if (error instanceof EmbeddingVectorCountMismatchError) {
+        expect(error.provider).toBe("short-provider");
+        expect(error.expectedCount).toBe(2);
+        expect(error.receivedCount).toBe(1);
+        expect(error.record).toBe("ai.rag.docs.missing.0");
+      }
+    }
   });
 
   it("returns { chunks: 0 } and writes nothing for an empty document", async () => {

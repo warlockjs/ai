@@ -13,6 +13,10 @@ export {
 } from "./agent-max-trips-error";
 export { AIError, type AIErrorOptions } from "./ai-error";
 export {
+  EmbeddingVectorCountMismatchError,
+  type EmbeddingVectorCountMismatchErrorOptions,
+} from "./embedding-vector-count-mismatch-error";
+export {
   BudgetExceededError,
   type BudgetExceededErrorOptions,
   type BudgetUnit,

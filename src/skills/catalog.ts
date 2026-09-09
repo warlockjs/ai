@@ -1,4 +1,5 @@
 import type { EmbedderContract } from "../contracts/embedder.contract";
+import { EmbeddingVectorCountMismatchError } from "../errors";
 import type {
   SkillCatalogEntry,
   SkillRecord,
@@ -186,14 +187,46 @@ export async function semanticPreselect(
     ...catalog.map((entry) => entry.description),
   ]);
 
+  if (vectors.length !== catalog.length + 1) {
+    const missingRecord = vectors.length === 0
+      ? "input"
+      : catalog[vectors.length - 1]?.name ?? "none";
+
+    throw new EmbeddingVectorCountMismatchError({
+      provider: embedder.provider,
+      expectedCount: catalog.length + 1,
+      receivedCount: vectors.length,
+      record: missingRecord,
+    });
+  }
+
   const inputVector = vectors[0];
   const threshold = options.threshold ?? 0;
 
+  if (inputVector === undefined) {
+    throw new EmbeddingVectorCountMismatchError({
+      provider: embedder.provider,
+      expectedCount: catalog.length + 1,
+      receivedCount: vectors.length,
+      record: "input",
+    });
+  }
+
   const scored = catalog
-    .map((entry, index) => ({
-      entry,
-      score: cosineSimilarity(inputVector, vectors[index + 1]),
-    }))
+    .map((entry, index) => {
+      const vector = vectors[index + 1];
+
+      if (vector === undefined) {
+        throw new EmbeddingVectorCountMismatchError({
+          provider: embedder.provider,
+          expectedCount: catalog.length + 1,
+          receivedCount: vectors.length,
+          record: entry.name,
+        });
+      }
+
+      return { entry, score: cosineSimilarity(inputVector, vector) };
+    })
     .filter((candidate) => candidate.score >= threshold)
     .sort((first, second) => second.score - first.score)
     .slice(0, topK);
@@ -213,14 +246,24 @@ export async function semanticPreselect(
 
 /** Cosine similarity of two equal-length vectors; `0` when either is degenerate. */
 function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) {
+    return 0;
+  }
+
   let dot = 0;
   let normA = 0;
   let normB = 0;
 
-  for (let index = 0; index < a.length; index++) {
-    dot += a[index] * b[index];
-    normA += a[index] * a[index];
-    normB += b[index] * b[index];
+  for (const [index, aValue] of a.entries()) {
+    const bValue = b[index];
+
+    if (bValue === undefined) {
+      return 0;
+    }
+
+    dot += aValue * bValue;
+    normA += aValue * aValue;
+    normB += bValue * bValue;
   }
 
   if (normA === 0 || normB === 0) {
