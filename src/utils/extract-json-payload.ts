@@ -31,8 +31,9 @@ export function extractJsonPayload(text: string): string {
 
   const fenceMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
 
-  if (fenceMatch) {
-    return fenceMatch[1].trim();
+  const fencedPayload = fenceMatch?.[1];
+  if (fencedPayload !== undefined) {
+    return fencedPayload.trim();
   }
 
   return trimmed;

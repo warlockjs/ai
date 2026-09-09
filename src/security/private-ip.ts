@@ -51,13 +51,14 @@ function isPrivateIpv4(ip: string): boolean {
 }
 
 function isPrivateIpv6(ip: string): boolean {
-  const normalized = ip.toLowerCase().split("%")[0]; // drop zone id
+  const normalized = ip.toLowerCase().split("%")[0] ?? ""; // drop zone id
 
   // IPv4-mapped / -embedded (::ffff:a.b.c.d, ::a.b.c.d) — defer to the v4
   // check on the trailing dotted-quad so an inward-mapped address is caught.
   const v4 = normalized.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
   if (v4) {
-    return isPrivateIpv4(v4[1]);
+    const embeddedIpv4 = v4[1];
+    if (embeddedIpv4) return isPrivateIpv4(embeddedIpv4);
   }
 
   if (normalized === "::1" || normalized === "::") {
@@ -65,7 +66,7 @@ function isPrivateIpv6(ip: string): boolean {
   }
 
   // Expand only the leading group enough to classify the reserved blocks.
-  const firstGroup = normalized.split(":")[0];
+  const firstGroup = normalized.split(":")[0] ?? "";
   const head = firstGroup === "" ? 0 : Number.parseInt(firstGroup, 16);
 
   // fc00::/7 unique-local (fc.. / fd..)

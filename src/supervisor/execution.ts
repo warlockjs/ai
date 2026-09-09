@@ -767,7 +767,7 @@ export class SupervisorExecution<TOutput> {
         kind: "dispatch",
         intents: reassignTo,
         source: "route",
-        raw: reassignTo.length === 1 ? reassignTo[0] : reassignTo,
+        raw: reassignTo.length === 1 ? (reassignTo[0] ?? reassignTo) : reassignTo,
         durationMs: 0,
       };
 
@@ -817,7 +817,10 @@ export class SupervisorExecution<TOutput> {
         kind: "dispatch",
         intents: carried.intents,
         source: "route",
-        raw: carried.intents.length === 1 ? carried.intents[0] : carried.intents,
+        raw:
+          carried.intents.length === 1
+            ? (carried.intents[0] ?? carried.intents)
+            : carried.intents,
         durationMs: 0,
       };
 

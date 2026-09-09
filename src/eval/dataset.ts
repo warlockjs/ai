@@ -13,8 +13,8 @@ function parseJsonl<TOutput>(path: string, contents: string): DatasetEntry<TOutp
   const entries: DatasetEntry<TOutput>[] = [];
   const lines = contents.split(/\r?\n/);
 
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index].trim();
+  for (const [index, sourceLine] of lines.entries()) {
+    const line = sourceLine.trim();
 
     if (line === "") {
       continue;

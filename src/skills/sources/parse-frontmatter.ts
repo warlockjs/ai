@@ -25,7 +25,9 @@ export function parseFrontmatter(text: string): ParsedFrontmatter {
 
   const meta: Record<string, string> = {};
 
-  for (const line of match[1].split("\n")) {
+  const frontmatter = match[1] ?? "";
+
+  for (const line of frontmatter.split("\n")) {
     const colon = line.indexOf(":");
 
     if (colon === -1) {
@@ -45,7 +47,7 @@ export function parseFrontmatter(text: string): ParsedFrontmatter {
     meta[key] = value;
   }
 
-  return { meta, body: match[2] };
+  return { meta, body: match[2] ?? "" };
 }
 
 /**

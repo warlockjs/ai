@@ -75,7 +75,9 @@ export function mockRouter<TState = Record<string, unknown>>(
       const decision = decisions[cursor];
       cursor++;
 
-      return resolveDecision(decision, context);
+      if (decision) {
+        return resolveDecision(decision, context);
+      }
     }
 
     if (onExhausted === "throw") {
@@ -85,7 +87,10 @@ export function mockRouter<TState = Record<string, unknown>>(
     }
 
     if (onExhausted === "repeat" && decisions.length > 0) {
-      return resolveDecision(decisions[decisions.length - 1], context);
+      const finalDecision = decisions.at(-1);
+      if (finalDecision) {
+        return resolveDecision(finalDecision, context);
+      }
     }
 
     return END;

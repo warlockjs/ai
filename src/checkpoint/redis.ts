@@ -187,7 +187,9 @@ class RedisCheckpointStore implements CheckpointStore {
       return;
     }
 
-    const maxTurnIndex = document.rows[document.rows.length - 1].turn_index;
+    const lastRow = document.rows.at(-1);
+    if (!lastRow) return;
+    const maxTurnIndex = lastRow.turn_index;
     const threshold = maxTurnIndex - keepSnapshots;
 
     const kept = document.rows.filter((row) => row.turn_index >= threshold);

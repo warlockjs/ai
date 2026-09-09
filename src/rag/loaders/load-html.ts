@@ -93,7 +93,7 @@ function extractTitle(html: string): string | undefined {
     return undefined;
   }
 
-  const title = decodeEntities(match[1]).replace(/\s+/g, " ").trim();
+  const title = decodeEntities(match[1] ?? "").replace(/\s+/g, " ").trim();
 
   return title.length > 0 ? title : undefined;
 }

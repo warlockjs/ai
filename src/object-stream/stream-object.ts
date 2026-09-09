@@ -138,7 +138,7 @@ export async function collectStreamObject<T>(
 /** Strip a leading/trailing ```json fence the model may wrap output in. */
 function stripJsonFences(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  return fenced ? fenced[1] : text;
+  return fenced?.[1] ?? text;
 }
 
 function safeStringify(value: unknown): string {

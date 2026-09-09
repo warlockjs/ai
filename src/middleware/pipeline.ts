@@ -90,6 +90,9 @@ export async function runPipeline<Level extends MiddlewareLevel, TResult>(
 
   for (let index = middlewares.length - 1; index >= 0; index--) {
     const middleware = middlewares[index];
+    if (!middleware) {
+      continue;
+    }
     const hooks = middleware[level];
 
     if (!hooks) {
@@ -99,11 +102,12 @@ export async function runPipeline<Level extends MiddlewareLevel, TResult>(
     const previous = next;
 
     next = async () => {
-      const logEnabled = middleware.log !== false && logger !== undefined;
+      const activeLogger = logger;
+      const logEnabled = middleware.log !== false && activeLogger !== undefined;
 
       if (hooks.before) {
         if (logEnabled) {
-          logger!.debug(LOG_MODULE, `${level}.before`, middleware.name, {
+          activeLogger.debug(LOG_MODULE, `${level}.before`, middleware.name, {
             middleware: middleware.name,
             level,
           });
@@ -115,7 +119,7 @@ export async function runPipeline<Level extends MiddlewareLevel, TResult>(
 
         if (shortCircuit !== undefined) {
           if (logEnabled) {
-            logger!.debug(
+            activeLogger.debug(
               LOG_MODULE,
               `${level}.short-circuit`,
               middleware.name,
@@ -151,7 +155,7 @@ export async function runPipeline<Level extends MiddlewareLevel, TResult>(
         }
 
         if (logEnabled) {
-          logger!.debug(LOG_MODULE, `${level}.recovered`, middleware.name, {
+          activeLogger.debug(LOG_MODULE, `${level}.recovered`, middleware.name, {
             middleware: middleware.name,
             level,
           });
@@ -173,7 +177,7 @@ export async function runPipeline<Level extends MiddlewareLevel, TResult>(
         }
 
         if (logEnabled) {
-          logger!.debug(LOG_MODULE, `${level}.after`, middleware.name, {
+          activeLogger.debug(LOG_MODULE, `${level}.after`, middleware.name, {
             middleware: middleware.name,
             level,
           });

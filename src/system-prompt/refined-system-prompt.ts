@@ -133,7 +133,9 @@ function collectPlaceholderTokens(template: string): Map<string, string> {
   const tokens = new Map<string, string>();
 
   for (const match of template.matchAll(PLACEHOLDER_PATTERN)) {
-    const [rawPath, rawDefault] = match[1].split("|");
+    const expression = match[1];
+    if (!expression) continue;
+    const [rawPath = "", rawDefault] = expression.split("|");
     const path = rawPath.trim();
 
     if (path.length === 0) {
@@ -186,8 +188,9 @@ function stripCodeFence(text: string): string {
   const trimmed = text.trim();
   const fenced = /^```[\w-]*\r?\n([\s\S]*?)\r?\n?```$/.exec(trimmed);
 
-  if (fenced && !fenced[1].includes("```")) {
-    return fenced[1].trim();
+  const fencedBody = fenced?.[1];
+  if (fencedBody !== undefined && !fencedBody.includes("```")) {
+    return fencedBody.trim();
   }
 
   return trimmed;

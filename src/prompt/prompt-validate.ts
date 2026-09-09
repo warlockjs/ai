@@ -107,7 +107,9 @@ function collectPlaceholders(template: string): string[] {
   const seen = new Set<string>();
 
   for (const match of template.matchAll(PLACEHOLDER_PATTERN)) {
-    const path = match[1].split("|")[0].trim();
+    const expression = match[1];
+    if (!expression) continue;
+    const path = (expression.split("|")[0] ?? "").trim();
 
     if (path.length > 0 && !seen.has(path)) {
       seen.add(path);

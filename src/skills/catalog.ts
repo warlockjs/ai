@@ -146,8 +146,8 @@ export async function loadRecord(
   name: string,
   version?: number,
 ): Promise<SkillRecord | undefined> {
-  for (let index = stores.length - 1; index >= 0; index--) {
-    const record = await stores[index].load(name, version);
+  for (const store of [...stores].reverse()) {
+    const record = await store.load(name, version);
 
     if (record) {
       return record;

@@ -37,7 +37,9 @@ function collectPlaceholders(template: string): ParsedPlaceholder[] {
   const order: string[] = [];
 
   for (const match of template.matchAll(PLACEHOLDER_PATTERN)) {
-    const [rawPath, rawDefault] = match[1].split("|");
+    const expression = match[1];
+    if (!expression) continue;
+    const [rawPath = "", rawDefault] = expression.split("|");
     const path = rawPath.trim();
 
     if (path.length === 0) {

@@ -36,6 +36,9 @@ import type { Message } from "../../contracts/conversation-message.type";
 export function extractUserText(messages: ReadonlyArray<Message>): string {
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index];
+    if (!message) {
+      continue;
+    }
 
     if (message.role !== "user") {
       continue;

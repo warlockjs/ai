@@ -33,7 +33,7 @@ export function renderPlaceholders(
   return template.replace(
     PLACEHOLDER_PATTERN,
     (match, rawExpression: string) => {
-      const [rawPath, rawFallback] = rawExpression.split("|");
+      const [rawPath = "", rawFallback] = rawExpression.split("|");
       const path = rawPath.trim();
       const fallback = rawFallback?.trim();
 

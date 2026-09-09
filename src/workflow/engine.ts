@@ -417,6 +417,9 @@ export async function runWorkflow<TOutput>(
   const children: BaseReport[] = [];
   for (const stepName in steps) {
     const snap = steps[stepName];
+    if (!snap) {
+      continue;
+    }
     if (snap.agentReport) {
       children.push(snap.agentReport);
     }

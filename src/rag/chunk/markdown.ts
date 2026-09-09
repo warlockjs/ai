@@ -91,12 +91,13 @@ function splitSections(text: string): SectionSpan[] {
   const sections: SectionSpan[] = [];
 
   // Preamble before the first heading, if any.
-  if (starts[0] > 0) {
-    sections.push({ start: 0, end: starts[0] });
+  const firstStart = starts[0];
+  if (firstStart !== undefined && firstStart > 0) {
+    sections.push({ start: 0, end: firstStart });
   }
 
   starts.forEach((start, position) => {
-    const end = position + 1 < starts.length ? starts[position + 1] : text.length;
+    const end = starts[position + 1] ?? text.length;
 
     sections.push({ start, end });
   });

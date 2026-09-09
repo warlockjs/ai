@@ -192,8 +192,8 @@ export class JsonStreamGuard {
    * which are rare in normal traffic.
    */
   public async feed(chunk: string): Promise<void> {
-    for (let i = 0; i < chunk.length; i++) {
-      await this.processChar(chunk[i]);
+    for (const character of chunk) {
+      await this.processChar(character);
     }
   }
 
