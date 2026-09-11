@@ -84,6 +84,61 @@ describe("rag — index → retrieve", () => {
     }
   });
 
+  it("writes NOTHING when a provider response is short — no partial index", async () => {
+    // The sibling test above proves the right ERROR is raised. It does not
+    // prove WHERE, and that turns out to matter: rag.ts has two guards for
+    // this, a batch-level one before any upsert and a per-record one inside
+    // the `Promise.all` map. Delete the batch-level guard and that test still
+    // passes, because the per-record guard raises the identical error with the
+    // identical fields.
+    //
+    // What changes is what is left in the store. The map calls `store.upsert`
+    // for each position IN ORDER and only throws when it reaches the missing
+    // one — so every record before it has already been written. Measured, not
+    // assumed: with the batch-level guard 0 writes reach the store; with it
+    // removed, 1 does.
+    //
+    // A half-written index is worse than a failed one. It reports failure, so
+    // nobody trusts the run — but the store now holds records that look
+    // indexed, and a retry writes them again. The guard exists to make a short
+    // response leave the store untouched, and this is the only thing asserting
+    // that.
+    let writes = 0;
+    const store = makeStore();
+    const originalSet = store.set.bind(store);
+    (store as unknown as Record<string, unknown>).set = (...args: unknown[]) => {
+      writes += 1;
+
+      return (originalSet as (...args: unknown[]) => unknown)(...args);
+    };
+
+    const embedder: EmbedderContract = {
+      name: "short-embedder",
+      provider: "short-provider",
+      dimensions: 0,
+      async embed(input): Promise<EmbeddingResult> {
+        return new FakeEmbedder().embed(input);
+      },
+      async embedMany(inputs): Promise<EmbeddingBatchResult> {
+        const result = await new FakeEmbedder().embedMany(inputs);
+
+        return { ...result, vectors: result.vectors.slice(0, -1) };
+      },
+    };
+    const kb = rag({ name: "docs", embedder, store, chunk: { size: 1000 } });
+
+    await expect(
+      kb.index(
+        makeDocs([
+          { id: "first", text: "first document" },
+          { id: "missing", text: "missing document" },
+        ]),
+      ),
+    ).rejects.toBeInstanceOf(EmbeddingVectorCountMismatchError);
+
+    expect(writes).toBe(0);
+  });
+
   it("returns { chunks: 0 } and writes nothing for an empty document", async () => {
     const embedder = new FakeEmbedder();
     const kb = rag({ name: "docs", embedder, store: makeStore() });
