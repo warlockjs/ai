@@ -13,20 +13,14 @@ import { WorkflowError } from "../errors";
  * outside that context with full typing, pass them explicitly:
  * `ai.step<MyInput, MyState, MyContext>({ ... })`.
  */
-export function step<
-  TInput = unknown,
-  TState = Record<string, unknown>,
-  TContext = unknown,
->(
+export function step<TInput = unknown, TState = Record<string, unknown>, TContext = unknown>(
   definition: StepDefinition<TInput, TState, TContext>,
 ): StepDefinition<TInput, TState, TContext> {
   validate(definition);
   return definition;
 }
 
-function validate<TInput, TState, TContext>(
-  def: StepDefinition<TInput, TState, TContext>,
-): void {
+function validate<TInput, TState, TContext>(def: StepDefinition<TInput, TState, TContext>): void {
   if (!def.name || typeof def.name !== "string") {
     throw new WorkflowError("ai.step: `name` is required");
   }
@@ -44,9 +38,7 @@ function validate<TInput, TState, TContext>(
   }
 
   if (modes > 1) {
-    throw new WorkflowError(
-      `ai.step("${def.name}"): define only one of run | agent | parallel`,
-    );
+    throw new WorkflowError(`ai.step("${def.name}"): define only one of run | agent | parallel`);
   }
 
   if (hasAgent && typeof def.input !== "function") {

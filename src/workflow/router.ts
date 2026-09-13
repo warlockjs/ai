@@ -25,10 +25,10 @@ export async function resolveNextStep<T>(params: {
     try {
       outcome = await step.nextStep(ctx);
     } catch (err) {
-      throw new RoutingError(
-        `workflow "${definition.name}": step "${step.name}" nextStep threw`,
-        { stepName: step.name, cause: err },
-      );
+      throw new RoutingError(`workflow "${definition.name}": step "${step.name}" nextStep threw`, {
+        stepName: step.name,
+        cause: err,
+      });
     }
     const mapped = mapNextStep(outcome);
     if (mapped !== undefined) return mapped;
@@ -51,13 +51,10 @@ export async function resolveNextStep<T>(params: {
   return undefined;
 }
 
-export function mapNextStep(
-  outcome: NextStepResult,
-): "end" | string | undefined {
+export function mapNextStep(outcome: NextStepResult): "end" | string | undefined {
   if (!outcome) return undefined;
   if ("end" in outcome && outcome.end === true) return "end";
-  if ("goto" in outcome && typeof outcome.goto === "string")
-    return outcome.goto;
+  if ("goto" in outcome && typeof outcome.goto === "string") return outcome.goto;
   return undefined;
 }
 
@@ -65,7 +62,7 @@ export function nextDeclaredStep<T>(
   definition: WorkflowDefinition<any, T, any, any>,
   currentName: string,
 ): string | null {
-  const idx = definition.steps.findIndex(s => s.name === currentName);
+  const idx = definition.steps.findIndex((s) => s.name === currentName);
   if (idx === -1) return null;
   return definition.steps[idx + 1]?.name ?? null;
 }

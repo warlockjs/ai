@@ -117,9 +117,7 @@ export function asTool<TOutput, TState, TToolInput>(
 
   return compositeAsTool<TToolInput, TOutput>({
     name: options.name ?? orchestrator.name,
-    description:
-      options.description ??
-      `Invoke orchestrator "${orchestrator.name}" as a tool.`,
+    description: options.description ?? `Invoke orchestrator "${orchestrator.name}" as a tool.`,
     input: options.inputSchema,
     execute: async (input, ctx) => {
       const { sessionId, history, executeInput } = await resolveSession(
@@ -177,9 +175,7 @@ async function resolveSession(
     };
   }
 
-  const payload = (
-    typeof input === "object" && input !== null ? input : {}
-  ) as SharedScopePayload;
+  const payload = (typeof input === "object" && input !== null ? input : {}) as SharedScopePayload;
 
   const { sessionId: payloadSessionId, history: payloadHistory, ...rest } = payload;
   const executeInput = coerceInput(rest);

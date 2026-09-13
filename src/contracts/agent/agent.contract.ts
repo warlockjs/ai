@@ -9,9 +9,7 @@ import type { EvalOptions, EvalReport } from "./eval.type";
  * Handler function for a single agent event. Takes the event's typed
  * payload; return value is ignored.
  */
-export type AgentEventHandler<K extends keyof AgentEventMap> = (
-  payload: AgentEventMap[K],
-) => void;
+export type AgentEventHandler<K extends keyof AgentEventMap> = (payload: AgentEventMap[K]) => void;
 
 /**
  * Contract for an AI agent — the core executable primitive.
@@ -113,29 +111,20 @@ export interface AgentContract<TOutput = unknown> extends ExecutableContract<
    * // ...process crashes mid-run...
    * const recovered = await writer.resume("run-42");
    */
-  resume(
-    runId: string,
-    options?: AgentResumeOptions<TOutput>,
-  ): Promise<AgentResult<TOutput>>;
+  resume(runId: string, options?: AgentResumeOptions<TOutput>): Promise<AgentResult<TOutput>>;
 
   /**
    * Subscribe a handler to a single event name for the lifetime of
    * this agent instance. Returns an unsubscribe function; calling it
    * is equivalent to `off(event, handler)`.
    */
-  on<K extends keyof AgentEventMap>(
-    event: K,
-    handler: AgentEventHandler<K>,
-  ): () => void;
+  on<K extends keyof AgentEventMap>(event: K, handler: AgentEventHandler<K>): () => void;
 
   /**
    * Remove a previously-subscribed handler. No-op when the handler was
    * never registered or was already removed.
    */
-  off<K extends keyof AgentEventMap>(
-    event: K,
-    handler: AgentEventHandler<K>,
-  ): void;
+  off<K extends keyof AgentEventMap>(event: K, handler: AgentEventHandler<K>): void;
 
   /**
    * Run a suite of evaluation cases against this agent and return an

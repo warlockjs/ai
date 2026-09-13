@@ -70,10 +70,7 @@ function withTags(tags: string[] | undefined): PolicyVerdict {
  * );
  * // → { requiresApproval: true, tags: ["money"] }
  */
-export function evaluatePolicy(
-  policy: InterruptPolicy,
-  context: PolicyContext,
-): PolicyVerdict {
+export function evaluatePolicy(policy: InterruptPolicy, context: PolicyContext): PolicyVerdict {
   if (policy.type === "allowlist") {
     if (!policy.tools.includes(context.toolName)) {
       return SKIP;

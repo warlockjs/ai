@@ -5,10 +5,7 @@
  * VCR cassettes (S2), Panoptic content capture, and future RAG loaders
  * (A4) — instead of six isolated guards.
  */
-export type {
-  OutboundPolicy,
-  ResolvedOutboundPolicy,
-} from "./outbound-policy.type";
+export type { OutboundPolicy, ResolvedOutboundPolicy } from "./outbound-policy.type";
 export {
   assertUrlAllowed,
   fetchTextWithPolicy,
@@ -17,12 +14,7 @@ export {
   resolveOutboundPolicy,
 } from "./outbound-policy";
 export { isPrivateOrReservedIp } from "./private-ip";
-export {
-  assignSafeKey,
-  isUnsafeMergeKey,
-  mergeSafely,
-  UNSAFE_MERGE_KEYS,
-} from "./safe-merge";
+export { assignSafeKey, isUnsafeMergeKey, mergeSafely, UNSAFE_MERGE_KEYS } from "./safe-merge";
 export {
   DEFAULT_SENSITIVE_KEYS,
   redact,

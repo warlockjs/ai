@@ -211,9 +211,7 @@ describe("JsonStreamGuard", () => {
 
       expect(emittedText(cap)).toBe("");
       expect(cap.recovered).toHaveLength(1);
-      expect((cap.recovered[0].input as { query: string }).query).toBe(
-        'he said "hi" then left',
-      );
+      expect((cap.recovered[0].input as { query: string }).query).toBe('he said "hi" then left');
     });
   });
 
@@ -289,7 +287,7 @@ describe("JsonStreamGuard", () => {
     it("flushes a fenced block as text when the JSON doesn't match any tool", async () => {
       const cap = makeCapture();
 
-      const fenced = "```json\n{\"foo\":\"bar\"}\n```";
+      const fenced = '```json\n{"foo":"bar"}\n```';
 
       await cap.guard.feed(fenced);
       await cap.guard.finalize();
@@ -301,10 +299,10 @@ describe("JsonStreamGuard", () => {
     it("flushes a broken fence (no closing) as text on finalize", async () => {
       const cap = makeCapture();
 
-      await cap.guard.feed("```json\n{\"name\":\"search_catalog\"");
+      await cap.guard.feed('```json\n{"name":"search_catalog"');
       await cap.guard.finalize();
 
-      expect(emittedText(cap)).toBe("```json\n{\"name\":\"search_catalog\"");
+      expect(emittedText(cap)).toBe('```json\n{"name":"search_catalog"');
       expect(cap.recovered).toHaveLength(0);
     });
   });
@@ -404,9 +402,7 @@ describe("JsonStreamGuard", () => {
 
       expect(cap.guard.hasRecoveredCalls()).toBe(false);
 
-      await cap.guard.feed(
-        `{"name":"search_catalog","arguments":{"query":"x"}}`,
-      );
+      await cap.guard.feed(`{"name":"search_catalog","arguments":{"query":"x"}}`);
       await cap.guard.finalize();
 
       expect(cap.guard.hasRecoveredCalls()).toBe(true);

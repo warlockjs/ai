@@ -3,17 +3,8 @@ export { createCancelledError as createSupervisorCancelledError } from "./cancel
 export { SupervisorEmitter } from "./emitter";
 export { resolveIntentEntries, type ResolvedIntentEntry } from "./entries";
 export { SupervisorExecution } from "./execution";
-export {
-  fanOut,
-  type FanOutOptions,
-  type FanOutUnit,
-} from "./fan-out";
-export {
-  router,
-  type RouterConfig,
-  type RouterIntents,
-  type RouterOutput,
-} from "./router-factory";
+export { fanOut, type FanOutOptions, type FanOutUnit } from "./fan-out";
+export { router, type RouterConfig, type RouterIntents, type RouterOutput } from "./router-factory";
 export { buildRouterContextMessage } from "./router-prompt";
 export { computeSignature as computeSupervisorSignature } from "./signature";
 export {

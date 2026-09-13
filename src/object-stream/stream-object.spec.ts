@@ -35,7 +35,7 @@ const personSchema: StandardSchemaV1<{ name: string; age: number }> = {
   "~standard": {
     version: 1,
     vendor: "test",
-    validate: value => {
+    validate: (value) => {
       if (
         value &&
         typeof value === "object" &&
@@ -63,7 +63,9 @@ describe("streamObject (A1)", () => {
       streamObject({ model, messages: [{ role: "user", content: "who?" }], schema: personSchema }),
     );
 
-    const partials = events.filter(e => e.type === "partial").map(e => (e as { value: unknown }).value);
+    const partials = events
+      .filter((e) => e.type === "partial")
+      .map((e) => (e as { value: unknown }).value);
     expect(partials).toContainEqual({ name: "Ada" }); // mid-stream snapshot
 
     const done = events.at(-1);

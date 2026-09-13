@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { END } from "../contracts/end.type";
-import type { CheckpointRecord, CheckpointStore } from "../contracts/orchestrator/checkpoint-store.contract";
+import type {
+  CheckpointRecord,
+  CheckpointStore,
+} from "../contracts/orchestrator/checkpoint-store.contract";
 import type { SnapshotStore } from "../contracts/orchestrator/snapshot-store.contract";
 import type { SupervisorSnapshot } from "../contracts/supervisor/supervisor-snapshot.type";
 import { checkpointMemory } from "../checkpoint";
@@ -56,17 +59,11 @@ class RecordingCheckpointStore implements CheckpointStore {
     await this.inner.save(record);
   }
 
-  public async delete(
-    orchestratorName: string,
-    sessionId: string,
-  ): Promise<void> {
+  public async delete(orchestratorName: string, sessionId: string): Promise<void> {
     await this.inner.delete(orchestratorName, sessionId);
   }
 
-  public async list(
-    orchestratorName: string,
-    prefix?: string,
-  ): Promise<string[]> {
+  public async list(orchestratorName: string, prefix?: string): Promise<string[]> {
     return this.inner.list?.(orchestratorName, prefix) ?? [];
   }
 
@@ -323,9 +320,7 @@ describe("orchestrator failures — mid-turn cancel (§17 / Q10)", () => {
     // aborted turn (§17 — state reverts to the pre-turn checkpoint).
     const after = await checkpointStore.load("cancellable", "s1");
     expect(after?.turn_index).toBe(0);
-    expect((after?.state as CounterState).count).toBe(
-      (before?.state as CounterState).count,
-    );
+    expect((after?.state as CounterState).count).toBe((before?.state as CounterState).count);
   });
 
   it("emits orchestrator.turn.cancelled for the aborted turn", async () => {
@@ -454,9 +449,7 @@ describe("orchestrator failures — resume drain (§9)", () => {
       },
     });
 
-    await expect(drifted.resume("s1")).rejects.toBeInstanceOf(
-      OrchestratorDriftError,
-    );
+    await expect(drifted.resume("s1")).rejects.toBeInstanceOf(OrchestratorDriftError);
   });
 });
 

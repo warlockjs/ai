@@ -25,7 +25,7 @@ describe("supervisor — persistence + resume", () => {
     const supervisorInstance = supervisor({
       name: "persistor",
       intents: { worker },
-      route: ctx => (ctx.iteration >= 2 ? END : "worker"),
+      route: (ctx) => (ctx.iteration >= 2 ? END : "worker"),
       snapshotStore: store,
     });
 
@@ -90,7 +90,7 @@ describe("supervisor — persistence + resume", () => {
     const supervisorInstance = supervisor({
       name: "resumer",
       intents: { worker },
-      route: ctx => (ctx.iteration >= 2 ? END : "worker"),
+      route: (ctx) => (ctx.iteration >= 2 ? END : "worker"),
       snapshotStore: store,
     });
 

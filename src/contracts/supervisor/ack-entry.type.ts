@@ -96,6 +96,4 @@ export type AckRunEntry<TState = Record<string, unknown>> = {
  *   report node lives in `result.report.children[]`.
  */
 export type AckConfig<TState = Record<string, unknown>> =
-  | AckEntry<TState>
-  | AckRunEntry<TState>
-  | AckCallback<TState>;
+  AckEntry<TState> | AckRunEntry<TState> | AckCallback<TState>;

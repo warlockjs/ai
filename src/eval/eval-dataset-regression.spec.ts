@@ -99,9 +99,7 @@ describe("agent.eval regression against a baseline", () => {
     });
 
     expect(report.regression?.passed).toBe(false);
-    expect(report.regression?.regressed).toEqual([
-      { name: "egypt", before: 1, after: 0 },
-    ]);
+    expect(report.regression?.regressed).toEqual([{ name: "egypt", before: 1, after: 0 }]);
   });
 
   it("should not attach a regression block without a baseline", async () => {

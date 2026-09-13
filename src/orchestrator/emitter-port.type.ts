@@ -20,10 +20,7 @@ export type OrchestratorEmitterLike = {
    * Fire an event to all three tiers (definition → instance →
    * per-call) in order. Identity is injected by the emitter.
    */
-  emit<K extends keyof OrchestratorEventMap>(
-    event: K,
-    payload: OrchestratorEventMap[K],
-  ): void;
+  emit<K extends keyof OrchestratorEventMap>(event: K, payload: OrchestratorEventMap[K]): void;
 
   /**
    * Register the per-call handler bag (tier 3) for the scope of one

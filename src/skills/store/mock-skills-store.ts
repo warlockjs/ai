@@ -1,7 +1,4 @@
-import type {
-  SkillCatalogEntry,
-  SkillRecord,
-} from "../contracts/skill-record.type";
+import type { SkillCatalogEntry, SkillRecord } from "../contracts/skill-record.type";
 import type { SkillsStoreContract } from "../contracts/skills-store.contract";
 
 /**
@@ -71,9 +68,7 @@ export class MockSkillsStore implements SkillsStoreContract {
    * candidate is filtered out of `list()` / `load()` — it can never be
    * injected until a `review` gate promotes it.
    */
-  public async saveCandidate(
-    record: Omit<SkillRecord, "version" | "type">,
-  ): Promise<SkillRecord> {
+  public async saveCandidate(record: Omit<SkillRecord, "version" | "type">): Promise<SkillRecord> {
     const candidate: SkillRecord = {
       ...record,
       version: 0,

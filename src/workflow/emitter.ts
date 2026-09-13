@@ -33,10 +33,7 @@ export interface WorkflowEventSink {
  */
 export class WorkflowEmitter {
   private readonly factoryHandlers?: WorkflowEventHandlers;
-  private readonly instanceHandlers = new Map<
-    keyof WorkflowEventMap,
-    Set<AnyHandler>
-  >();
+  private readonly instanceHandlers = new Map<keyof WorkflowEventMap, Set<AnyHandler>>();
 
   public constructor(factoryHandlers?: WorkflowEventHandlers) {
     this.factoryHandlers = factoryHandlers;
@@ -55,10 +52,7 @@ export class WorkflowEmitter {
     return () => this.off(event, handler);
   }
 
-  public off<K extends keyof WorkflowEventMap>(
-    event: K,
-    handler: WorkflowEventHandler<K>,
-  ): void {
+  public off<K extends keyof WorkflowEventMap>(event: K, handler: WorkflowEventHandler<K>): void {
     this.instanceHandlers.get(event)?.delete(handler as AnyHandler);
   }
 

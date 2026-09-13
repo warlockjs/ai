@@ -8,9 +8,7 @@ import { computeSignature } from "./signature";
  * fields the fingerprint reads (`name`, `version`, `steps`) matter —
  * everything else is irrelevant to `computeSignature` and omitted.
  */
-function def(
-  partial: Partial<WorkflowDefinition> & { name: string },
-): WorkflowDefinition {
+function def(partial: Partial<WorkflowDefinition> & { name: string }): WorkflowDefinition {
   return {
     steps: [],
     ...partial,
@@ -30,12 +28,8 @@ describe("computeSignature (workflow)", () => {
   });
 
   it("is deterministic — identical definitions hash identically", () => {
-    const a = computeSignature(
-      def({ name: "wf", steps: [runStep("a"), runStep("b")] }),
-    );
-    const b = computeSignature(
-      def({ name: "wf", steps: [runStep("a"), runStep("b")] }),
-    );
+    const a = computeSignature(def({ name: "wf", steps: [runStep("a"), runStep("b")] }));
+    const b = computeSignature(def({ name: "wf", steps: [runStep("a"), runStep("b")] }));
 
     expect(a).toBe(b);
   });
@@ -48,29 +42,21 @@ describe("computeSignature (workflow)", () => {
   });
 
   it("changes when the version changes", () => {
-    const v1 = computeSignature(
-      def({ name: "wf", version: "1", steps: [runStep("s")] }),
-    );
-    const v2 = computeSignature(
-      def({ name: "wf", version: "2", steps: [runStep("s")] }),
-    );
+    const v1 = computeSignature(def({ name: "wf", version: "1", steps: [runStep("s")] }));
+    const v2 = computeSignature(def({ name: "wf", version: "2", steps: [runStep("s")] }));
 
     expect(v1).not.toBe(v2);
   });
 
   it("treats omitted version as null — distinct from any explicit version", () => {
     const omitted = computeSignature(def({ name: "wf", steps: [runStep("s")] }));
-    const explicit = computeSignature(
-      def({ name: "wf", version: "1", steps: [runStep("s")] }),
-    );
+    const explicit = computeSignature(def({ name: "wf", version: "1", steps: [runStep("s")] }));
 
     expect(omitted).not.toBe(explicit);
   });
 
   it("ignores description — a cosmetic change keeps the signature stable", () => {
-    const withoutDesc = computeSignature(
-      def({ name: "wf", steps: [runStep("s")] }),
-    );
+    const withoutDesc = computeSignature(def({ name: "wf", steps: [runStep("s")] }));
     const withDesc = computeSignature(
       def({ name: "wf", description: "does things", steps: [runStep("s")] }),
     );
@@ -80,9 +66,7 @@ describe("computeSignature (workflow)", () => {
 
   it("changes when a step is added", () => {
     const one = computeSignature(def({ name: "wf", steps: [runStep("a")] }));
-    const two = computeSignature(
-      def({ name: "wf", steps: [runStep("a"), runStep("b")] }),
-    );
+    const two = computeSignature(def({ name: "wf", steps: [runStep("a"), runStep("b")] }));
 
     expect(one).not.toBe(two);
   });
@@ -95,12 +79,8 @@ describe("computeSignature (workflow)", () => {
   });
 
   it("changes when step order is swapped (order is structural)", () => {
-    const ab = computeSignature(
-      def({ name: "wf", steps: [runStep("a"), runStep("b")] }),
-    );
-    const ba = computeSignature(
-      def({ name: "wf", steps: [runStep("b"), runStep("a")] }),
-    );
+    const ab = computeSignature(def({ name: "wf", steps: [runStep("a"), runStep("b")] }));
+    const ba = computeSignature(def({ name: "wf", steps: [runStep("b"), runStep("a")] }));
 
     expect(ab).not.toBe(ba);
   });
@@ -109,9 +89,7 @@ describe("computeSignature (workflow)", () => {
     const runType = computeSignature(
       def({ name: "wf", steps: [{ name: "s", run: () => undefined }] }),
     );
-    const emptyType = computeSignature(
-      def({ name: "wf", steps: [{ name: "s" }] }),
-    );
+    const emptyType = computeSignature(def({ name: "wf", steps: [{ name: "s" }] }));
 
     expect(runType).not.toBe(emptyType);
   });
@@ -160,9 +138,7 @@ describe("computeSignature (workflow)", () => {
       name: "fan",
       parallel: [runStep("a"), runStep("c")],
     };
-    expect(computeSignature(def({ name: "wf", steps: [altered] }))).not.toBe(
-      sig,
-    );
+    expect(computeSignature(def({ name: "wf", steps: [altered] }))).not.toBe(sig);
   });
 
   it("parallel child order is structural", () => {

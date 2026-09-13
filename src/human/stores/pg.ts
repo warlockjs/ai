@@ -120,8 +120,7 @@ function toIso(value: unknown): string {
  * wrappers hand back the raw string).
  */
 function rowToRecord(row: Record<string, unknown>): PendingInterrupt {
-  const request =
-    typeof row.request === "string" ? JSON.parse(row.request) : row.request;
+  const request = typeof row.request === "string" ? JSON.parse(row.request) : row.request;
 
   return {
     interruptId: row.interrupt_id as string,
@@ -219,12 +218,7 @@ class PgInterruptStore implements InterruptStore {
          SET request = EXCLUDED.request,
              status = EXCLUDED.status,
              saved_at = EXCLUDED.saved_at`,
-      [
-        record.interruptId,
-        JSON.stringify(record.request),
-        record.status,
-        record.savedAt,
-      ],
+      [record.interruptId, JSON.stringify(record.request), record.status, record.savedAt],
     );
   }
 
@@ -232,9 +226,7 @@ class PgInterruptStore implements InterruptStore {
    * Load the interrupt for an `interruptId`, or `undefined` when none is
    * recorded.
    */
-  public async load(
-    interruptId: string,
-  ): Promise<PendingInterrupt | undefined> {
+  public async load(interruptId: string): Promise<PendingInterrupt | undefined> {
     const client = await this.client();
 
     const { rows } = await client.query(
@@ -258,10 +250,7 @@ class PgInterruptStore implements InterruptStore {
   public async delete(interruptId: string): Promise<void> {
     const client = await this.client();
 
-    await client.query(
-      `DELETE FROM ${this.table} WHERE interrupt_id = $1`,
-      [interruptId],
-    );
+    await client.query(`DELETE FROM ${this.table} WHERE interrupt_id = $1`, [interruptId]);
   }
 
   /**
@@ -273,19 +262,12 @@ class PgInterruptStore implements InterruptStore {
     const client = await this.client();
 
     if (prefix === undefined) {
-      const { rows } = await client.query(
-        `SELECT interrupt_id FROM ${this.table}`,
-      );
+      const { rows } = await client.query(`SELECT interrupt_id FROM ${this.table}`);
 
-      return rows.map(
-        (row) => (row as Record<string, unknown>).interrupt_id as string,
-      );
+      return rows.map((row) => (row as Record<string, unknown>).interrupt_id as string);
     }
 
-    const escaped = prefix
-      .replace(/\\/g, "\\\\")
-      .replace(/_/g, "\\_")
-      .replace(/%/g, "\\%");
+    const escaped = prefix.replace(/\\/g, "\\\\").replace(/_/g, "\\_").replace(/%/g, "\\%");
 
     const { rows } = await client.query(
       `SELECT interrupt_id FROM ${this.table}
@@ -293,9 +275,7 @@ class PgInterruptStore implements InterruptStore {
       [`${escaped}%`],
     );
 
-    return rows.map(
-      (row) => (row as Record<string, unknown>).interrupt_id as string,
-    );
+    return rows.map((row) => (row as Record<string, unknown>).interrupt_id as string);
   }
 
   /**

@@ -14,7 +14,11 @@ describe("catalog — progressive disclosure", () => {
     const entries = await lib.catalog();
 
     expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ name: "scaffold", version: 1, description: "Scaffold a form" });
+    expect(entries[0]).toMatchObject({
+      name: "scaffold",
+      version: 1,
+      description: "Scaffold a form",
+    });
     expect(JSON.stringify(entries)).not.toContain("SECRET BODY");
     expect((entries[0] as Record<string, unknown>).body).toBeUndefined();
   });
@@ -35,7 +39,10 @@ describe("catalog — progressive disclosure", () => {
   });
 
   it("returns an empty prompt when no skills are in scope", async () => {
-    const lib = skills({ name: "empty", sources: [{ type: "store", store: new MockSkillsStore([]) }] });
+    const lib = skills({
+      name: "empty",
+      sources: [{ type: "store", store: new MockSkillsStore([]) }],
+    });
 
     expect(await lib.catalogPrompt()).toBe("");
   });

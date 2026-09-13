@@ -26,9 +26,7 @@ export interface MakeTripCtxOptions {
  * Build a minimal {@link MiddlewareTripContext} carrying a single user message
  * (so `extractUserText` returns `prompt`) and a shared-state bag.
  */
-export function makeTripCtx(
-  options: MakeTripCtxOptions = {},
-): MiddlewareTripContext {
+export function makeTripCtx(options: MakeTripCtxOptions = {}): MiddlewareTripContext {
   const state = options.state ?? new Map<string, unknown>();
   const prompt = options.prompt ?? "";
 
@@ -58,9 +56,7 @@ export interface MakeToolCtxOptions {
  * {@link ModelToolCallRequest} (`request.input` is what the tool detectors
  * stringify) and the dispatched tool's name.
  */
-export function makeToolCtx(
-  options: MakeToolCtxOptions = {},
-): MiddlewareToolContext {
+export function makeToolCtx(options: MakeToolCtxOptions = {}): MiddlewareToolContext {
   const state = options.state ?? new Map<string, unknown>();
   const toolName = options.toolName ?? "test_tool";
 

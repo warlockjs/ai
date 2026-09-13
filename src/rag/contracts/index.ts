@@ -12,12 +12,7 @@ export type { RagDocument } from "./rag-document.type";
 export type { Chunk, ChunkOptions, ChunkType } from "./chunk-options.type";
 
 // Citation / retrieval shapes
-export type {
-  Citation,
-  RetrievedChunk,
-  RetrieveOptions,
-  RetrieveResult,
-} from "./citation.type";
+export type { Citation, RetrievedChunk, RetrieveOptions, RetrieveResult } from "./citation.type";
 
 // Pipeline + config
 export type { Rag, RagAsToolOptions, RagConfig } from "./rag-config.type";

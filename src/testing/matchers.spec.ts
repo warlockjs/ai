@@ -111,7 +111,11 @@ describe("toPassStep", () => {
 
 describe("toOutputShape", () => {
   const shape = schema<{ city: string }>((value) => {
-    if (value && typeof value === "object" && typeof (value as { city?: unknown }).city === "string") {
+    if (
+      value &&
+      typeof value === "object" &&
+      typeof (value as { city?: unknown }).city === "string"
+    ) {
       return { value: value as { city: string } };
     }
     return { issues: [{ message: "expected { city: string }" }] };

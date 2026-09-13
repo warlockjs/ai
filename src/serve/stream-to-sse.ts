@@ -5,8 +5,9 @@ import { encodeSSE, SSE_DONE } from "./sse";
  * exposes the final `result` promise — exactly the shape every primitive's
  * `stream()` returns ({@link StreamContract}).
  */
-export type StreamLike<TEvent extends { type: string }, TResult> =
-  AsyncIterable<TEvent> & { result?: Promise<TResult> };
+export type StreamLike<TEvent extends { type: string }, TResult> = AsyncIterable<TEvent> & {
+  result?: Promise<TResult>;
+};
 
 /**
  * Convert a primitive's event stream into an SSE byte stream (A3): each

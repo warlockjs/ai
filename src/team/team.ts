@@ -92,11 +92,7 @@ export function team<
  * function forwards untouched; a {@link TeamGate} string is validated
  * against `members` and desugared into the matching pre-built gate.
  */
-function resolveGate<
-  TOutput,
-  TState,
-  TMembers extends Record<string, TeamMemberValue>,
->(
+function resolveGate<TOutput, TState, TMembers extends Record<string, TeamMemberValue>>(
   config: TeamConfig<TOutput, TState, TMembers>,
 ): (ctx: EvaluateContext<TState>) => EvaluateResult | Promise<EvaluateResult> {
   if (typeof config.gate === "function") {
@@ -128,11 +124,7 @@ function resolveGate<
  * `members`, throwing an authoring-style {@link SupervisorFailedError}
  * (tagged `authoring: true`) listing the missing role when it doesn't.
  */
-function assertMemberExists<
-  TOutput,
-  TState,
-  TMembers extends Record<string, TeamMemberValue>,
->(
+function assertMemberExists<TOutput, TState, TMembers extends Record<string, TeamMemberValue>>(
   config: TeamConfig<TOutput, TState, TMembers>,
   role: string,
   label: string,

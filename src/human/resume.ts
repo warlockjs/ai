@@ -1,9 +1,4 @@
-import type {
-  ApprovalDecision,
-  PendingInterrupt,
-  ResumeOptions,
-  ResumeResult,
-} from "./contracts";
+import type { ApprovalDecision, PendingInterrupt, ResumeOptions, ResumeResult } from "./contracts";
 import { clearSeededDecision, seedDecision } from "./resume-seed";
 
 /**
@@ -21,9 +16,7 @@ function assertDecision(decision: ApprovalDecision): void {
 
   if (decision.type === "reject") {
     if (typeof decision.reason !== "string") {
-      throw new TypeError(
-        "ai.human.resume: a 'reject' decision requires a string 'reason'.",
-      );
+      throw new TypeError("ai.human.resume: a 'reject' decision requires a string 'reason'.");
     }
 
     return;
@@ -31,9 +24,7 @@ function assertDecision(decision: ApprovalDecision): void {
 
   if (decision.type === "edit") {
     if (!("args" in decision)) {
-      throw new TypeError(
-        "ai.human.resume: an 'edit' decision requires replacement 'args'.",
-      );
+      throw new TypeError("ai.human.resume: an 'edit' decision requires replacement 'args'.");
     }
 
     return;

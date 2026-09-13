@@ -94,9 +94,10 @@ function resolveRouterName(router: OrchestratorConfig<unknown>["router"]): strin
  * the signature, while tuning the window value (e.g. `5` → `8`) does
  * not. The window value is a runtime knob, not a shape change.
  */
-function fingerprintHistoryWindow(
-  historyWindow: OrchestratorConfig<unknown>["historyWindow"],
-): { router: HistoryWindowRoleFingerprint; agents: HistoryWindowRoleFingerprint } {
+function fingerprintHistoryWindow(historyWindow: OrchestratorConfig<unknown>["historyWindow"]): {
+  router: HistoryWindowRoleFingerprint;
+  agents: HistoryWindowRoleFingerprint;
+} {
   return {
     router: fingerprintHistoryWindowRole(historyWindow?.router),
     agents: fingerprintHistoryWindowRole(historyWindow?.agents),

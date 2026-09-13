@@ -33,10 +33,7 @@ declare module "pdf-parse" {
   }
 
   /** The callable default export (`pdf-parse` is CommonJS). */
-  function pdfParse(
-    data: Buffer | Uint8Array,
-    options?: PdfParseOptions,
-  ): Promise<PdfParseData>;
+  function pdfParse(data: Buffer | Uint8Array, options?: PdfParseOptions): Promise<PdfParseData>;
 
   export = pdfParse;
 }

@@ -292,9 +292,7 @@ class PgVectorStore implements VectorStore {
       return;
     }
 
-    throw new TypeError(
-      "pgVectorStore requires either a 'client' or a 'connectionString' option.",
-    );
+    throw new TypeError("pgVectorStore requires either a 'client' or a 'connectionString' option.");
   }
 
   /**
@@ -406,10 +404,7 @@ class PgVectorStore implements VectorStore {
   public async removeNamespace(namespace: string): Promise<void> {
     const client = await this.client();
 
-    const escaped = namespace
-      .replace(/\\/g, "\\\\")
-      .replace(/_/g, "\\_")
-      .replace(/%/g, "\\%");
+    const escaped = namespace.replace(/\\/g, "\\\\").replace(/_/g, "\\_").replace(/%/g, "\\%");
 
     await client.query(
       `DELETE FROM ${this.table}

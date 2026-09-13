@@ -1,15 +1,10 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { ToolContract } from "../tool/tool";
 import { tool } from "../tool/tool";
-import type {
-  LoadSkillInput,
-  SkillRecord,
-} from "./contracts/skill-record.type";
+import type { LoadSkillInput, SkillRecord } from "./contracts/skill-record.type";
 
 /** Result the `loadSkill` tool feeds back to the model. */
-export type LoadSkillResult =
-  | { body: string; name: string; version: number }
-  | { error: string };
+export type LoadSkillResult = { body: string; name: string; version: number } | { error: string };
 
 /**
  * Hand-built, schema-library-agnostic Standard Schema for
@@ -27,7 +22,9 @@ function loadSkillSchema(): StandardSchemaV1<LoadSkillInput> {
         const candidate = value as { name?: unknown; version?: unknown } | null;
 
         if (!candidate || typeof candidate.name !== "string") {
-          return { issues: [{ message: "loadSkill input must be { name: string; version?: number }" }] };
+          return {
+            issues: [{ message: "loadSkill input must be { name: string; version?: number }" }],
+          };
         }
 
         if (candidate.version !== undefined && typeof candidate.version !== "number") {
@@ -71,7 +68,9 @@ export type LoadSkillToolDeps = {
  * `execute` itself never throws — both failure modes are error results, so
  * the run continues.
  */
-export function loadSkillTool(deps: LoadSkillToolDeps): ToolContract<LoadSkillInput, LoadSkillResult> {
+export function loadSkillTool(
+  deps: LoadSkillToolDeps,
+): ToolContract<LoadSkillInput, LoadSkillResult> {
   let loads = 0;
 
   return tool<LoadSkillInput, LoadSkillResult>({

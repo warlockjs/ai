@@ -34,13 +34,7 @@ const CATEGORY_PATTERNS: Record<PiiCategory, RegExp> = {
 };
 
 /** Every built-in category, in a stable scan order. */
-const ALL_CATEGORIES: readonly PiiCategory[] = [
-  "ssn",
-  "email",
-  "phone",
-  "credit-card",
-  "ipv4",
-];
+const ALL_CATEGORIES: readonly PiiCategory[] = ["ssn", "email", "phone", "credit-card", "ipv4"];
 
 /**
  * A raw hit located inside the inspected text, before it is folded into a
@@ -157,7 +151,7 @@ function dedupeHits(hits: RawHit[]): RawHit[] {
 
   for (const hit of sorted) {
     const overlaps = kept.some(
-      existing => hit.start <= existing.end && hit.end >= existing.start,
+      (existing) => hit.start <= existing.end && hit.end >= existing.start,
     );
 
     if (!overlaps) {
@@ -235,10 +229,7 @@ export function pii(options: PiiDetectorOptions = {}): SyncGuardrailDetector {
   return {
     name: DETECTOR_NAME,
     check(text: string): GuardrailVerdict {
-      const rawHits = [
-        ...scanCategories(text, categories),
-        ...scanDictionary(text, dictionary),
-      ];
+      const rawHits = [...scanCategories(text, categories), ...scanDictionary(text, dictionary)];
 
       if (rawHits.length === 0) {
         return { type: "allow" };
@@ -246,7 +237,7 @@ export function pii(options: PiiDetectorOptions = {}): SyncGuardrailDetector {
 
       const hits = dedupeHits(rawHits);
       const matches = hits.map(toMatch);
-      const labels = [...new Set(hits.map(hit => hit.label))].join(", ");
+      const labels = [...new Set(hits.map((hit) => hit.label))].join(", ");
 
       if (onMatch === "block") {
         return {

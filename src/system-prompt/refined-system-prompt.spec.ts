@@ -8,8 +8,7 @@ import { defaultPromptsManager } from "../prompts/prompts-manager";
 import { systemPrompt } from "./system-prompt";
 
 /** A parity-clean rewrite of {@link sourceWithPlaceholders}'s template. */
-const REFINED_WITH_PLACEHOLDERS =
-  "REFINED: assist {{name|friend}} with {{product}} precisely.";
+const REFINED_WITH_PLACEHOLDERS = "REFINED: assist {{name|friend}} with {{product}} precisely.";
 
 function sourceWithPlaceholders() {
   return systemPrompt("You are support for {{product}} helping {{name|friend}}.");
@@ -85,23 +84,17 @@ describe("systemPrompt.refined — laziness and the agent path", () => {
 
     // Pinned — the second run reads the compiled text without a refiner call.
     expect(refiner.callCount).toBe(1);
-    expect(chat.callHistory[1].messages[0].content).toBe(
-      "REFINED SUPPORT PROMPT.",
-    );
+    expect(chat.callHistory[1].messages[0].content).toBe("REFINED SUPPORT PROMPT.");
   });
 
   it("falls back to the original prompt when the refiner fails — the agent path never throws", async () => {
-    const refiner = refinerModel([
-      { content: "", error: new Error("refiner down") },
-    ]);
+    const refiner = refinerModel([{ content: "", error: new Error("refiner down") }]);
     const chat = new MockModel("chat", [{ content: "ok", finishReason: "stop" }]);
     const refined = systemPrompt("You are a support agent.").refined({
       model: refiner,
     });
 
-    const result = await agent({ model: chat, systemPrompt: refined }).execute(
-      "Hi",
-    );
+    const result = await agent({ model: chat, systemPrompt: refined }).execute("Hi");
 
     expect(result.error).toBeUndefined();
     expect(chat.callHistory[0].messages[0]).toEqual({
@@ -118,9 +111,7 @@ describe("systemPrompt.refined — laziness and the agent path", () => {
       version: "3",
     }).refined({ model: refiner });
 
-    const result = await agent({ model: chat, systemPrompt: refined }).execute(
-      "Hi",
-    );
+    const result = await agent({ model: chat, systemPrompt: refined }).execute("Hi");
 
     expect(result.report.promptName).toBe("refined-spec-report-linkage");
     expect(result.report.promptVersion).toBe("3");
@@ -150,9 +141,7 @@ describe("refine() — the explicit compilation surface", () => {
     expect(refiner.callCount).toBe(1);
     expect(store.setCalls).toBe(1);
 
-    const second = await sourceWithPlaceholders()
-      .refined({ model: refiner, store })
-      .refine();
+    const second = await sourceWithPlaceholders().refined({ model: refiner, store }).refine();
 
     expect(second).toBe(REFINED_WITH_PLACEHOLDERS);
     expect(refiner.callCount).toBe(1);
@@ -179,9 +168,7 @@ describe("refine() — the explicit compilation surface", () => {
   });
 
   it("throws PromptRefinementError (reason 'model') when the refiner model fails", async () => {
-    const refiner = refinerModel([
-      { content: "", error: new Error("provider down") },
-    ]);
+    const refiner = refinerModel([{ content: "", error: new Error("provider down") }]);
     const refined = sourceWithPlaceholders().refined({ model: refiner });
 
     await expect(refined.refine()).rejects.toMatchObject({
@@ -197,9 +184,7 @@ describe("refine() — the explicit compilation surface", () => {
     ]);
     const refined = sourceWithPlaceholders().refined({ model: refiner });
 
-    await expect(refined.refine()).rejects.toBeInstanceOf(
-      PromptRefinementError,
-    );
+    await expect(refined.refine()).rejects.toBeInstanceOf(PromptRefinementError);
     // First attempt + one bounded repair re-ask, then reject.
     expect(refiner.callCount).toBe(2);
   });
@@ -216,8 +201,8 @@ describe("refine() — the explicit compilation surface", () => {
 
     // The repair prompt named the exact parity breaks.
     const sent = refiner.callHistory
-      .flatMap(call => call.messages)
-      .map(message => JSON.stringify(message.content))
+      .flatMap((call) => call.messages)
+      .map((message) => JSON.stringify(message.content))
       .join("\n");
 
     expect(sent).toContain("placeholder parity");
@@ -225,14 +210,10 @@ describe("refine() — the explicit compilation surface", () => {
   });
 
   it("unwraps a code-fenced rewrite", async () => {
-    const refiner = refinerModel([
-      { content: "```\nREFINED {{product}} {{name|friend}}\n```" },
-    ]);
+    const refiner = refinerModel([{ content: "```\nREFINED {{product}} {{name|friend}}\n```" }]);
     const refined = sourceWithPlaceholders().refined({ model: refiner });
 
-    await expect(refined.refine()).resolves.toBe(
-      "REFINED {{product}} {{name|friend}}",
-    );
+    await expect(refined.refine()).resolves.toBe("REFINED {{product}} {{name|friend}}");
   });
 
   it("throws PromptRefinementError (reason 'empty') on blank refiner output", async () => {
@@ -252,8 +233,8 @@ describe("refine() — the explicit compilation surface", () => {
     await refined.refine();
 
     const sent = refiner.callHistory
-      .flatMap(call => call.messages)
-      .map(message => JSON.stringify(message.content))
+      .flatMap((call) => call.messages)
+      .map((message) => JSON.stringify(message.content))
       .join("\n");
 
     expect(sent).toContain("MUST also satisfy ALL of the following criteria");
@@ -273,14 +254,11 @@ describe("refine() — the explicit compilation surface", () => {
 describe("refinePrompt() — the composable compiled prompt", () => {
   it("returns a plain prompt carrying the refined template, provenance, and the source's required keys", async () => {
     const refiner = refinerModel([{ content: REFINED_WITH_PLACEHOLDERS }]);
-    const source = systemPrompt(
-      "You are support for {{product}} helping {{name|friend}}.",
-      {
-        name: "refined-spec-provenance",
-        version: "2",
-        required: ["product"],
-      },
-    );
+    const source = systemPrompt("You are support for {{product}} helping {{name|friend}}.", {
+      name: "refined-spec-provenance",
+      version: "2",
+      required: ["product"],
+    });
 
     const compiled = await source.refined({ model: refiner }).refinePrompt();
 
@@ -362,9 +340,7 @@ describe("pin invalidation — the lockfile rule", () => {
 
     store.entries.set(key, "tampered pin with no placeholders");
 
-    const text = await sourceWithPlaceholders()
-      .refined({ model: refiner, store })
-      .refine();
+    const text = await sourceWithPlaceholders().refined({ model: refiner, store }).refine();
 
     expect(text).toBe(REFINED_WITH_PLACEHOLDERS);
     expect(refiner.callCount).toBe(2);
@@ -373,15 +349,10 @@ describe("pin invalidation — the lockfile rule", () => {
 
 describe("single-flight and supersession", () => {
   it("concurrent refine() calls share one compilation", async () => {
-    const refiner = refinerModel([
-      { content: REFINED_WITH_PLACEHOLDERS, delay: 15 },
-    ]);
+    const refiner = refinerModel([{ content: REFINED_WITH_PLACEHOLDERS, delay: 15 }]);
     const refined = sourceWithPlaceholders().refined({ model: refiner });
 
-    const [first, second] = await Promise.all([
-      refined.refine(),
-      refined.refine(),
-    ]);
+    const [first, second] = await Promise.all([refined.refine(), refined.refine()]);
 
     expect(first).toBe(REFINED_WITH_PLACEHOLDERS);
     expect(second).toBe(REFINED_WITH_PLACEHOLDERS);
@@ -399,7 +370,7 @@ describe("single-flight and supersession", () => {
     // Start the lazy compile and let it grab the slow scripted response…
     const lazy = refined.materialize();
 
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     // …then compile fresh (settles first) — this is now the approved pin.
     const fresh = await refined.refine({ fresh: true });
@@ -408,21 +379,15 @@ describe("single-flight and supersession", () => {
 
     expect(fresh).toContain("FRESH take");
     // The stale lazy result must not have re-pinned the instance…
-    expect(refined.resolve({ product: "X", name: "Y" })).toContain(
-      "FRESH take",
-    );
+    expect(refined.resolve({ product: "X", name: "Y" })).toContain("FRESH take");
     // …nor the shared store.
-    expect([...store.entries.values()]).toEqual([
-      "FRESH take {{product}} {{name|friend}}.",
-    ]);
+    expect([...store.entries.values()]).toEqual(["FRESH take {{product}} {{name|friend}}."]);
   });
 });
 
 describe("lazy failure cap", () => {
   it("stops retrying a persistently-failing refiner on the agent path after 3 attempts", async () => {
-    const refiner = refinerModel([
-      { content: "", error: new Error("key revoked") },
-    ]);
+    const refiner = refinerModel([{ content: "", error: new Error("key revoked") }]);
     const chat = new MockModel("chat", [{ content: "ok", finishReason: "stop" }]);
     const refined = systemPrompt("You are a support agent.").refined({
       model: refiner,
@@ -437,9 +402,7 @@ describe("lazy failure cap", () => {
 
     // Attempts 1-3 hit the refiner; runs 4-5 serve the original immediately.
     expect(refiner.callCount).toBe(3);
-    expect(chat.callHistory[4].messages[0].content).toBe(
-      "You are a support agent.",
-    );
+    expect(chat.callHistory[4].messages[0].content).toBe("You are a support agent.");
   });
 
   it("explicit refine() stays live past the lazy cap", async () => {

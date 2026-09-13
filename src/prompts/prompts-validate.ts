@@ -57,7 +57,7 @@ function collectPlaceholders(template: string): ParsedPlaceholder[] {
     }
   }
 
-  return order.map(path => ({ path, hasDefault: byPath.get(path) ?? false }));
+  return order.map((path) => ({ path, hasDefault: byPath.get(path) ?? false }));
 }
 
 /**
@@ -100,13 +100,10 @@ export function findMissingPlaceholders(
  * required but never referenced — is itself a defect worth surfacing. Returns
  * the declared keys that appear nowhere in the body.
  */
-export function findUnreferencedRequired(
-  text: string,
-  required: readonly string[],
-): string[] {
-  const present = new Set(collectPlaceholders(text).map(p => p.path));
+export function findUnreferencedRequired(text: string, required: readonly string[]): string[] {
+  const present = new Set(collectPlaceholders(text).map((p) => p.path));
 
-  return required.filter(key => !present.has(key));
+  return required.filter((key) => !present.has(key));
 }
 
 /**
@@ -149,7 +146,7 @@ export function formatCriteria(
     return trimmed.length > 0 ? trimmed : undefined;
   }
 
-  const rules = criteria.map(rule => rule.trim()).filter(rule => rule.length > 0);
+  const rules = criteria.map((rule) => rule.trim()).filter((rule) => rule.length > 0);
 
   if (rules.length === 0) {
     return undefined;

@@ -48,7 +48,7 @@ describe("supervisor — ctx.run and ctx.stream", () => {
     const supervisorInstance = supervisor({
       name: "ctx-run-envelope",
       intents: {
-        custom: async ctx => {
+        custom: async (ctx) => {
           const result = (await ctx.run(inner, ctx.input)) as AgentResult<unknown>;
 
           return {
@@ -58,7 +58,7 @@ describe("supervisor — ctx.run and ctx.stream", () => {
           };
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "custom" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "custom" : END),
     });
 
     const result = await supervisorInstance.execute("hi");
@@ -79,14 +79,14 @@ describe("supervisor — ctx.run and ctx.stream", () => {
     const supervisorInstance = supervisor({
       name: "ctx-stream-bubble",
       intents: {
-        chatInline: async ctx => {
+        chatInline: async (ctx) => {
           const stream = ctx.stream(inner, ctx.input);
           const final = (await stream.result) as AgentResult<unknown>;
 
           return { reply: final.text };
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "chatInline" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "chatInline" : END),
     });
 
     const seen: { intent: string; delta: string }[] = [];
@@ -112,7 +112,7 @@ describe("supervisor — ctx.run and ctx.stream", () => {
   it("ctx.run threads toolCtx — inline agent's tool writes to supervisor's artifacts bag", async () => {
     type Block = { type: "items"; itemIds: string[] };
 
-    const inputSchema: StandardSchemaV1<{ q: string }> = schema<{ q: string }>(value => {
+    const inputSchema: StandardSchemaV1<{ q: string }> = schema<{ q: string }>((value) => {
       if (!value || typeof value !== "object" || typeof (value as { q?: unknown }).q !== "string") {
         return { issues: [{ message: "bad input" }] };
       }
@@ -141,9 +141,7 @@ describe("supervisor — ctx.run and ctx.stream", () => {
         {
           content: "",
           finishReason: "tool_calls",
-          toolCalls: [
-            { id: "c0", name: "search_inline", input: { q: "ac" } },
-          ],
+          toolCalls: [{ id: "c0", name: "search_inline", input: { q: "ac" } }],
         },
         { content: "found two", finishReason: "stop" },
       ],
@@ -158,21 +156,21 @@ describe("supervisor — ctx.run and ctx.stream", () => {
     const supervisorInstance = supervisor({
       name: "ctx-run-toolctx",
       intents: {
-        delegate: async ctx => {
+        delegate: async (ctx) => {
           const result = (await ctx.run(inner, "search")) as AgentResult<unknown>;
 
           return { reply: result.text };
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "delegate" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "delegate" : END),
     });
 
     const result = await supervisorInstance.execute("find");
 
     expect(result.error).toBeUndefined();
-    expect(
-      (result.report.snapshots[0].state as { blocks?: Block[] }).blocks,
-    ).toEqual([{ type: "items", itemIds: ["i1", "i2"] }]);
+    expect((result.report.snapshots[0].state as { blocks?: Block[] }).blocks).toEqual([
+      { type: "items", itemIds: ["i1", "i2"] },
+    ]);
   });
 
   it("ctx.run nests inline executable's report under the calling callback's children", async () => {
@@ -181,13 +179,13 @@ describe("supervisor — ctx.run and ctx.stream", () => {
     const supervisorInstance = supervisor({
       name: "ctx-run-report-nesting",
       intents: {
-        delegate: async ctx => {
+        delegate: async (ctx) => {
           const result = (await ctx.run(inner, "go")) as AgentResult<unknown>;
 
           return { reply: result.text };
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "delegate" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "delegate" : END),
     });
 
     const result = await supervisorInstance.execute("hi");
@@ -196,12 +194,10 @@ describe("supervisor — ctx.run and ctx.stream", () => {
     // agent's report as a child — the inline run nested under the
     // calling callback, not under the supervisor's top-level
     // children list (no double-counting).
-    const callbackChild = result.report.children.find(
-      child => child.name === "delegate",
-    );
+    const callbackChild = result.report.children.find((child) => child.name === "delegate");
     expect(callbackChild).toBeDefined();
     expect(callbackChild?.children).toBeDefined();
-    expect(callbackChild?.children.some(c => c.name === "inline-reporter")).toBe(true);
+    expect(callbackChild?.children.some((c) => c.name === "inline-reporter")).toBe(true);
   });
 
   it("ctx.run cycle detection by executable name", async () => {
@@ -212,7 +208,7 @@ describe("supervisor — ctx.run and ctx.stream", () => {
     const supervisorInstance = supervisor({
       name: "ctx-run-cycle",
       intents: {
-        custom: async ctx => {
+        custom: async (ctx) => {
           // The inline agent's own name === this callback's intent
           // name — this re-entry must surface SUPERVISOR_DISPATCH_CYCLE.
           await ctx.run(recursive, "x");
@@ -220,15 +216,13 @@ describe("supervisor — ctx.run and ctx.stream", () => {
           return { reply: "unreachable" };
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "custom" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "custom" : END),
     });
 
     const result = await supervisorInstance.execute("hi");
 
     expect(result.report.snapshots[0].result.custom.error).toBeDefined();
-    expect(result.report.snapshots[0].result.custom.error?.code).toBe(
-      "SUPERVISOR_DISPATCH_CYCLE",
-    );
+    expect(result.report.snapshots[0].result.custom.error?.code).toBe("SUPERVISOR_DISPATCH_CYCLE");
   });
 
   it("ctx.intents.X.stream is the streaming sibling of ctx.intents.X.execute for registered intents", async () => {
@@ -239,14 +233,14 @@ describe("supervisor — ctx.run and ctx.stream", () => {
       name: "intent-runner-stream",
       intents: {
         named: namedAgent,
-        delegate: async ctx => {
+        delegate: async (ctx) => {
           const stream = ctx.intents.named.stream();
           const final = (await stream.result) as AgentResult<unknown>;
 
           return { reply: final.text };
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "delegate" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "delegate" : END),
     });
 
     const seen: string[] = [];
@@ -281,20 +275,20 @@ describe("supervisor — ctx.run and ctx.stream", () => {
     const supervisorInstance = supervisor({
       name: "coerce-input",
       intents: {
-        delegate: async ctx => {
+        delegate: async (ctx) => {
           await ctx.run(inner, { question: "why", attempt: 2 });
 
           return { done: true };
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "delegate" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "delegate" : END),
     });
 
     await supervisorInstance.execute("go");
 
     const userMessages = model.callHistory
-      .flatMap(call => call.messages)
-      .filter(message => message.role === "user");
+      .flatMap((call) => call.messages)
+      .filter((message) => message.role === "user");
 
     expect(userMessages.length).toBeGreaterThan(0);
 
@@ -302,7 +296,7 @@ describe("supervisor — ctx.run and ctx.stream", () => {
       expect(typeof message.content).toBe("string");
     }
 
-    expect(userMessages.map(message => message.content).join("|")).toContain(
+    expect(userMessages.map((message) => message.content).join("|")).toContain(
       '{"question":"why","attempt":2}',
     );
   });

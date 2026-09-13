@@ -18,7 +18,11 @@ function toolNamed(lib: SkillsContract, runId: string, name: string): ToolContra
 }
 
 /** Pull the single `loadSkill` tool out of a freshly built library. */
-function loadTool(store: MockSkillsStore, runId = "run-1", maxLoadsPerRun?: number): ToolContract<any, any> {
+function loadTool(
+  store: MockSkillsStore,
+  runId = "run-1",
+  maxLoadsPerRun?: number,
+): ToolContract<any, any> {
   const lib = skills({
     name: "build",
     sources: [{ type: "store", store }],

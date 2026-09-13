@@ -137,12 +137,7 @@ function anchorPieces(text: string, pieces: string[]): AnchoredPiece[] {
  * from the anchored pieces, so the overlap text is part of the next
  * chunk's span exactly.
  */
-function packPieces(
-  text: string,
-  pieces: AnchoredPiece[],
-  size: number,
-  overlap: number,
-): Chunk[] {
+function packPieces(text: string, pieces: AnchoredPiece[], size: number, overlap: number): Chunk[] {
   const chunks: Chunk[] = [];
 
   let bufferStart = -1;

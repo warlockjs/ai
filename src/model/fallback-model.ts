@@ -91,9 +91,7 @@ export function fallbackModel(
  * function is used verbatim; absence falls back to the transient
  * default set.
  */
-function resolveShouldRetry(
-  retryOn: FallbackModelOptions["retryOn"],
-): FallbackRetryPredicate {
+function resolveShouldRetry(retryOn: FallbackModelOptions["retryOn"]): FallbackRetryPredicate {
   if (typeof retryOn === "function") {
     return retryOn;
   }
@@ -169,10 +167,7 @@ class FallbackModel implements FallbackModelContract {
     return this.latestAttempts;
   }
 
-  public async complete(
-    messages: Message[],
-    options?: ModelCallOptions,
-  ): Promise<ModelResponse> {
+  public async complete(messages: Message[], options?: ModelCallOptions): Promise<ModelResponse> {
     const run = new FallbackRun(this.models, this.shouldRetry);
     const response = await run.complete(messages, options);
 
@@ -181,10 +176,7 @@ class FallbackModel implements FallbackModelContract {
     return response;
   }
 
-  public stream(
-    messages: Message[],
-    options?: ModelCallOptions,
-  ): AsyncIterable<ModelStreamChunk> {
+  public stream(messages: Message[], options?: ModelCallOptions): AsyncIterable<ModelStreamChunk> {
     const run = new FallbackRun(this.models, this.shouldRetry);
 
     return run.stream(messages, options, (attempts) => {
@@ -215,10 +207,7 @@ class FallbackRun {
    * non-retryable error) re-throw the underlying error verbatim so the
    * caller still sees a typed `AIError` with its original code.
    */
-  public async complete(
-    messages: Message[],
-    options?: ModelCallOptions,
-  ): Promise<ModelResponse> {
+  public async complete(messages: Message[], options?: ModelCallOptions): Promise<ModelResponse> {
     for (let index = 0; index < this.models.length; index++) {
       const model = this.models[index]!;
       const isLast = index === this.models.length - 1;

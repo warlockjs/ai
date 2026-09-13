@@ -132,9 +132,7 @@ class PgSnapshotStore implements SnapshotStore {
    * Drop the snapshot for a `runId`.
    */
   public async delete(runId: string): Promise<void> {
-    await this.client.query(`DELETE FROM ${this.table} WHERE run_id = $1`, [
-      runId,
-    ]);
+    await this.client.query(`DELETE FROM ${this.table} WHERE run_id = $1`, [runId]);
   }
 
   /**
@@ -144,17 +142,12 @@ class PgSnapshotStore implements SnapshotStore {
    */
   public async list(prefix?: string): Promise<string[]> {
     if (prefix === undefined) {
-      const { rows } = await this.client.query(
-        `SELECT run_id FROM ${this.table}`,
-      );
+      const { rows } = await this.client.query(`SELECT run_id FROM ${this.table}`);
 
       return rows.map((row) => (row as { run_id: string }).run_id);
     }
 
-    const escaped = prefix
-      .replace(/\\/g, "\\\\")
-      .replace(/_/g, "\\_")
-      .replace(/%/g, "\\%");
+    const escaped = prefix.replace(/\\/g, "\\\\").replace(/_/g, "\\_").replace(/%/g, "\\%");
 
     const { rows } = await this.client.query(
       `SELECT run_id FROM ${this.table} WHERE run_id LIKE $1 ESCAPE '\\'`,

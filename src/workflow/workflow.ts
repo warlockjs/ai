@@ -39,10 +39,7 @@ export function workflow<
     inputOrOptions: TInput | WorkflowExecuteOptions<TInput, TContext>,
     maybeOptions?: WorkflowRunOptions<TContext>,
   ): Promise<WorkflowResult<TOutput>> {
-    const { input, options } = normalizeExecuteArgs<TInput, TContext>(
-      inputOrOptions,
-      maybeOptions,
-    );
+    const { input, options } = normalizeExecuteArgs<TInput, TContext>(inputOrOptions, maybeOptions);
     const runId = options?.runId ?? generateRunId();
     const result = await runWorkflow<TOutput>({
       definition,

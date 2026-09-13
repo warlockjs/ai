@@ -3,11 +3,7 @@ import { agent } from "../agent/agent";
 import type { BaseReport } from "../contracts/result/base-report.type";
 import type { Usage } from "../contracts/result/usage.type";
 import { MockSDK } from "../mock/mock-sdk";
-import {
-  clearObservers,
-  registerObserver,
-  setObserveAll,
-} from "../observe/observer-registry";
+import { clearObservers, registerObserver, setObserveAll } from "../observe/observer-registry";
 import type { Observer } from "../observe/observer.contract";
 import { passthrough } from "../supervisor/_test-helpers";
 import { tool } from "../tool/tool";
@@ -171,7 +167,7 @@ describe("auto-nest agents invoked inside a workflow run step", () => {
     const { report } = await wf.execute({ input: {} });
 
     expect(report.children).toHaveLength(2);
-    expect(report.children.map(c => c.name)).toEqual(["first", "second"]);
+    expect(report.children.map((c) => c.name)).toEqual(["first", "second"]);
     expect(report.usage).toEqual(sumUsage(report.children));
   });
 
@@ -243,7 +239,7 @@ describe("auto-nest agents invoked inside a workflow run step", () => {
     const { report } = await wf.execute({ input: {} });
 
     expect(report.children).toHaveLength(2);
-    expect(report.children.map(c => c.name)).toEqual(["declarative", "adhoc"]);
+    expect(report.children.map((c) => c.name)).toEqual(["declarative", "adhoc"]);
   });
 
   it("propagates sessionId through the ambient frame onto the captured agent subtree", async () => {

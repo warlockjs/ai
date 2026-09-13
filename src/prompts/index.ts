@@ -1,9 +1,5 @@
 // Factory + process-wide default manager.
-export {
-  defaultPromptsManager,
-  promptKey,
-  prompts,
-} from "./prompts-manager";
+export { defaultPromptsManager, promptKey, prompts } from "./prompts-manager";
 
 // Types.
 export type {

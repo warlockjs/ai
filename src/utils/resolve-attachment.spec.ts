@@ -51,18 +51,14 @@ describe("resolveAttachment", () => {
   });
 
   it("resolves tagged image with string source", () => {
-    expect(
-      resolveAttachment({ type: "image", source: "/tmp/cat.png" }),
-    ).toEqual({
+    expect(resolveAttachment({ type: "image", source: "/tmp/cat.png" })).toEqual({
       type: "path",
       value: "/tmp/cat.png",
     });
   });
 
   it("resolves tagged image with url source", () => {
-    expect(
-      resolveAttachment({ type: "image", source: "https://cdn/x.jpg" }),
-    ).toEqual({
+    expect(resolveAttachment({ type: "image", source: "https://cdn/x.jpg" })).toEqual({
       type: "url",
       value: "https://cdn/x.jpg",
     });
@@ -97,15 +93,13 @@ describe("resolveAttachment", () => {
 
   it("throws InvalidRequestError when input has no url, absolutePath, or base64", () => {
     expect(() => resolveAttachment({})).toThrow(InvalidRequestError);
-    expect(() => resolveAttachment({})).toThrow(
-      /Unrecognized attachment source/,
-    );
+    expect(() => resolveAttachment({})).toThrow(/Unrecognized attachment source/);
   });
 
   it("throws InvalidRequestError when storage file has url/absolutePath keys but both are empty", () => {
-    expect(() =>
-      resolveAttachment({ url: undefined, absolutePath: undefined }),
-    ).toThrow(/neither url nor absolutePath/);
+    expect(() => resolveAttachment({ url: undefined, absolutePath: undefined })).toThrow(
+      /neither url nor absolutePath/,
+    );
   });
 
   it("throws InvalidRequestError on inline source missing mediaType", () => {

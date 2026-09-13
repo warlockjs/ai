@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  AgentMiddleware,
-  MiddlewareExecuteContext,
-} from "../contracts/middleware";
+import type { AgentMiddleware, MiddlewareExecuteContext } from "../contracts/middleware";
 import { AIError } from "../errors";
 import { runPipeline } from "./pipeline";
 
@@ -69,15 +66,10 @@ describe("runPipeline — empty + single middleware", () => {
       },
     });
 
-    const result = await runPipeline(
-      [middleware],
-      "execute",
-      context,
-      async () => {
-        order.push("inner");
-        return "value";
-      },
-    );
+    const result = await runPipeline([middleware], "execute", context, async () => {
+      order.push("inner");
+      return "value";
+    });
 
     expect(result).toBe("value");
     expect(order).toEqual(["one.before", "inner", "one.after(value)"]);
@@ -102,15 +94,10 @@ describe("runPipeline — onion ordering", () => {
         },
       });
 
-    await runPipeline(
-      [make("a"), make("b"), make("c")],
-      "execute",
-      context,
-      async () => {
-        order.push("inner");
-        return 42;
-      },
-    );
+    await runPipeline([make("a"), make("b"), make("c")], "execute", context, async () => {
+      order.push("inner");
+      return 42;
+    });
 
     expect(order).toEqual([
       "a.before",
@@ -140,12 +127,7 @@ describe("runPipeline — onion ordering", () => {
       },
     });
 
-    const result = await runPipeline(
-      [outer, inner],
-      "execute",
-      context,
-      async () => "core",
-    );
+    const result = await runPipeline([outer, inner], "execute", context, async () => "core");
 
     expect(result).toBe("outer(inner(core))");
   });
@@ -171,12 +153,7 @@ describe("runPipeline — short-circuit via before-hook return", () => {
       },
     });
 
-    const result = await runPipeline(
-      [shortCircuiting, deeper],
-      "execute",
-      context,
-      innerFn,
-    );
+    const result = await runPipeline([shortCircuiting, deeper], "execute", context, innerFn);
 
     expect(result).toBe("cached");
     expect(innerFn).not.toHaveBeenCalled();
@@ -186,9 +163,7 @@ describe("runPipeline — short-circuit via before-hook return", () => {
   it("runs outer-middleware after hooks on a short-circuited result", async () => {
     const context = makeExecuteContext();
     const innerFn = vi.fn(async () => "should-not-run");
-    const outerAfter = vi.fn(
-      async (_ctx: unknown, result: unknown) => `wrapped(${result})`,
-    );
+    const outerAfter = vi.fn(async (_ctx: unknown, result: unknown) => `wrapped(${result})`);
 
     const outer = asMiddleware({
       name: "outer",
@@ -202,12 +177,7 @@ describe("runPipeline — short-circuit via before-hook return", () => {
       },
     });
 
-    const result = await runPipeline(
-      [outer, shortCircuiting],
-      "execute",
-      context,
-      innerFn,
-    );
+    const result = await runPipeline([outer, shortCircuiting], "execute", context, innerFn);
 
     expect(result).toBe("wrapped(HIT)");
     expect(outerAfter).toHaveBeenCalledWith(context, "HIT");
@@ -256,22 +226,13 @@ describe("runPipeline — onError recovery", () => {
       },
     });
 
-    const result = await runPipeline(
-      [outer, recoverer],
-      "execute",
-      context,
-      async () => {
-        order.push("inner-throws");
-        throw new AIError("AGENT_EXEC_FAILED", "boom");
-      },
-    );
+    const result = await runPipeline([outer, recoverer], "execute", context, async () => {
+      order.push("inner-throws");
+      throw new AIError("AGENT_EXEC_FAILED", "boom");
+    });
 
     expect(result).toBe("RECOVERED");
-    expect(order).toEqual([
-      "inner-throws",
-      "recoverer.onError(boom)",
-      "outer.after(RECOVERED)",
-    ]);
+    expect(order).toEqual(["inner-throws", "recoverer.onError(boom)", "outer.after(RECOVERED)"]);
   });
 
   it("onError returning undefined propagates the error to the next outer frame", async () => {
@@ -289,14 +250,9 @@ describe("runPipeline — onError recovery", () => {
       execute: { onError: innerOnError },
     });
 
-    const result = await runPipeline(
-      [outer, innerMw],
-      "execute",
-      context,
-      async () => {
-        throw new AIError("AGENT_EXEC_FAILED", "boom");
-      },
-    );
+    const result = await runPipeline([outer, innerMw], "execute", context, async () => {
+      throw new AIError("AGENT_EXEC_FAILED", "boom");
+    });
 
     expect(result).toBe("outer-recovered");
     expect(innerOnError).toHaveBeenCalledTimes(1);
@@ -323,12 +279,7 @@ describe("runPipeline — onError recovery", () => {
       },
     });
 
-    const result = await runPipeline(
-      [outer, thrower],
-      "execute",
-      context,
-      async () => "never",
-    );
+    const result = await runPipeline([outer, thrower], "execute", context, async () => "never");
 
     expect(result).toBe("outer-saw(before-boom)");
   });
@@ -356,15 +307,9 @@ describe("runPipeline — logging", () => {
       execute: { before: async () => {}, after: async () => {} },
     });
 
-    await runPipeline(
-      [loud, silent],
-      "execute",
-      context,
-      async () => "done",
-      logger as never,
-    );
+    await runPipeline([loud, silent], "execute", context, async () => "done", logger as never);
 
-    const debugCalls = logger.debug.mock.calls.map(call => call[2]);
+    const debugCalls = logger.debug.mock.calls.map((call) => call[2]);
 
     expect(debugCalls).toContain("loud");
     expect(debugCalls).not.toContain("silent");

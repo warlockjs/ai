@@ -23,19 +23,9 @@ export { humanApproval } from "./human/human-approval";
 export { evaluatePolicy } from "./human/policy";
 export type { PolicyVerdict } from "./human/policy";
 export { resume } from "./human/resume";
-export {
-  interruptMemory,
-  interruptPg,
-  interruptRedis,
-} from "./human/stores";
-export type {
-  PgInterruptOptions,
-  RedisInterruptOptions,
-} from "./human/stores";
-export {
-  ApprovalRejectedError,
-  InterruptSuspendedError,
-} from "./human/errors";
+export { interruptMemory, interruptPg, interruptRedis } from "./human/stores";
+export type { PgInterruptOptions, RedisInterruptOptions } from "./human/stores";
+export { ApprovalRejectedError, InterruptSuspendedError } from "./human/errors";
 export type {
   ApprovalRejectedErrorOptions,
   HumanErrorCode,

@@ -53,11 +53,8 @@ export function forTool(
   toolNames: string | ReadonlyArray<string>,
   middleware: AgentMiddleware,
 ): AgentMiddleware {
-  const allowed = new Set(
-    typeof toolNames === "string" ? [toolNames] : toolNames,
-  );
-  const scope =
-    allowed.size === 1 ? Array.from(allowed)[0] : Array.from(allowed).join("+");
+  const allowed = new Set(typeof toolNames === "string" ? [toolNames] : toolNames);
+  const scope = allowed.size === 1 ? Array.from(allowed)[0] : Array.from(allowed).join("+");
 
   if (!middleware.tool) {
     return middleware;
@@ -72,7 +69,7 @@ export function forTool(
     name: `${middleware.name}[for:${scope}]`,
     tool: {
       before: innerBefore
-        ? async ctx => {
+        ? async (ctx) => {
             if (!allowed.has(ctx.tool.name)) {
               return;
             }

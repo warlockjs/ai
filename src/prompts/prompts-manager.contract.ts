@@ -129,11 +129,7 @@ export interface PromptsManagerContract {
    * `name@selector` form is accepted) and renders it against `placeholders`.
    * Throws `InvalidRequestError` on an unknown name / version / tag.
    */
-  resolve(
-    name: string,
-    versionOrTag?: string,
-    placeholders?: Placeholders,
-  ): string;
+  resolve(name: string, versionOrTag?: string, placeholders?: Placeholders): string;
 
   /**
    * Bulk-register many versions of one name in a single call. Each entry's
@@ -142,10 +138,7 @@ export interface PromptsManagerContract {
    * in array order; the same duplicate / idempotency rule as `register` applies
    * per `name@version`. Returns the manager for chaining.
    */
-  define(
-    name: string,
-    versions: readonly PromptTemplateVersion[],
-  ): PromptsManagerContract;
+  define(name: string, versions: readonly PromptTemplateVersion[]): PromptsManagerContract;
 
   /**
    * Pin a tag to a specific registered version of a name (e.g.

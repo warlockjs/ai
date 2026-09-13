@@ -14,12 +14,9 @@ describe("OrchestratorEmitter — three-tier fan-out", () => {
 
     emitter.on("orchestrator.turn.starting", () => order.push("instance"));
 
-    emitter.emit(
-      "orchestrator.turn.starting",
-      { sessionId: "s1", turnIndex: 0 },
-      identity,
-      { "orchestrator.turn.starting": () => order.push("per-call") },
-    );
+    emitter.emit("orchestrator.turn.starting", { sessionId: "s1", turnIndex: 0 }, identity, {
+      "orchestrator.turn.starting": () => order.push("per-call"),
+    });
 
     expect(order).toEqual(["definition", "instance", "per-call"]);
   });
@@ -48,18 +45,10 @@ describe("OrchestratorEmitter — three-tier fan-out", () => {
     const emitter = new OrchestratorEmitter();
 
     const off = emitter.on("orchestrator.turn.starting", handler);
-    emitter.emit(
-      "orchestrator.turn.starting",
-      { sessionId: "s1", turnIndex: 0 },
-      identity,
-    );
+    emitter.emit("orchestrator.turn.starting", { sessionId: "s1", turnIndex: 0 }, identity);
 
     off();
-    emitter.emit(
-      "orchestrator.turn.starting",
-      { sessionId: "s1", turnIndex: 1 },
-      identity,
-    );
+    emitter.emit("orchestrator.turn.starting", { sessionId: "s1", turnIndex: 1 }, identity);
 
     expect(handler).toHaveBeenCalledTimes(1);
   });
@@ -71,11 +60,7 @@ describe("OrchestratorEmitter — three-tier fan-out", () => {
     emitter.on("orchestrator.checkpoint.persisted", handler);
     emitter.off("orchestrator.checkpoint.persisted", handler);
 
-    emitter.emit(
-      "orchestrator.checkpoint.persisted",
-      { sessionId: "s1", turnIndex: 1 },
-      identity,
-    );
+    emitter.emit("orchestrator.checkpoint.persisted", { sessionId: "s1", turnIndex: 1 }, identity);
 
     expect(handler).not.toHaveBeenCalled();
   });
@@ -92,11 +77,7 @@ describe("OrchestratorEmitter — three-tier fan-out", () => {
     emitter.on("orchestrator.turn.starting", () => order.push("instance"));
 
     expect(() =>
-      emitter.emit(
-        "orchestrator.turn.starting",
-        { sessionId: "s1", turnIndex: 0 },
-        identity,
-      ),
+      emitter.emit("orchestrator.turn.starting", { sessionId: "s1", turnIndex: 0 }, identity),
     ).not.toThrow();
 
     expect(order).toEqual(["definition", "instance"]);

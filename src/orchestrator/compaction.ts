@@ -30,10 +30,7 @@ function isCallbackForm(
  * exclusively by `command("compact")` (the manual path). Returns false
  * when `summarize` is unset.
  */
-export function shouldCompact(
-  ctx: OrchestratorEngineContext,
-  turnIndex: number,
-): boolean {
+export function shouldCompact(ctx: OrchestratorEngineContext, turnIndex: number): boolean {
   const summarize = ctx.config.summarize;
 
   if (summarize === undefined || isCallbackForm(summarize)) {
@@ -96,10 +93,7 @@ async function produceCompaction(
  * otherwise returns a placeholder memo. The summarizer is intentionally
  * the cheap model — never the specialists (§12.4).
  */
-async function summarizeSlice(
-  summarize: SummarizeConfig,
-  slice: Message[],
-): Promise<string> {
+async function summarizeSlice(summarize: SummarizeConfig, slice: Message[]): Promise<string> {
   if (slice.length === 0) {
     return "";
   }

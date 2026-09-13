@@ -58,10 +58,7 @@ export interface CheckpointStore {
    * Load the latest checkpoint (highest `turn_index`) for a session,
    * or `undefined` for a brand-new session the store has never seen.
    */
-  load(
-    orchestratorName: string,
-    sessionId: string,
-  ): Promise<CheckpointRecord | undefined>;
+  load(orchestratorName: string, sessionId: string): Promise<CheckpointRecord | undefined>;
 
   /**
    * Persist a fresh checkpoint row. Append-only — never overwrites a
@@ -89,11 +86,7 @@ export interface CheckpointStore {
    * that prune in their own dialect (or never prune) omit it; the engine
    * skips pruning when it is absent.
    */
-  prune?(
-    orchestratorName: string,
-    sessionId: string,
-    keepBeforeTurnIndex: number,
-  ): Promise<void>;
+  prune?(orchestratorName: string, sessionId: string, keepBeforeTurnIndex: number): Promise<void>;
 
   /**
    * Return the DDL string for this store's backing table. The dev runs

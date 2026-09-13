@@ -6,11 +6,7 @@
  * - `"exponential"` — 500ms, 1s, 2s, 4s, ... (capped at 30s)
  * - custom `(attempt) => ms` — full control (attempt is 1-based)
  */
-export type RetryBackoff =
-  | "none"
-  | "linear"
-  | "exponential"
-  | ((attempt: number) => number);
+export type RetryBackoff = "none" | "linear" | "exponential" | ((attempt: number) => number);
 
 export type RetryConfig = {
   /** Total attempts including the first. Default 1 (no retry). */

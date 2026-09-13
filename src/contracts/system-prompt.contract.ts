@@ -124,10 +124,7 @@ export interface SystemPromptMergeOptions {
  * block, another prompt contract (its blocks are folded — persona replaces,
  * instructions append), or a registered prompt name resolved from `ai.prompts`.
  */
-export type SystemPromptMergeSource =
-  | SystemPromptBlockContract
-  | SystemPromptContract
-  | string;
+export type SystemPromptMergeSource = SystemPromptBlockContract | SystemPromptContract | string;
 
 /**
  * Structural store a refined prompt pins its compiled text into — the same
@@ -287,10 +284,7 @@ export interface SystemPromptContract {
    * Throws `InvalidRequestError` when the name (or requested version) is not
    * registered. Provenance is recorded in `meta.composedFrom`.
    */
-  merge(
-    name: string,
-    options?: SystemPromptMergeOptions,
-  ): SystemPromptContract;
+  merge(name: string, options?: SystemPromptMergeOptions): SystemPromptContract;
 
   /**
    * Resolve all placeholders across every block, producing the final system
@@ -366,19 +360,12 @@ export interface RefinedSystemPromptContract extends SystemPromptContract {
   persona(persona: PersonaContract | string): RefinedSystemPromptContract;
 
   /** See {@link RefinedSystemPromptContract.persona} — chaining stays compiled. */
-  instruction(
-    instruction: InstructionContract | string,
-  ): RefinedSystemPromptContract;
+  instruction(instruction: InstructionContract | string): RefinedSystemPromptContract;
 
   /** See {@link RefinedSystemPromptContract.persona} — chaining stays compiled. */
-  merge(
-    ...blocks: readonly SystemPromptBlockContract[]
-  ): RefinedSystemPromptContract;
+  merge(...blocks: readonly SystemPromptBlockContract[]): RefinedSystemPromptContract;
   merge(source: SystemPromptContract): RefinedSystemPromptContract;
-  merge(
-    name: string,
-    options?: SystemPromptMergeOptions,
-  ): RefinedSystemPromptContract;
+  merge(name: string, options?: SystemPromptMergeOptions): RefinedSystemPromptContract;
 
   /** Read the SOURCE prompt's metadata — a compiled prompt keeps its source identity. */
   meta(): SystemPromptMeta | undefined;

@@ -174,9 +174,7 @@ export function humanApproval(options: HumanApprovalOptions): AgentMiddleware {
   return {
     name,
     tool: {
-      async before(
-        ctx: MiddlewareToolContext,
-      ): Promise<ToolInvokeResult<unknown> | void> {
+      async before(ctx: MiddlewareToolContext): Promise<ToolInvokeResult<unknown> | void> {
         const verdict = evaluatePolicy(policy, toPolicyContext(ctx));
 
         // Not gated — let the real tool run unchanged.

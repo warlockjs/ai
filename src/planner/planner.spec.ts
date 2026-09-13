@@ -36,9 +36,7 @@ describe("ai.planner — authoring validation", () => {
       planner({
         name: "",
         model: planModel({ steps: [] }),
-        capabilities: [
-          { name: "a", description: "d", executable: mockAgent({ name: "a" }) },
-        ],
+        capabilities: [{ name: "a", description: "d", executable: mockAgent({ name: "a" }) }],
       }),
     ).toThrow(PlannerFailedError);
   });
@@ -47,9 +45,7 @@ describe("ai.planner — authoring validation", () => {
     expect(() =>
       planner({
         name: "p",
-        capabilities: [
-          { name: "a", description: "d", executable: mockAgent({ name: "a" }) },
-        ],
+        capabilities: [{ name: "a", description: "d", executable: mockAgent({ name: "a" }) }],
       } as never),
     ).toThrow(/one of `model` or `planner`/);
   });
@@ -60,17 +56,15 @@ describe("ai.planner — authoring validation", () => {
         name: "p",
         model: planModel({ steps: [] }),
         planner: mockAgent({ name: "byo" }),
-        capabilities: [
-          { name: "a", description: "d", executable: mockAgent({ name: "a" }) },
-        ],
+        capabilities: [{ name: "a", description: "d", executable: mockAgent({ name: "a" }) }],
       }),
     ).toThrow(/mutually exclusive/);
   });
 
   it("throws when no capabilities are given", () => {
-    expect(() =>
-      planner({ name: "p", model: planModel({ steps: [] }), capabilities: [] }),
-    ).toThrow(/at least one capability/);
+    expect(() => planner({ name: "p", model: planModel({ steps: [] }), capabilities: [] })).toThrow(
+      /at least one capability/,
+    );
   });
 
   it("throws on a duplicate capability name", () => {
@@ -92,9 +86,7 @@ describe("ai.planner — authoring validation", () => {
         name: "p",
         model: planModel({ steps: [] }),
         maxSteps: 0,
-        capabilities: [
-          { name: "a", description: "d", executable: mockAgent({ name: "a" }) },
-        ],
+        capabilities: [{ name: "a", description: "d", executable: mockAgent({ name: "a" }) }],
       }),
     ).toThrow(/`maxSteps` must be >= 1/);
   });
@@ -521,11 +513,11 @@ describe("ai.planner — error categories", () => {
     expect(new PlannerFailedError("x").category).toBe("provider");
   });
 
-  it("PlannerPlanInvalidError is category \"schema\"", () => {
+  it('PlannerPlanInvalidError is category "schema"', () => {
     expect(new PlannerPlanInvalidError("x").category).toBe("schema");
   });
 
-  it("PlannerCancelledError is category \"cancelled\"", () => {
+  it('PlannerCancelledError is category "cancelled"', () => {
     expect(new PlannerCancelledError("x", { cancelledAt: "t" }).category).toBe("cancelled");
   });
 });
@@ -580,7 +572,14 @@ describe("ai.planner — default sequential path unchanged (no new flags)", () =
       name: "no-mode",
       model: planModel(plan),
       capabilities: [
-        { name: "a", description: "a", executable: mockAgent({ name: "a", responses: [{ content: "ok", finishReason: "stop" }] }) },
+        {
+          name: "a",
+          description: "a",
+          executable: mockAgent({
+            name: "a",
+            responses: [{ content: "ok", finishReason: "stop" }],
+          }),
+        },
       ],
     });
 

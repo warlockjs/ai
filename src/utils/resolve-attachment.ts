@@ -35,11 +35,7 @@ const REMOTE_URL_PATTERN = /^https?:\/\//i;
  * // → { type: "path", value: "/tmp/x.png" }
  */
 export function resolveAttachment(attachment: Attachment): ResolvedAttachment {
-  if (
-    typeof attachment === "object" &&
-    attachment !== null &&
-    "type" in attachment
-  ) {
+  if (typeof attachment === "object" && attachment !== null && "type" in attachment) {
     return resolveSource(attachment.source);
   }
 
@@ -73,16 +69,12 @@ function resolveSource(source: AttachmentSource): ResolvedAttachment {
       return { type: "url", value: storage.url };
     }
 
-    throw new InvalidRequestError(
-      "Storage attachment has neither url nor absolutePath",
-    );
+    throw new InvalidRequestError("Storage attachment has neither url nor absolutePath");
   }
 
   if ("base64" in source) {
     if (!source.base64 || !source.mediaType) {
-      throw new InvalidRequestError(
-        "Inline attachment requires both `base64` and `mediaType`",
-      );
+      throw new InvalidRequestError("Inline attachment requires both `base64` and `mediaType`");
     }
 
     return {

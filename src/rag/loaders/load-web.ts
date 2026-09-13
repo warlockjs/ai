@@ -9,8 +9,7 @@ import { htmlToText, extractTitle } from "./load-html";
 import type { LoadWebOptions, RagLoaderResult } from "./loader.type";
 
 /** Browser-ish UA so servers that gate on it still return prose. */
-const DEFAULT_USER_AGENT =
-  "warlock-ai-rag-loader/1.0 (+https://github.com/warlock-js)";
+const DEFAULT_USER_AGENT = "warlock-ai-rag-loader/1.0 (+https://github.com/warlock-js)";
 
 /**
  * Whether a `content-type` header names an HTML document (so it is run
@@ -62,10 +61,7 @@ function isHtmlContentType(contentType: string | undefined): boolean {
  * @throws {OutboundPolicyError} when the policy blocks the URL, the request
  *   times out, the body exceeds the cap, or the response is not OK.
  */
-export async function loadWeb(
-  url: string,
-  options: LoadWebOptions = {},
-): Promise<RagLoaderResult> {
+export async function loadWeb(url: string, options: LoadWebOptions = {}): Promise<RagLoaderResult> {
   const policy = resolveOutboundPolicy(options.policy);
 
   const response = await guardedFetch(url, policy, {

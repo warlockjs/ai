@@ -1,11 +1,6 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { expect } from "vitest";
-import {
-  matchConverge,
-  matchOutputShape,
-  matchPassStep,
-  matchRouteTo,
-} from "./matcher-logic";
+import { matchConverge, matchOutputShape, matchPassStep, matchRouteTo } from "./matcher-logic";
 
 /**
  * Custom Vitest matchers over the unified `@warlock.js/ai` report tree.

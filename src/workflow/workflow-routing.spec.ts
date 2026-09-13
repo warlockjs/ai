@@ -50,7 +50,7 @@ describe("ai.workflow — routing (1.5)", () => {
         step({ name: "b", run: () => order.push("b") }),
         step({ name: "c", run: () => order.push("c") }),
       ],
-      nextStep: name => {
+      nextStep: (name) => {
         if (name === "a") return { goto: "c" };
       },
     });
@@ -100,16 +100,15 @@ describe("ai.workflow — routing (1.5)", () => {
       maxSteps: 10,
       loopWarnAfter: 3,
       on: {
-        "workflow.loop.warning": p => warnings.push(p),
+        "workflow.loop.warning": (p) => warnings.push(p),
       },
       steps: [
         step({
           name: "a",
-          run: ctx => {
+          run: (ctx) => {
             ctx.state.count = ((ctx.state.count as number) ?? 0) + 1;
           },
-          nextStep: ctx =>
-            (ctx.state.count as number) < 5 ? { goto: "a" } : { end: true },
+          nextStep: (ctx) => ((ctx.state.count as number) < 5 ? { goto: "a" } : { end: true }),
         }),
       ],
     });

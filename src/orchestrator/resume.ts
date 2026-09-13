@@ -96,17 +96,10 @@ export async function resolveResume<TOutput, TState>(
     signal: options?.signal,
   });
 
-  const status = result.error
-    ? hooks.deriveStatus(result.report.status)
-    : "awaiting-input";
+  const status = result.error ? hooks.deriveStatus(result.report.status) : "awaiting-input";
 
   if (result.error) {
-    const report = hooks.buildReport(
-      resumedTurnIndex,
-      status,
-      turnSnapshot,
-      result.report,
-    );
+    const report = hooks.buildReport(resumedTurnIndex, status, turnSnapshot, result.report);
 
     hooks.emitTerminal(resumedTurnIndex, status);
 
@@ -128,12 +121,7 @@ export async function resolveResume<TOutput, TState>(
     loaded.record?.summarized_through ?? null,
   );
 
-  const report = hooks.buildReport(
-    resumedTurnIndex,
-    "awaiting-input",
-    turnSnapshot,
-    result.report,
-  );
+  const report = hooks.buildReport(resumedTurnIndex, "awaiting-input", turnSnapshot, result.report);
 
   hooks.emitTerminal(resumedTurnIndex, "awaiting-input");
 

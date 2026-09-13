@@ -33,10 +33,7 @@ export type SessionSendResult = {
   /** Typed AI error if the session turn failed */
   error?: AIError;
   /** Full execution result — narrow by `.executionResult.type` */
-  executionResult:
-    | AgentResult<unknown>
-    | SupervisorResult<unknown>
-    | WorkflowResult<unknown>;
+  executionResult: AgentResult<unknown> | SupervisorResult<unknown> | WorkflowResult<unknown>;
   /** Aggregated token usage for this turn */
   usage: Usage;
 };

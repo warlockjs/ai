@@ -9,18 +9,13 @@ describe("ai.workflow — authoring validation", () => {
     expect(() =>
       workflow({
         name: "dup",
-        steps: [
-          step({ name: "a", run: () => {} }),
-          step({ name: "a", run: () => {} }),
-        ],
+        steps: [step({ name: "a", run: () => {} }), step({ name: "a", run: () => {} })],
       }),
     ).toThrow(WorkflowError);
   });
 
   it("ai.step throws WorkflowError when name missing", () => {
-    expect(() => step({ name: "", run: () => {} } as any)).toThrow(
-      WorkflowError,
-    );
+    expect(() => step({ name: "", run: () => {} } as any)).toThrow(WorkflowError);
   });
 
   it("ai.step throws WorkflowError when both run and agent are set", () => {
@@ -44,9 +39,7 @@ describe("ai.workflow — authoring validation", () => {
 
   it("ai.step throws WorkflowError when agent is set without input()", () => {
     const dummyAgent = { execute: async () => ({}) as any } as any;
-    expect(() => step({ name: "no-input", agent: dummyAgent } as any)).toThrow(
-      WorkflowError,
-    );
+    expect(() => step({ name: "no-input", agent: dummyAgent } as any)).toThrow(WorkflowError);
   });
 
   it("emits workflow.error when snapshot persistence fails", async () => {
@@ -69,7 +62,7 @@ describe("ai.workflow — authoring validation", () => {
       // Test-only stub — only `save` is exercised on the persist path,
       // which is exactly what we want to fail.
       snapshotStore: brokenStore,
-      on: { "workflow.error": e => errors.push(e) },
+      on: { "workflow.error": (e) => errors.push(e) },
       steps: [step({ name: "a", run: () => {} })],
     });
 

@@ -39,9 +39,7 @@ export type PersistOutcome = { ok: true } | { ok: false; error: unknown };
  * via events/logs without aborting the run — callers decide whether
  * a failed checkpoint is fatal.
  */
-export async function persistSupervisorSnapshot(
-  params: PersistParams,
-): Promise<PersistOutcome> {
+export async function persistSupervisorSnapshot(params: PersistParams): Promise<PersistOutcome> {
   const store = resolveSnapshotStore(params.config);
 
   if (!store) {
@@ -101,14 +99,11 @@ export async function loadSnapshotForResume(params: {
   }
 
   if (!params.options?.force && snapshot.signature !== params.signature) {
-    throw new SupervisorDriftError(
-      `supervisor "${params.config.name}" signature drift on resume`,
-      {
-        savedSignature: snapshot.signature,
-        currentSignature: params.signature,
-        runId: params.runId,
-      },
-    );
+    throw new SupervisorDriftError(`supervisor "${params.config.name}" signature drift on resume`, {
+      savedSignature: snapshot.signature,
+      currentSignature: params.signature,
+      runId: params.runId,
+    });
   }
 
   return snapshot;

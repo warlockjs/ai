@@ -79,9 +79,7 @@ Or with your preferred package manager:
  * is not installed.
  */
 interface RedisModuleLike {
-  createClient(config: {
-    url: string;
-  }): RedisClientLike & { connect(): Promise<unknown> };
+  createClient(config: { url: string }): RedisClientLike & { connect(): Promise<unknown> };
 }
 
 /**
@@ -159,9 +157,7 @@ class RedisInterruptStore implements InterruptStore {
       return;
     }
 
-    throw new TypeError(
-      "ai.human.interrupt.redis requires either a 'client' or a 'url' option.",
-    );
+    throw new TypeError("ai.human.interrupt.redis requires either a 'client' or a 'url' option.");
   }
 
   /**
@@ -189,9 +185,7 @@ class RedisInterruptStore implements InterruptStore {
    * missing. Redis returns `null` for an absent key — converted to
    * `undefined` at the boundary.
    */
-  public async load(
-    interruptId: string,
-  ): Promise<PendingInterrupt | undefined> {
+  public async load(interruptId: string): Promise<PendingInterrupt | undefined> {
     const client = await this.client();
     const raw = await client.get(this.recordKey(interruptId));
 

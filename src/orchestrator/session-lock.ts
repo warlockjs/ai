@@ -38,7 +38,7 @@ export function inProcessSessionLock(): SessionLock {
       const waitSignal = existing ? options?.signal : undefined;
 
       let release!: () => void;
-      const held = new Promise<void>(resolve => {
+      const held = new Promise<void>((resolve) => {
         release = resolve;
       });
 

@@ -24,20 +24,17 @@ export function agentEventToStreamEvent<K extends keyof AgentEventMap>(
     }
 
     case "agent.trip.started": {
-      const { tripIndex, input } =
-        payload as AgentEventMap["agent.trip.started"];
+      const { tripIndex, input } = payload as AgentEventMap["agent.trip.started"];
       return { type: "agent.trip.started", tripIndex, input };
     }
 
     case "agent.trip.streaming": {
-      const { delta, tripIndex } =
-        payload as AgentEventMap["agent.trip.streaming"];
+      const { delta, tripIndex } = payload as AgentEventMap["agent.trip.streaming"];
       return { type: "agent.trip.streaming", delta, tripIndex };
     }
 
     case "agent.tool.calling": {
-      const { tool, input, tripIndex } =
-        payload as AgentEventMap["agent.tool.calling"];
+      const { tool, input, tripIndex } = payload as AgentEventMap["agent.tool.calling"];
       return { type: "agent.tool.calling", tool, input, tripIndex };
     }
 
@@ -50,8 +47,7 @@ export function agentEventToStreamEvent<K extends keyof AgentEventMap>(
     }
 
     case "agent.tool.failed": {
-      const { tool, error, tripIndex } =
-        payload as AgentEventMap["agent.tool.failed"];
+      const { tool, error, tripIndex } = payload as AgentEventMap["agent.tool.failed"];
       return { type: "agent.tool.failed", tool, error, tripIndex };
     }
 

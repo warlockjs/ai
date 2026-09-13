@@ -14,11 +14,7 @@ import { supervisor } from "./supervisor";
  * forensic fields (`returned`, `availableKeys`) for each malformed
  * decision shape the normalizer rejects.
  */
-function makeScripted(
-  name: string,
-  description: string,
-  content: string,
-): AgentContract {
+function makeScripted(name: string, description: string, content: string): AgentContract {
   return buildScriptedAgent({
     name,
     description,
@@ -40,9 +36,7 @@ describe("supervisor decide — route callback normalization faults", () => {
 
     expect(result.error?.code).toBe("SUPERVISOR_INVALID_ROUTE");
     expect(result.error?.message).toMatch(/empty array/);
-    expect((result.error as SupervisorRoutingError).availableKeys).toEqual([
-      "worker",
-    ]);
+    expect((result.error as SupervisorRoutingError).availableKeys).toEqual(["worker"]);
     expect((result.error as SupervisorRoutingError).returned).toEqual([]);
   });
 
@@ -188,9 +182,7 @@ describe("supervisor decide — router-agent result faults", () => {
     const routerAgent = buildScriptedAgent({
       name: "router",
       description: "routes",
-      responses: [
-        { content: "", finishReason: "error", error: new Error("router boom") },
-      ],
+      responses: [{ content: "", finishReason: "error", error: new Error("router boom") }],
     });
 
     const supervisorInstance = supervisor({
@@ -232,10 +224,7 @@ describe("supervisor decide — router-agent result faults", () => {
     const result = await supervisorInstance.execute("x");
 
     expect(result.error).toBeUndefined();
-    expect(Object.keys(result.report.snapshots[0].result).sort()).toEqual([
-      "market",
-      "pricing",
-    ]);
+    expect(Object.keys(result.report.snapshots[0].result).sort()).toEqual(["market", "pricing"]);
     expect(result.report.snapshots[0].decision.source).toBe("router");
   });
 
@@ -263,9 +252,7 @@ describe("supervisor decide — router-agent result faults", () => {
     const result = await supervisorInstance.execute("x");
 
     expect(result.error).toBeUndefined();
-    expect(result.report.snapshots[0].decision.reasoning).toBe(
-      "ticket looks like a billing issue",
-    );
+    expect(result.report.snapshots[0].decision.reasoning).toBe("ticket looks like a billing issue");
   });
 });
 
@@ -282,7 +269,7 @@ describe("supervisor decide — initialAgent fast-path", () => {
       name: "initial-fastpath",
       intents: { triage },
       initialAgent: "triage",
-      route: ctx => {
+      route: (ctx) => {
         routeIterations.push(ctx.iteration);
         return END;
       },

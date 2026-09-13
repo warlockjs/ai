@@ -17,19 +17,17 @@ describe("supervisor.stream() — event parity with execute()", () => {
     const executeSupervisor = supervisor({
       name: "stream-parity-exec",
       intents: { writer },
-      route: ctx => (ctx.iteration === 0 ? "writer" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "writer" : END),
     });
 
     const executeEvents: string[] = [];
     await executeSupervisor.execute("x", {
       on: {
         "supervisor.starting": () => executeEvents.push("supervisor.starting"),
-        "supervisor.iteration.starting": () =>
-          executeEvents.push("supervisor.iteration.starting"),
+        "supervisor.iteration.starting": () => executeEvents.push("supervisor.iteration.starting"),
         "supervisor.iteration.completed": () =>
           executeEvents.push("supervisor.iteration.completed"),
-        "supervisor.completed": () =>
-          executeEvents.push("supervisor.completed"),
+        "supervisor.completed": () => executeEvents.push("supervisor.completed"),
       },
     });
 
@@ -44,7 +42,7 @@ describe("supervisor.stream() — event parity with execute()", () => {
           responses: [{ content: "hi", finishReason: "stop" }],
         }),
       },
-      route: ctx => (ctx.iteration === 0 ? "writer" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "writer" : END),
     });
 
     const interesting = new Set([
@@ -70,7 +68,7 @@ describe("supervisor.stream() — event parity with execute()", () => {
     const supervisorInstance = supervisor({
       name: "stream-iter",
       intents: { writer },
-      route: ctx => (ctx.iteration === 0 ? "writer" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "writer" : END),
     });
 
     const stream = supervisorInstance.stream("x");
@@ -90,7 +88,7 @@ describe("supervisor.stream() — event parity with execute()", () => {
     const supervisorInstance = supervisor({
       name: "stream-result",
       intents: { writer },
-      route: ctx => (ctx.iteration === 0 ? "writer" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "writer" : END),
     });
 
     const stream = supervisorInstance.stream("x");

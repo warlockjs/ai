@@ -49,9 +49,7 @@ export type AgentMiddlewareExecuteHooks = {
  *   to recover (fallback chain), or `void` to propagate the error up.
  */
 export type AgentMiddlewareTripHooks = {
-  before?(
-    ctx: MiddlewareTripContext,
-  ): void | ModelResponse | Promise<void | ModelResponse>;
+  before?(ctx: MiddlewareTripContext): void | ModelResponse | Promise<void | ModelResponse>;
   after?(
     ctx: MiddlewareTripContext,
     response: ModelResponse,
@@ -78,24 +76,15 @@ export type AgentMiddlewareTripHooks = {
 export type AgentMiddlewareToolHooks = {
   before?(
     ctx: MiddlewareToolContext,
-  ):
-    | void
-    | ToolInvokeResult<unknown>
-    | Promise<void | ToolInvokeResult<unknown>>;
+  ): void | ToolInvokeResult<unknown> | Promise<void | ToolInvokeResult<unknown>>;
   after?(
     ctx: MiddlewareToolContext,
     result: ToolInvokeResult<unknown>,
-  ):
-    | void
-    | ToolInvokeResult<unknown>
-    | Promise<void | ToolInvokeResult<unknown>>;
+  ): void | ToolInvokeResult<unknown> | Promise<void | ToolInvokeResult<unknown>>;
   onError?(
     ctx: MiddlewareToolContext,
     error: AIError,
-  ):
-    | void
-    | ToolInvokeResult<unknown>
-    | Promise<void | ToolInvokeResult<unknown>>;
+  ): void | ToolInvokeResult<unknown> | Promise<void | ToolInvokeResult<unknown>>;
 };
 
 /**

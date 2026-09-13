@@ -1,7 +1,4 @@
-import type {
-  GeneratedImage,
-  ImageModelContract,
-} from "../contracts/image-model.contract";
+import type { GeneratedImage, ImageModelContract } from "../contracts/image-model.contract";
 import type { BaseReport } from "../contracts/result/base-report.type";
 import { REPORT_SCHEMA_VERSION } from "../contracts/result/base-report.type";
 import type { ExecuteResult } from "../contracts/result/execute-result.type";
@@ -154,7 +151,8 @@ export async function image(params: ImageParams): Promise<ImageResult> {
     data = { images: response.images };
     imageCount = response.images.length;
   } catch (thrown) {
-    error = thrown instanceof AIError ? thrown : new ProviderError(toMessage(thrown), { cause: thrown });
+    error =
+      thrown instanceof AIError ? thrown : new ProviderError(toMessage(thrown), { cause: thrown });
     // A caller-aborted run is "cancelled", not "failed" — keep the typed
     // cause but distinguish the terminal status for dashboards/retry policy.
     status = params.signal?.aborted ? "cancelled" : "failed";

@@ -22,7 +22,11 @@ function makeRouterModel(structuredOutput = false) {
 }
 
 const intents = {
-  triage: buildScriptedAgent({ name: "triage", description: "Classify the request", responses: [] }),
+  triage: buildScriptedAgent({
+    name: "triage",
+    description: "Classify the request",
+    responses: [],
+  }),
   resolver: buildScriptedAgent({
     name: "resolver",
     description: "Produce the final answer",
@@ -91,9 +95,9 @@ describe("ai.router — generated system prompt", () => {
 
     await routerAgent.execute("help me");
 
-    const content = sdk.models[0]
-      .callHistory[0]
-      .messages.find((message) => message.role === "system")!.content as string;
+    const content = sdk.models[0].callHistory[0].messages.find(
+      (message) => message.role === "system",
+    )!.content as string;
 
     expect(content.indexOf("You coordinate a support team.")).toBeLessThan(
       content.indexOf("Available intents:"),
@@ -109,9 +113,9 @@ describe("ai.router — generated system prompt", () => {
 
     await routerAgent.execute("help me");
 
-    const content = sdk.models[0]
-      .callHistory[0]
-      .messages.find((message) => message.role === "system")!.content as string;
+    const content = sdk.models[0].callHistory[0].messages.find(
+      (message) => message.role === "system",
+    )!.content as string;
 
     expect(content).toMatch(/- log(\n|$)/);
   });

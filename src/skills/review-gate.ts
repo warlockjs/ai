@@ -1,13 +1,9 @@
-import type {
-  SkillAnalyticsEvent,
-  SkillReviewGate,
-} from "./contracts/skills-config.type";
+import type { SkillAnalyticsEvent, SkillReviewGate } from "./contracts/skills-config.type";
 import type { SkillRecord } from "./contracts/skill-record.type";
 
 /** Outcome of running a candidate through the review gate. */
 export type ReviewOutcome =
-  | { promoted: true; record: SkillRecord; reason?: string }
-  | { promoted: false; reason?: string };
+  { promoted: true; record: SkillRecord; reason?: string } | { promoted: false; reason?: string };
 
 /**
  * Run a candidate through the **default-DENY** review gate (Phase 2).

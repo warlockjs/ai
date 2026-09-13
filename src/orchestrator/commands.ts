@@ -45,9 +45,7 @@ export function createCommandDispatcher(handlers: OrchestratorCommandHandlers) {
     const handler = handlers[name];
 
     if (typeof handler !== "function") {
-      throw new SupervisorFailedError(
-        `orchestrator.command(): unknown command "${String(name)}"`,
-      );
+      throw new SupervisorFailedError(`orchestrator.command(): unknown command "${String(name)}"`);
     }
 
     return handler(args);

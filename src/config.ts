@@ -94,7 +94,7 @@ export interface AIConfig {
    * ai.config({ defaultSnapshotStore: ai.snapshot.memory() });
    */
   defaultSnapshotStore?: SnapshotStore;
-};
+}
 
 const aiConfig: AIConfig = {};
 

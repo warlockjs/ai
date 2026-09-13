@@ -34,7 +34,7 @@ describe("unified report tree — cross-primitive recursion", () => {
       name: "echo",
       description: "echoes input",
       input: passthrough,
-      execute: async input => `echoed:${JSON.stringify(input)}`,
+      execute: async (input) => `echoed:${JSON.stringify(input)}`,
     });
 
     const sdk = MockSDK({
@@ -71,7 +71,7 @@ describe("unified report tree — cross-primitive recursion", () => {
     const innerSup = supervisor({
       name: "inner-sup",
       intents: { writer: innerWriter },
-      route: ctx => (ctx.iteration === 0 ? "writer" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "writer" : END),
     });
 
     const supTool = innerSup.asTool({
@@ -86,9 +86,7 @@ describe("unified report tree — cross-primitive recursion", () => {
         {
           content: "",
           finishReason: "tool_calls",
-          toolCalls: [
-            { id: "1", name: "run_inner_sup", input: { topic: "x" } },
-          ],
+          toolCalls: [{ id: "1", name: "run_inner_sup", input: { topic: "x" } }],
         },
         { content: "all good", finishReason: "stop" },
       ],
@@ -119,7 +117,7 @@ describe("unified report tree — cross-primitive recursion", () => {
     expect(innerReport.status).toBe("completed");
 
     // Supervisor's own children include the dispatched writer agent.
-    const writerReport = innerReport.children.find(c => c.name === "writer");
+    const writerReport = innerReport.children.find((c) => c.name === "writer");
     expect(writerReport).toBeDefined();
     expect(writerReport!.type).toBe("agent");
   });
@@ -139,7 +137,7 @@ describe("unified report tree — cross-primitive recursion", () => {
     const sup = supervisor({
       name: "team",
       intents: { writer, reviewer },
-      route: ctx => {
+      route: (ctx) => {
         if (ctx.iteration === 0) return "writer";
         if (ctx.iteration === 1) return "reviewer";
         return END;
@@ -152,7 +150,7 @@ describe("unified report tree — cross-primitive recursion", () => {
     expect(usage).toEqual(report.usage);
 
     // Rollup invariant: parent.usage == sum(children.usage).
-    const expected = sumUsage(...report.children.map(c => c.usage));
+    const expected = sumUsage(...report.children.map((c) => c.usage));
     expect(report.usage).toEqual(expected);
   });
 
@@ -166,7 +164,7 @@ describe("unified report tree — cross-primitive recursion", () => {
     const innerSup = supervisor({
       name: "inner-sup",
       intents: { writer },
-      route: ctx => (ctx.iteration === 0 ? "writer" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "writer" : END),
     });
     const supTool = innerSup.asTool({
       name: "inner",
@@ -198,7 +196,7 @@ describe("unified report tree — cross-primitive recursion", () => {
     // throughout the tool wrapper → supervisor → writer chain.
     function walkTools(node: BaseReport): void {
       if (node.type === "tool") {
-        const childSum = sumUsage(...node.children.map(c => c.usage));
+        const childSum = sumUsage(...node.children.map((c) => c.usage));
         expect(node.usage).toEqual(childSum);
       }
       node.children.forEach(walkTools);
@@ -209,8 +207,6 @@ describe("unified report tree — cross-primitive recursion", () => {
     // Structural assertions — three levels deep.
     expect(report.children[0].type).toBe("tool"); // tool dispatch
     expect(report.children[0].children[0].type).toBe("supervisor"); // inner sup
-    expect(
-      report.children[0].children[0].children.some(c => c.type === "agent"),
-    ).toBe(true);
+    expect(report.children[0].children[0].children.some((c) => c.type === "agent")).toBe(true);
   });
 });

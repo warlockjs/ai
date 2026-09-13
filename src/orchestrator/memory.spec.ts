@@ -41,9 +41,7 @@ type SeenState = {
  */
 function buildMemoryBot(
   checkpointStore: CheckpointStore,
-  memoryConfig: NonNullable<
-    Parameters<typeof ai.orchestrator>[0]
-  >["memory"],
+  memoryConfig: NonNullable<Parameters<typeof ai.orchestrator>[0]>["memory"],
   injectKey = "memories",
   answer = "the answer",
 ) {
@@ -91,9 +89,7 @@ describe("ai.orchestrator() — memory recall injection (M2)", () => {
 
     expect(result.error).toBeUndefined();
     expect(seen).toBeDefined();
-    expect(seen?.some((hit) => hit.text === "the user prefers metric units")).toBe(
-      true,
-    );
+    expect(seen?.some((hit) => hit.text === "the user prefers metric units")).toBe(true);
   });
 
   it("recalls a memory a PRIOR turn remembered, on a later turn", async () => {
@@ -119,9 +115,7 @@ describe("ai.orchestrator() — memory recall injection (M2)", () => {
     const seen = (second.report.turns[0]?.state as SeenState).seen ?? [];
 
     expect(seen.length).toBeGreaterThan(0);
-    expect(
-      seen.some((hit) => hit.text.includes("the launch is in March")),
-    ).toBe(true);
+    expect(seen.some((hit) => hit.text.includes("the launch is in March"))).toBe(true);
   });
 
   it("accepts the bare MemoryContract form and remembers the turn outcome", async () => {
@@ -138,9 +132,7 @@ describe("ai.orchestrator() — memory recall injection (M2)", () => {
       scope: sessionMemoryScope("s1"),
     });
 
-    expect(recalled.some((hit) => hit.text.includes("first turn input"))).toBe(
-      true,
-    );
+    expect(recalled.some((hit) => hit.text.includes("first turn input"))).toBe(true);
   });
 });
 
@@ -214,9 +206,7 @@ describe("ai.orchestrator() — memory config knobs (M2)", () => {
     const recalled = await mem.recall("the brand new query text", {
       scope: sessionMemoryScope("s1"),
     });
-    expect(
-      recalled.some((hit) => hit.text.includes("the brand new query text")),
-    ).toBe(false);
+    expect(recalled.some((hit) => hit.text.includes("the brand new query text"))).toBe(false);
   });
 });
 
@@ -308,9 +298,7 @@ describe("ai.orchestrator() — memory session isolation (security)", () => {
 
     const seen = (bTurn.report.turns[0]?.state as SeenState).seen ?? [];
 
-    expect(seen.some((hit) => hit.text.includes("the launch is in March"))).toBe(
-      true,
-    );
+    expect(seen.some((hit) => hit.text.includes("the launch is in March"))).toBe(true);
   });
 
   it("a scope callback isolates tenants while sharing within one tenant", async () => {
@@ -363,8 +351,6 @@ describe("ai.orchestrator() — without memory (unchanged)", () => {
     const result = await bot.execute("plain", { sessionId: "s1", history: [] });
 
     expect(result.error).toBeUndefined();
-    expect(
-      (result.report.turns[0]?.state as SeenState).rawInjectKey,
-    ).toBeUndefined();
+    expect((result.report.turns[0]?.state as SeenState).rawInjectKey).toBeUndefined();
   });
 });

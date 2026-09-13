@@ -128,7 +128,7 @@ describe("AgentCancelledError", () => {
     expect(error).toBeInstanceOf(AIError);
   });
 
-  it("declares category \"cancelled\" via static defaultCategory", () => {
+  it('declares category "cancelled" via static defaultCategory', () => {
     const error = new AgentCancelledError("aborted");
 
     expect(error.category).toBe("cancelled");
@@ -160,7 +160,7 @@ describe("AgentMaxTripsError", () => {
     expect(error).toBeInstanceOf(AIError);
   });
 
-  it("declares category \"max-trips\" via static defaultCategory", () => {
+  it('declares category "max-trips" via static defaultCategory', () => {
     const error = new AgentMaxTripsError("hit cap", { maxTrips: 10 });
 
     expect(error.category).toBe("max-trips");
@@ -250,9 +250,14 @@ describe("ProviderError + subclasses", () => {
 
     expect(error.code).toBe("PROVIDER_EMBEDDING_VECTOR_COUNT_MISMATCH");
     expect(error.message).toBe(
-      "Embedding provider \"short-provider\" returned 1 vectors for 2 records; record \"missing\" was left without a vector.",
+      'Embedding provider "short-provider" returned 1 vectors for 2 records; record "missing" was left without a vector.',
     );
-    expect(error).toMatchObject({ provider: "short-provider", expectedCount: 2, receivedCount: 1, record: "missing" });
+    expect(error).toMatchObject({
+      provider: "short-provider",
+      expectedCount: 2,
+      receivedCount: 1,
+      record: "missing",
+    });
     expect(error).toBeInstanceOf(ProviderError);
   });
 
@@ -387,11 +392,7 @@ describe("BudgetExceededError", () => {
   });
 
   it("accepts each supported unit", () => {
-    const units: Array<"tokens" | "usd" | "requests"> = [
-      "tokens",
-      "usd",
-      "requests",
-    ];
+    const units: Array<"tokens" | "usd" | "requests"> = ["tokens", "usd", "requests"];
 
     for (const unit of units) {
       const error = new BudgetExceededError("x", { limit: 1, actual: 2, unit });
@@ -417,7 +418,7 @@ describe("narrowing by code across the hierarchy", () => {
       new BudgetExceededError("k", { limit: 1, actual: 2, unit: "tokens" }),
     ];
 
-    const codes = errors.map(error => error.code);
+    const codes = errors.map((error) => error.code);
 
     expect(codes).toEqual([
       "AGENT_EXEC_FAILED",
@@ -638,7 +639,7 @@ describe("SupervisorFailedError + subclasses", () => {
 });
 
 describe("error category — static defaultCategory + AIError-only override", () => {
-  it("AIError base defaults to \"unknown\" when no override is supplied", () => {
+  it('AIError base defaults to "unknown" when no override is supplied', () => {
     const error = new AIError("PROVIDER_ERROR", "boom");
 
     expect(error.category).toBe("unknown");
@@ -667,21 +668,12 @@ describe("error category — static defaultCategory + AIError-only override", ()
       [new ContextLengthExceededError("x"), "context-length"],
       [new InvalidRequestError("x"), "validation"],
       [new QuotaExceededError("x"), "quota"],
-      [
-        new BudgetExceededError("x", { limit: 1, actual: 2, unit: "usd" }),
-        "budget",
-      ],
-      [
-        new GuardrailViolationError("x", { phase: "input", reason: "y" }),
-        "guardrail",
-      ],
+      [new BudgetExceededError("x", { limit: 1, actual: 2, unit: "usd" }), "budget"],
+      [new GuardrailViolationError("x", { phase: "input", reason: "y" }), "guardrail"],
       [new SchemaValidationError("x"), "schema"],
       [new ToolExecutionError("x", { toolName: "t" }), "tool"],
       [new RoutingError("x", { stepName: "s" }), "routing"],
-      [
-        new SupervisorRoutingError("x", { returned: null, availableKeys: [] }),
-        "routing",
-      ],
+      [new SupervisorRoutingError("x", { returned: null, availableKeys: [] }), "routing"],
       [new MaxIterationsError("x", { maxIterations: 1 }), "max-iterations"],
       [new MaxStepsExceededError("x", { maxSteps: 1 }), "max-steps"],
       [new WorkflowCancelledError("x", { cancelledAt: "t" }), "cancelled"],
@@ -709,15 +701,13 @@ describe("error category — static defaultCategory + AIError-only override", ()
     }
   });
 
-  it("base-class subclasses without their own defaultCategory inherit \"unknown\"", () => {
+  it('base-class subclasses without their own defaultCategory inherit "unknown"', () => {
     // Catch-all bases keep "unknown" — narrowing comes from picking
     // a specific subclass, not from runtime override.
     expect(new AgentExecutionError("x").category).toBe("unknown");
     expect(new WorkflowError("x").category).toBe("unknown");
     expect(new SupervisorFailedError("x").category).toBe("unknown");
-    expect(
-      new StepFailedError("x", { stepName: "s", attempts: 1 }).category,
-    ).toBe("unknown");
+    expect(new StepFailedError("x", { stepName: "s", attempts: 1 }).category).toBe("unknown");
   });
 
   it("subclass options do not carry a category field (it's structurally unreachable)", () => {

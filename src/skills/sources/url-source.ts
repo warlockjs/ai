@@ -1,9 +1,6 @@
 import { fetchTextWithPolicy } from "../../security/outbound-policy";
 import type { OutboundPolicy } from "../../security/outbound-policy.type";
-import type {
-  SkillCatalogEntry,
-  SkillRecord,
-} from "../contracts/skill-record.type";
+import type { SkillCatalogEntry, SkillRecord } from "../contracts/skill-record.type";
 import type { SkillsStoreContract } from "../contracts/skills-store.contract";
 
 /**
@@ -37,10 +34,7 @@ export type UrlSourceOptions = {
  * is cached for the source's lifetime, or for `cacheTtlMs` when set
  * (a stale cache refetches on next access).
  */
-export function urlSource(
-  url: string,
-  options: UrlSourceOptions = {},
-): SkillsStoreContract {
+export function urlSource(url: string, options: UrlSourceOptions = {}): SkillsStoreContract {
   const { headers, policy, cacheTtlMs } = options;
 
   let cache: Promise<Map<string, SkillRecord>> | undefined;
@@ -48,9 +42,7 @@ export function urlSource(
 
   const records = (): Promise<Map<string, SkillRecord>> => {
     const expired =
-      cacheTtlMs !== undefined &&
-      cachedAtMs !== undefined &&
-      Date.now() - cachedAtMs > cacheTtlMs;
+      cacheTtlMs !== undefined && cachedAtMs !== undefined && Date.now() - cachedAtMs > cacheTtlMs;
 
     if (!cache || expired) {
       cachedAtMs = Date.now();
@@ -66,8 +58,8 @@ export function urlSource(
       const wanted = scope?.tags;
 
       return [...all.values()]
-        .filter(record => record.type !== "candidate")
-        .filter(record => intersects(record.tags, wanted))
+        .filter((record) => record.type !== "candidate")
+        .filter((record) => intersects(record.tags, wanted))
         .map(toCatalogEntry);
     },
     async load(name: string, version?: number): Promise<SkillRecord | undefined> {
@@ -103,16 +95,10 @@ async function fetchManifest(
   headers: Record<string, string> | undefined,
   policy: OutboundPolicy | undefined,
 ): Promise<Map<string, SkillRecord>> {
-  const result = await fetchTextWithPolicy(
-    url,
-    policy ?? {},
-    headers ? { headers } : undefined,
-  );
+  const result = await fetchTextWithPolicy(url, policy ?? {}, headers ? { headers } : undefined);
 
   if (!result.ok) {
-    throw new Error(
-      `url skill source failed: ${result.status} ${result.statusText} for ${url}`,
-    );
+    throw new Error(`url skill source failed: ${result.status} ${result.statusText} for ${url}`);
   }
 
   let parsed: unknown;
@@ -125,9 +111,7 @@ async function fetchManifest(
   }
 
   if (!Array.isArray(parsed)) {
-    throw new Error(
-      `url skill source at ${url} must return a JSON array of skill records`,
-    );
+    throw new Error(`url skill source at ${url} must return a JSON array of skill records`);
   }
 
   const records = new Map<string, SkillRecord>();
@@ -147,11 +131,7 @@ async function fetchManifest(
  * record missing the required `name` / `description` / `body` strings, and
  * fills `version` / `type` defaults for a thin record.
  */
-function validateManifestRecord(
-  raw: unknown,
-  url: string,
-  index: number,
-): SkillRecord {
+function validateManifestRecord(raw: unknown, url: string, index: number): SkillRecord {
   if (!raw || typeof raw !== "object") {
     throw new Error(`url skill source at ${url}: record #${index} is not an object`);
   }
@@ -172,9 +152,7 @@ function validateManifestRecord(
   const body = requireString("body");
 
   const type =
-    r.type === "authored" || r.type === "promoted" || r.type === "candidate"
-      ? r.type
-      : "authored";
+    r.type === "authored" || r.type === "promoted" || r.type === "candidate" ? r.type : "authored";
   const version = typeof r.version === "number" ? r.version : 1;
   const tags = Array.isArray(r.tags)
     ? r.tags.filter((t): t is string => typeof t === "string")
@@ -208,5 +186,5 @@ function intersects(recordTags: string[] | undefined, wanted: string[] | undefin
     return false;
   }
 
-  return recordTags.some(tag => wanted.includes(tag));
+  return recordTags.some((tag) => wanted.includes(tag));
 }

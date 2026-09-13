@@ -12,11 +12,7 @@ import type { BaseResult } from "./result/base-result.type";
  * // A workflow implements ExecutableContract<WorkflowInput, WorkflowOptions, WorkflowResult>
  * const result = await workflow.execute({ topic: "AI trends" });
  */
-export interface ExecutableContract<
-  TInput,
-  TOptions,
-  TResult extends BaseResult,
-> {
+export interface ExecutableContract<TInput, TOptions, TResult extends BaseResult> {
   /**
    * Execute the primitive with the given input and options.
    * Returns a promise that resolves to the typed result.

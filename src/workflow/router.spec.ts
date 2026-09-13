@@ -7,7 +7,7 @@ import { mapNextStep, nextDeclaredStep } from "./router";
 function def(stepNames: string[]): WorkflowDefinition {
   return {
     name: "wf",
-    steps: stepNames.map(name => ({ name }) as StepDefinition),
+    steps: stepNames.map((name) => ({ name }) as StepDefinition),
   } as WorkflowDefinition;
 }
 

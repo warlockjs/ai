@@ -69,10 +69,7 @@ describe("dataset", () => {
   });
 
   it("should throw naming the line number on a malformed JSON line", () => {
-    const path = writeJsonl(
-      "bad.jsonl",
-      '{"name":"a","input":"1"}\n{"name":"b" "input":"2"}\n',
-    );
+    const path = writeJsonl("bad.jsonl", '{"name":"a","input":"1"}\n{"name":"b" "input":"2"}\n');
 
     expect(() => dataset({ name: "bad", fromFile: path })).toThrow(InvalidRequestError);
     expect(() => dataset({ name: "bad", fromFile: path })).toThrow(/line 2/);
@@ -85,9 +82,9 @@ describe("dataset", () => {
   });
 
   it("should throw a read error when the file does not exist", () => {
-    expect(() =>
-      dataset({ name: "missing", fromFile: join(dir, "does-not-exist.jsonl") }),
-    ).toThrow(InvalidRequestError);
+    expect(() => dataset({ name: "missing", fromFile: join(dir, "does-not-exist.jsonl") })).toThrow(
+      InvalidRequestError,
+    );
   });
 
   it("should filter to a new dataset without mutating the original", () => {
@@ -123,16 +120,8 @@ describe("dataset", () => {
       "case-6",
       "case-9",
     ]);
-    expect(shards[1].cases.map((entry) => entry.name)).toEqual([
-      "case-1",
-      "case-4",
-      "case-7",
-    ]);
-    expect(shards[2].cases.map((entry) => entry.name)).toEqual([
-      "case-2",
-      "case-5",
-      "case-8",
-    ]);
+    expect(shards[1].cases.map((entry) => entry.name)).toEqual(["case-1", "case-4", "case-7"]);
+    expect(shards[2].cases.map((entry) => entry.name)).toEqual(["case-2", "case-5", "case-8"]);
 
     const reunited = shards.flatMap((shard) => shard.cases.map((entry) => entry.name)).sort();
     expect(reunited).toHaveLength(10);

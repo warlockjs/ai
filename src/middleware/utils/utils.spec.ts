@@ -146,9 +146,7 @@ describe("extractUserText", () => {
     const messages: Message[] = [
       {
         role: "user",
-        content: [
-          { type: "image", source: { url: "https://example.com/a.png" } },
-        ],
+        content: [{ type: "image", source: { url: "https://example.com/a.png" } }],
       },
     ];
 

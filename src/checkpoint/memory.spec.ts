@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CheckpointRecord } from "../contracts/orchestrator/checkpoint-store.contract";
 import { memory } from "./memory";
 
-function makeRecord(
-  overrides: Partial<CheckpointRecord> = {},
-): CheckpointRecord {
+function makeRecord(overrides: Partial<CheckpointRecord> = {}): CheckpointRecord {
   return {
     orchestrator_name: "support",
     session_id: "sess-1",
@@ -68,12 +66,8 @@ describe("checkpoint memory store", () => {
   it("should isolate sessions by orchestrator name and session id", async () => {
     const store = memory();
 
-    await store.save(
-      makeRecord({ orchestrator_name: "support", session_id: "a" }),
-    );
-    await store.save(
-      makeRecord({ orchestrator_name: "billing", session_id: "a" }),
-    );
+    await store.save(makeRecord({ orchestrator_name: "support", session_id: "a" }));
+    await store.save(makeRecord({ orchestrator_name: "billing", session_id: "a" }));
 
     const supportSession = await store.load("support", "a");
     const billingSession = await store.load("billing", "a");
@@ -95,15 +89,9 @@ describe("checkpoint memory store", () => {
   it("should list session ids scoped to an orchestrator", async () => {
     const store = memory();
 
-    await store.save(
-      makeRecord({ orchestrator_name: "support", session_id: "a" }),
-    );
-    await store.save(
-      makeRecord({ orchestrator_name: "support", session_id: "b" }),
-    );
-    await store.save(
-      makeRecord({ orchestrator_name: "billing", session_id: "c" }),
-    );
+    await store.save(makeRecord({ orchestrator_name: "support", session_id: "a" }));
+    await store.save(makeRecord({ orchestrator_name: "support", session_id: "b" }));
+    await store.save(makeRecord({ orchestrator_name: "billing", session_id: "c" }));
 
     const supportSessions = await store.list?.("support");
 
@@ -113,15 +101,9 @@ describe("checkpoint memory store", () => {
   it("should filter listed sessions by prefix", async () => {
     const store = memory();
 
-    await store.save(
-      makeRecord({ orchestrator_name: "support", session_id: "user-1" }),
-    );
-    await store.save(
-      makeRecord({ orchestrator_name: "support", session_id: "user-2" }),
-    );
-    await store.save(
-      makeRecord({ orchestrator_name: "support", session_id: "guest-1" }),
-    );
+    await store.save(makeRecord({ orchestrator_name: "support", session_id: "user-1" }));
+    await store.save(makeRecord({ orchestrator_name: "support", session_id: "user-2" }));
+    await store.save(makeRecord({ orchestrator_name: "support", session_id: "guest-1" }));
 
     const userSessions = await store.list?.("support", "user-");
 
@@ -173,8 +155,6 @@ describe("checkpoint memory store", () => {
   it("should be a no-op when pruning an unknown session", async () => {
     const store = memory();
 
-    await expect(
-      store.prune?.("support", "never-seen", 3),
-    ).resolves.toBeUndefined();
+    await expect(store.prune?.("support", "never-seen", 3)).resolves.toBeUndefined();
   });
 });

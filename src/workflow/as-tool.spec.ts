@@ -14,18 +14,18 @@ describe("workflow.asTool()", () => {
       steps: [
         step({
           name: "respond",
-          run: ctx => {
+          run: (ctx) => {
             const topic = (ctx.input as { topic: string }).topic;
             ctx.state.answer = `re: ${topic}`;
           },
         }),
       ],
-      output: { extract: ctx => ({ answer: ctx.state.answer as string }) },
+      output: { extract: (ctx) => ({ answer: ctx.state.answer as string }) },
     });
 
     const wfTool = wf.asTool({
       description: "Bot that answers a topic",
-      inputSchema: schema<{ topic: string }>(raw => {
+      inputSchema: schema<{ topic: string }>((raw) => {
         if (raw && typeof raw === "object" && "topic" in raw) {
           return {
             value: { topic: String((raw as { topic: unknown }).topic) },
@@ -46,9 +46,7 @@ describe("workflow.asTool()", () => {
         {
           content: "",
           finishReason: "tool_calls",
-          toolCalls: [
-            { id: "c1", name: "answer-bot", input: { topic: "weather" } },
-          ],
+          toolCalls: [{ id: "c1", name: "answer-bot", input: { topic: "weather" } }],
         },
         { content: "done", finishReason: "stop" },
       ],
@@ -56,7 +54,7 @@ describe("workflow.asTool()", () => {
 
     const result = await a.execute("go");
     expect(result.error).toBeUndefined();
-    const toolCalls = result.report.children.filter(c => c.type === "tool");
+    const toolCalls = result.report.children.filter((c) => c.type === "tool");
     expect(toolCalls).toHaveLength(1);
     expect(toolCalls[0].name).toBe("answer-bot");
     expect((toolCalls[0] as { output?: unknown }).output).toEqual({
@@ -113,8 +111,6 @@ describe("workflow.asTool()", () => {
       asTool: () => ({}) as never,
     } as unknown as WorkflowInstance<unknown, unknown>;
 
-    expect(() => asTool(fakeWorkflow, { inputSchema: passthrough })).toThrow(
-      WorkflowError,
-    );
+    expect(() => asTool(fakeWorkflow, { inputSchema: passthrough })).toThrow(WorkflowError);
   });
 });

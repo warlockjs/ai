@@ -15,11 +15,7 @@ import type { Usage } from "../result/usage.type";
  *   caller decides whether to retry).
  * - `"failed"` — terminated with an error; resume after the fix.
  */
-export type AgentSnapshotStatus =
-  | "running"
-  | "completed"
-  | "cancelled"
-  | "failed";
+export type AgentSnapshotStatus = "running" | "completed" | "cancelled" | "failed";
 
 /**
  * Persisted shape written to the configured {@link

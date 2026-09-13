@@ -14,9 +14,7 @@ import type { SupervisorSnapshot } from "../contracts/supervisor/supervisor-snap
  *
  * Front it with the {@link memory} factory — callers never `new` it.
  */
-class MemorySnapshotStore<TSnapshot extends { runId: string }>
-  implements SnapshotStore<TSnapshot>
-{
+class MemorySnapshotStore<TSnapshot extends { runId: string }> implements SnapshotStore<TSnapshot> {
   /** Snapshots keyed by `runId`. */
   private readonly snapshots = new Map<string, TSnapshot>();
 

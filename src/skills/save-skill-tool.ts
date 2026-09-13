@@ -13,8 +13,7 @@ export type SaveSkillInput = {
 
 /** Result the `saveSkill` tool feeds back to the model. */
 export type SaveSkillResult =
-  | { saved: true; name: string; status: "candidate" }
-  | { error: string };
+  { saved: true; name: string; status: "candidate" } | { error: string };
 
 /**
  * Hand-built Standard Schema for the `saveSkill` input — dependency-free,
@@ -27,9 +26,12 @@ function saveSkillSchema(): StandardSchemaV1<SaveSkillInput> {
       version: 1,
       vendor: "warlock-ai-skills",
       validate: (value: unknown) => {
-        const candidate = value as
-          | { name?: unknown; description?: unknown; body?: unknown; tags?: unknown }
-          | null;
+        const candidate = value as {
+          name?: unknown;
+          description?: unknown;
+          body?: unknown;
+          tags?: unknown;
+        } | null;
 
         if (
           !candidate ||
@@ -87,7 +89,9 @@ export type SaveSkillToolDeps = {
  * `execute` never throws — a store write failure surfaces as an error
  * result so the run continues.
  */
-export function saveSkillTool(deps: SaveSkillToolDeps): ToolContract<SaveSkillInput, SaveSkillResult> {
+export function saveSkillTool(
+  deps: SaveSkillToolDeps,
+): ToolContract<SaveSkillInput, SaveSkillResult> {
   return tool<SaveSkillInput, SaveSkillResult>({
     name: "saveSkill",
     description:

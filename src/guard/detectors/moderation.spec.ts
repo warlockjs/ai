@@ -81,10 +81,7 @@ describe("moderation", () => {
   it("should block a flagged category listed in blockOn", async () => {
     const { client } = makeClient(violentResult);
 
-    const verdict = await moderation({ client, blockOn: ["violence"] }).check(
-      "bad text",
-      CTX,
-    );
+    const verdict = await moderation({ client, blockOn: ["violence"] }).check("bad text", CTX);
 
     expect(verdict.type).toBe("block");
 
@@ -99,10 +96,7 @@ describe("moderation", () => {
   it("should flag (not block) when the flagged category is outside blockOn", async () => {
     const { client } = makeClient(violentResult);
 
-    const verdict = await moderation({ client, blockOn: ["hate"] }).check(
-      "bad text",
-      CTX,
-    );
+    const verdict = await moderation({ client, blockOn: ["hate"] }).check("bad text", CTX);
 
     expect(verdict.type).toBe("flag");
   });
@@ -110,10 +104,7 @@ describe("moderation", () => {
   it("should send the configured model and input to the client", async () => {
     const { client, create } = makeClient(cleanResult);
 
-    await moderation({ client, model: "text-moderation-stable" }).check(
-      "inspect me",
-      CTX,
-    );
+    await moderation({ client, model: "text-moderation-stable" }).check("inspect me", CTX);
 
     expect(create).toHaveBeenCalledWith({
       model: "text-moderation-stable",

@@ -1,5 +1,2 @@
 export { extractUserText } from "./extract-user-text";
-export {
-  namespacedState,
-  type NamespacedStateAccessor,
-} from "./namespaced-state";
+export { namespacedState, type NamespacedStateAccessor } from "./namespaced-state";

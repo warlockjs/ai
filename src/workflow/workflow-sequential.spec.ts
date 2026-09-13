@@ -12,7 +12,7 @@ describe("ai.workflow — execute overloads", () => {
       steps: [
         step({
           name: "a",
-          run: ctx => {
+          run: (ctx) => {
             expect((ctx.input as { ticket: string }).ticket).toBe("hi");
           },
         }),
@@ -30,7 +30,7 @@ describe("ai.workflow — execute overloads", () => {
       steps: [
         step({
           name: "a",
-          run: ctx => {
+          run: (ctx) => {
             expect((ctx.input as { ticket: string }).ticket).toBe("hi");
           },
         }),
@@ -75,17 +75,17 @@ describe("ai.workflow — sequential engine (1.2)", () => {
       steps: [
         step({
           name: "one",
-          run: ctx => {
+          run: (ctx) => {
             seenInput = ctx.input;
             return "A";
           },
           output: {
-            extract: ctx => (ctx as any).agentResult ?? ctx.state.__last ?? "A",
+            extract: (ctx) => (ctx as any).agentResult ?? ctx.state.__last ?? "A",
           },
         }),
         step({
           name: "two",
-          run: ctx => {
+          run: (ctx) => {
             seenPriorOutput = ctx.steps.one?.output;
           },
         }),
@@ -104,13 +104,13 @@ describe("ai.workflow — sequential engine (1.2)", () => {
       steps: [
         step({
           name: "write",
-          run: ctx => {
+          run: (ctx) => {
             ctx.state.value = 42;
           },
         }),
         step({
           name: "read",
-          run: ctx => {
+          run: (ctx) => {
             expect(ctx.state.value).toBe(42);
           },
         }),
@@ -160,8 +160,8 @@ describe("ai.workflow — sequential engine (1.2)", () => {
           name: "call",
           agent: myAgent,
           input: () => ({ prompt: "go" }),
-          output: { extract: ctx => ctx.agentResult?.text },
-          after: ctx => {
+          output: { extract: (ctx) => ctx.agentResult?.text },
+          after: (ctx) => {
             seen = ctx.agentResult?.text;
           },
         }),
@@ -196,8 +196,8 @@ describe("ai.workflow — sequential engine (1.2)", () => {
     expect(result.error).toBeUndefined();
     expect(result.report.type).toBe("workflow");
     expect(result.report.children).toHaveLength(2);
-    expect(result.report.children.every(c => c.type === "agent")).toBe(true);
-    expect(result.report.children.map(c => c.name)).toEqual(["one", "two"]);
+    expect(result.report.children.every((c) => c.type === "agent")).toBe(true);
+    expect(result.report.children.map((c) => c.name)).toEqual(["one", "two"]);
   });
 
   it("schema validation failure in output surfaces as step error", async () => {
@@ -208,7 +208,7 @@ describe("ai.workflow — sequential engine (1.2)", () => {
           name: "one",
           run: () => ({ n: "not a number" }),
           output: {
-            extract: ctx => (ctx as any).agentResult ?? { n: "nope" },
+            extract: (ctx) => (ctx as any).agentResult ?? { n: "nope" },
             schema: numberSchema,
           },
         }),
@@ -219,17 +219,15 @@ describe("ai.workflow — sequential engine (1.2)", () => {
 
     expect(result.error).toBeInstanceOf(StepFailedError);
     expect(result.report.steps.one.status).toBe("failed");
-    expect((result.report.steps.one.error as any)?.cause?.code).toBe(
-      "SCHEMA_VALIDATION_FAILED",
-    );
+    expect((result.report.steps.one.error as any)?.cause?.code).toBe("SCHEMA_VALIDATION_FAILED");
   });
 
   it("workflow.output.extract + schema honored", async () => {
     const wf = workflow({
       name: "out",
-      steps: [step({ name: "one", run: ctx => (ctx.state.total = 7) })],
+      steps: [step({ name: "one", run: (ctx) => (ctx.state.total = 7) })],
       output: {
-        extract: ctx => ({ n: ctx.state.total }),
+        extract: (ctx) => ({ n: ctx.state.total }),
         schema: numberSchema,
       },
     });

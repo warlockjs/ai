@@ -31,7 +31,11 @@ describe("proceduralSkillStore — skills ⇄ procedural-memory unification (Pha
     const driver = makeStore();
     const store = proceduralSkillStore({ embedder: new FakeEmbedder(), store: driver });
 
-    await store.saveCandidate({ name: "deploy", description: "Deploy the app", body: "deploy steps" });
+    await store.saveCandidate({
+      name: "deploy",
+      description: "Deploy the app",
+      body: "deploy steps",
+    });
 
     const promoted = await store.promote("deploy");
 
@@ -42,7 +46,12 @@ describe("proceduralSkillStore — skills ⇄ procedural-memory unification (Pha
     expect(list.map((entry) => entry.name)).toEqual(["deploy"]);
 
     const record = await store.load("deploy");
-    expect(record).toMatchObject({ name: "deploy", version: 1, type: "promoted", body: "deploy steps" });
+    expect(record).toMatchObject({
+      name: "deploy",
+      version: 1,
+      type: "promoted",
+      body: "deploy steps",
+    });
 
     // Reinforcement: re-remembering the same id again (a second promote)
     // bumps the version monotonically and keeps the entry.
@@ -59,9 +68,19 @@ describe("proceduralSkillStore — skills ⇄ procedural-memory unification (Pha
   it("filters listed promoted skills by intersecting scope tags", async () => {
     const store = proceduralSkillStore({ embedder: new FakeEmbedder(), store: makeStore() });
 
-    await store.saveCandidate({ name: "fe", description: "Frontend", body: "fe", tags: ["frontend"] });
+    await store.saveCandidate({
+      name: "fe",
+      description: "Frontend",
+      body: "fe",
+      tags: ["frontend"],
+    });
     await store.promote("fe");
-    await store.saveCandidate({ name: "be", description: "Backend", body: "be", tags: ["backend"] });
+    await store.saveCandidate({
+      name: "be",
+      description: "Backend",
+      body: "be",
+      tags: ["backend"],
+    });
     await store.promote("be");
 
     const filtered = await store.list({ tags: ["frontend"] });

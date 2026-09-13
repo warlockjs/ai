@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Message } from "../contracts/conversation-message.type";
-import type {
-  ModelContract,
-  ModelResponse,
-  ModelStreamChunk,
-} from "../contracts/model.contract";
+import type { ModelContract, ModelResponse, ModelStreamChunk } from "../contracts/model.contract";
 import { AIError } from "../errors/ai-error";
 import { InvalidRequestError } from "../errors/invalid-request-error";
 import { ProviderAuthError } from "../errors/provider-auth-error";
@@ -27,9 +23,7 @@ function okModel(name: string, content = "ok"): MockModel {
 }
 
 /** Drain an async iterable of stream chunks into an array. */
-async function collect(
-  stream: AsyncIterable<ModelStreamChunk>,
-): Promise<ModelStreamChunk[]> {
+async function collect(stream: AsyncIterable<ModelStreamChunk>): Promise<ModelStreamChunk[]> {
   const chunks: ModelStreamChunk[] = [];
 
   for await (const chunk of stream) {
@@ -81,10 +75,7 @@ describe("fallbackModel.complete — happy path", () => {
 
 describe("fallbackModel.complete — fall-over on transient errors", () => {
   it("advances on a rate-limit error and returns the backup's response", async () => {
-    const primary = failingModel(
-      "primary",
-      new ProviderRateLimitError("429"),
-    );
+    const primary = failingModel("primary", new ProviderRateLimitError("429"));
     const backup = okModel("backup", "recovered");
 
     const model = fallbackModel([primary, backup]);
@@ -99,9 +90,7 @@ describe("fallbackModel.complete — fall-over on transient errors", () => {
     const primary = failingModel("primary", new ProviderTimeoutError("slow"));
     const backup = okModel("backup", "recovered");
 
-    const response = await fallbackModel([primary, backup]).complete(
-      userMessage,
-    );
+    const response = await fallbackModel([primary, backup]).complete(userMessage);
 
     expect(response.content).toBe("recovered");
   });
@@ -110,9 +99,7 @@ describe("fallbackModel.complete — fall-over on transient errors", () => {
     const primary = failingModel("primary", new ProviderError("502 bad gateway"));
     const backup = okModel("backup", "recovered");
 
-    const response = await fallbackModel([primary, backup]).complete(
-      userMessage,
-    );
+    const response = await fallbackModel([primary, backup]).complete(userMessage);
 
     expect(response.content).toBe("recovered");
   });
@@ -139,22 +126,17 @@ describe("fallbackModel.complete — non-retryable errors propagate", () => {
 
     const model = fallbackModel([primary, backup]);
 
-    await expect(model.complete(userMessage)).rejects.toBeInstanceOf(
-      ProviderAuthError,
-    );
+    await expect(model.complete(userMessage)).rejects.toBeInstanceOf(ProviderAuthError);
     expect(backup.callCount).toBe(0);
   });
 
   it("re-throws an invalid-request error without trying the backup", async () => {
-    const primary = failingModel(
-      "primary",
-      new InvalidRequestError("bad model"),
-    );
+    const primary = failingModel("primary", new InvalidRequestError("bad model"));
     const backup = okModel("backup");
 
-    await expect(
-      fallbackModel([primary, backup]).complete(userMessage),
-    ).rejects.toBeInstanceOf(InvalidRequestError);
+    await expect(fallbackModel([primary, backup]).complete(userMessage)).rejects.toBeInstanceOf(
+      InvalidRequestError,
+    );
     expect(backup.callCount).toBe(0);
   });
 });
@@ -173,10 +155,7 @@ describe("fallbackModel.complete — chain exhausted", () => {
 
 describe("fallbackModel — custom retryOn", () => {
   it("accepts an explicit allow-list of error codes", async () => {
-    const primary = failingModel(
-      "primary",
-      new ProviderAuthError("normally not retried"),
-    );
+    const primary = failingModel("primary", new ProviderAuthError("normally not retried"));
     const backup = okModel("backup", "recovered");
 
     const model = fallbackModel([primary, backup], {
@@ -188,27 +167,19 @@ describe("fallbackModel — custom retryOn", () => {
   });
 
   it("does NOT fall over on a code outside the allow-list", async () => {
-    const primary = failingModel(
-      "primary",
-      new ProviderRateLimitError("429"),
-    );
+    const primary = failingModel("primary", new ProviderRateLimitError("429"));
     const backup = okModel("backup");
 
     const model = fallbackModel([primary, backup], {
       retryOn: ["PROVIDER_TIMEOUT"],
     });
 
-    await expect(model.complete(userMessage)).rejects.toBeInstanceOf(
-      ProviderRateLimitError,
-    );
+    await expect(model.complete(userMessage)).rejects.toBeInstanceOf(ProviderRateLimitError);
     expect(backup.callCount).toBe(0);
   });
 
   it("accepts a predicate function", async () => {
-    const primary = failingModel(
-      "primary",
-      new InvalidRequestError("treat as retryable"),
-    );
+    const primary = failingModel("primary", new InvalidRequestError("treat as retryable"));
     const backup = okModel("backup", "recovered");
 
     const model = fallbackModel([primary, backup], {
@@ -223,9 +194,9 @@ describe("fallbackModel — custom retryOn", () => {
     const primary = failingModel("primary", new Error("plain error"));
     const backup = okModel("backup");
 
-    await expect(
-      fallbackModel([primary, backup]).complete(userMessage),
-    ).rejects.toThrowError("plain error");
+    await expect(fallbackModel([primary, backup]).complete(userMessage)).rejects.toThrowError(
+      "plain error",
+    );
     expect(backup.callCount).toBe(0);
   });
 });
@@ -241,9 +212,7 @@ describe("fallbackModel — usage aggregation", () => {
       },
     ]);
 
-    const response = await fallbackModel([primary, backup]).complete(
-      userMessage,
-    );
+    const response = await fallbackModel([primary, backup]).complete(userMessage);
 
     expect(response.usage.input).toBe(100);
     expect(response.usage.output).toBe(50);
@@ -277,10 +246,7 @@ describe("fallbackModel — lastAttempts", () => {
     const model = fallbackModel([first, second, third]);
     await model.complete(userMessage);
 
-    expect(model.lastAttempts.map((attempt) => attempt.modelName)).toEqual([
-      "first",
-      "second",
-    ]);
+    expect(model.lastAttempts.map((attempt) => attempt.modelName)).toEqual(["first", "second"]);
   });
 
   it("is empty when the primary model succeeds", async () => {
@@ -327,15 +293,13 @@ describe("fallbackModel.stream — fall-over", () => {
     ]);
 
     const chunks = await collect(
-      fallbackModel([
-        failingModel("primary", new ProviderTimeoutError("t")),
-        backup,
-      ]).stream(userMessage),
+      fallbackModel([failingModel("primary", new ProviderTimeoutError("t")), backup]).stream(
+        userMessage,
+      ),
     );
 
     const done = chunks.find(
-      (chunk): chunk is Extract<ModelStreamChunk, { type: "done" }> =>
-        chunk.type === "done",
+      (chunk): chunk is Extract<ModelStreamChunk, { type: "done" }> => chunk.type === "done",
     );
 
     expect(done?.usage.total).toBe(10);

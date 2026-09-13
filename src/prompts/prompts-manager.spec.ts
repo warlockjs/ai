@@ -69,16 +69,12 @@ describe("prompts() registry — registration", () => {
   it("throws when registering a prompt without a name", () => {
     const registry = prompts();
 
-    expect(() => registry.register(systemPrompt("anon"))).toThrow(
-      InvalidRequestError,
-    );
+    expect(() => registry.register(systemPrompt("anon"))).toThrow(InvalidRequestError);
   });
 
   it("honors an explicit version label", () => {
     const registry = prompts();
-    registry.register(
-      systemPrompt("body", { name: "agent", version: "2024-draft" }),
-    );
+    registry.register(systemPrompt("body", { name: "agent", version: "2024-draft" }));
 
     expect(registry.versions("agent")).toEqual(["2024-draft"]);
     expect(registry.resolve("agent", "2024-draft")).toBe("body");
@@ -116,9 +112,9 @@ describe("prompts() registry — duplicates + idempotency", () => {
 
     registry.register(first.meta({ name, version: "1" }));
 
-    expect(() =>
-      registry.register(second.meta({ name, version: "1" })),
-    ).toThrow(InvalidRequestError);
+    expect(() => registry.register(second.meta({ name, version: "1" }))).toThrow(
+      InvalidRequestError,
+    );
   });
 
   it("is idempotent — re-registering identical content under the same key is a no-op", () => {
@@ -135,9 +131,7 @@ describe("prompts() registry — duplicates + idempotency", () => {
   it("treats meta-only differences as idempotent (content signature ignores meta)", () => {
     const registry = prompts();
     const name = uniqueName("metaonly");
-    registry.register(
-      systemPrompt("same").meta({ name, version: "1", description: "a" }),
-    );
+    registry.register(systemPrompt("same").meta({ name, version: "1", description: "a" }));
 
     const sameBodyOtherMeta = systemPrompt("same").meta({
       name,
@@ -168,13 +162,9 @@ describe("prompts() registry — resolution", () => {
 
   it("resolve() renders placeholders", () => {
     const registry = prompts();
-    registry.register(
-      systemPrompt("Reply in {{language|English}}.", { name: "lang" }),
-    );
+    registry.register(systemPrompt("Reply in {{language|English}}.", { name: "lang" }));
 
-    expect(registry.resolve("lang", undefined, { language: "Arabic" })).toBe(
-      "Reply in Arabic.",
-    );
+    expect(registry.resolve("lang", undefined, { language: "Arabic" })).toBe("Reply in Arabic.");
   });
 
   it("get() throws InvalidRequestError on an unknown name", () => {
@@ -266,9 +256,7 @@ describe("systemPrompt fork purity (anonymous derivations)", () => {
     const registry = prompts();
     registry.register(systemPrompt("Base body.", { name: "base" }));
 
-    const renamed = systemPrompt("Base body.")
-      .instruction("Variant.")
-      .meta({ name: "variant" });
+    const renamed = systemPrompt("Base body.").instruction("Variant.").meta({ name: "variant" });
     registry.register(renamed);
 
     expect(registry.resolve("base")).toBe("Base body.");
@@ -280,18 +268,12 @@ describe("systemPrompt fork purity (anonymous derivations)", () => {
 
 describe("systemPrompt.merge — by contract", () => {
   it("folds another prompt's blocks (persona replaces, instructions append)", () => {
-    const base = systemPrompt()
-      .persona("Base persona.")
-      .instruction("Base rule.");
-    const overlay = systemPrompt()
-      .persona("Overlay persona.")
-      .instruction("Overlay rule.");
+    const base = systemPrompt().persona("Base persona.").instruction("Base rule.");
+    const overlay = systemPrompt().persona("Overlay persona.").instruction("Overlay rule.");
 
     const merged = base.merge(overlay);
 
-    expect(merged.resolve()).toBe(
-      "Overlay persona.\n\nBase rule.\n\nOverlay rule.",
-    );
+    expect(merged.resolve()).toBe("Overlay persona.\n\nBase rule.\n\nOverlay rule.");
   });
 
   it("records deterministic composedFrom provenance from named sources", () => {
@@ -305,10 +287,7 @@ describe("systemPrompt.merge — by contract", () => {
 
     const merged = base.merge(overlay);
 
-    expect(merged.meta()?.composedFrom).toEqual([
-      `${baseName}@2`,
-      `${overlayName}@1`,
-    ]);
+    expect(merged.meta()?.composedFrom).toEqual([`${baseName}@2`, `${overlayName}@1`]);
   });
 
   // Generous timeout for the one-time cold `../ai` facade transform (see the
@@ -336,9 +315,7 @@ describe("systemPrompt.merge — by contract", () => {
       instruction("Cite sources."),
     );
 
-    expect(merged.resolve()).toBe(
-      "You are Alex.\n\nBe concise.\n\nCite sources.",
-    );
+    expect(merged.resolve()).toBe("You are Alex.\n\nBe concise.\n\nCite sources.");
   });
 });
 
@@ -382,8 +359,6 @@ describe("systemPrompt.merge — by registry name", () => {
   });
 
   it("throws InvalidRequestError when the name is not registered", () => {
-    expect(() => systemPrompt().merge("does-not-exist-xyz")).toThrow(
-      InvalidRequestError,
-    );
+    expect(() => systemPrompt().merge("does-not-exist-xyz")).toThrow(InvalidRequestError);
   });
 });

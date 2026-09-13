@@ -13,10 +13,8 @@ const stringSchema: StandardSchemaV1<string> = {
   "~standard": {
     version: 1,
     vendor: "test",
-    validate: value =>
-      typeof value === "string"
-        ? { value }
-        : { issues: [{ message: "expected string" }] },
+    validate: (value) =>
+      typeof value === "string" ? { value } : { issues: [{ message: "expected string" }] },
   },
 };
 
@@ -291,7 +289,7 @@ describe("tool()", () => {
         name: "single",
         description: "single-issue tool",
         input: singleIssueSchema,
-        execute: async v => v,
+        execute: async (v) => v,
       });
 
       const result = await wrapped.invoke(123);
@@ -312,9 +310,7 @@ describe("tool()", () => {
 
       expect(result.error).toBeInstanceOf(SchemaValidationError);
       expect(result.error?.message).toContain("schema exploded");
-      expect(
-        (result.error as unknown as { cause: unknown }).cause,
-      ).toBeInstanceOf(Error);
+      expect((result.error as unknown as { cause: unknown }).cause).toBeInstanceOf(Error);
     });
   });
 

@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  pgVectorStore,
-  vectorLiteral,
-  type PgClientLike,
-} from "./pg-vector-store";
+import { pgVectorStore, vectorLiteral, type PgClientLike } from "./pg-vector-store";
 
 // Simulate `pg` NOT being installed: a dynamic `import("pg")` rejects, so
 // the store's lazy loader must surface the curated install string — never
@@ -71,10 +67,7 @@ class FakePgClient implements PgClientLike {
 
   public calls: { text: string; params: unknown[] }[] = [];
 
-  public async query(
-    text: string,
-    params: unknown[] = [],
-  ): Promise<{ rows: unknown[] }> {
+  public async query(text: string, params: unknown[] = []): Promise<{ rows: unknown[] }> {
     this.calls.push({ text, params });
     const sql = text.replace(/\s+/g, " ").trim();
 
@@ -94,12 +87,7 @@ class FakePgClient implements PgClientLike {
   }
 
   private handleUpsert(params: unknown[]): { rows: unknown[] } {
-    const [key, value, embedding, tags] = params as [
-      string,
-      string,
-      string,
-      string[],
-    ];
+    const [key, value, embedding, tags] = params as [string, string, string, string[]];
 
     const existing = this.rows.find((row) => row.key === key);
 
@@ -145,9 +133,7 @@ class FakePgClient implements PgClientLike {
     }
 
     if (tagsFilter !== undefined) {
-      matched = matched.filter((entry) =>
-        entry.row.tags.some((tag) => tagsFilter!.includes(tag)),
-      );
+      matched = matched.filter((entry) => entry.row.tags.some((tag) => tagsFilter!.includes(tag)));
     }
 
     matched.sort((left, right) => left.distance - right.distance);
@@ -172,9 +158,7 @@ class FakePgClient implements PgClientLike {
       .replace(/\\%/g, "%")
       .replace(/\\\\/g, "\\");
 
-    this.rows = this.rows.filter(
-      (row) => row.key !== exact && !row.key.startsWith(prefix),
-    );
+    this.rows = this.rows.filter((row) => row.key !== exact && !row.key.startsWith(prefix));
 
     return { rows: [] };
   }
@@ -199,9 +183,7 @@ describe("pgVectorStore construction", () => {
   });
 
   it("rejects a client missing query()", () => {
-    expect(() =>
-      pgVectorStore({ client: {} as unknown as PgClientLike }),
-    ).toThrow(/client/);
+    expect(() => pgVectorStore({ client: {} as unknown as PgClientLike })).toThrow(/client/);
   });
 
   it("rejects an unsafe table name", () => {
@@ -220,9 +202,7 @@ describe("pgVectorStore.ensureSchema", () => {
     const ddl = store.ensureSchema();
 
     expect(ddl).toContain("CREATE EXTENSION IF NOT EXISTS vector;");
-    expect(ddl).toContain(
-      "CREATE TABLE IF NOT EXISTS warlock_ai_rag_vectors",
-    );
+    expect(ddl).toContain("CREATE TABLE IF NOT EXISTS warlock_ai_rag_vectors");
     expect(ddl).toContain("key        TEXT PRIMARY KEY");
     expect(ddl).toContain("value      JSONB NOT NULL");
     expect(ddl).toContain("embedding  vector(1536) NOT NULL");
@@ -248,9 +228,7 @@ describe("pgVectorStore.ensureSchema", () => {
     const ddl = store.ensureSchema();
 
     expect(ddl).toContain("CREATE TABLE IF NOT EXISTS custom_vectors");
-    expect(ddl).toContain(
-      "USING ivfflat (embedding vector_cosine_ops)",
-    );
+    expect(ddl).toContain("USING ivfflat (embedding vector_cosine_ops)");
     expect(ddl).toContain("WITH (lists = 200)");
   });
 
@@ -272,9 +250,7 @@ describe("pgVectorStore.upsert", () => {
 
     await store.upsert("ns.a", { text: "alpha" }, [1, 0, 0], ["docs"]);
 
-    const insert = client.calls.find((call) =>
-      call.text.includes("INSERT INTO"),
-    );
+    const insert = client.calls.find((call) => call.text.includes("INSERT INTO"));
 
     expect(insert).toBeDefined();
     expect(insert!.text).toContain("ON CONFLICT (key) DO UPDATE");
@@ -336,9 +312,7 @@ describe("pgVectorStore.query", () => {
 
     const hits = await store.query<{ text: string }>([1, 0, 0], { topK: 2 });
 
-    const select = client.calls.find((call) =>
-      call.text.includes("SELECT key, value"),
-    );
+    const select = client.calls.find((call) => call.text.includes("SELECT key, value"));
 
     expect(select!.text).toContain("LIMIT $2");
     expect(select!.params[1]).toBe(2);
@@ -357,9 +331,7 @@ describe("pgVectorStore.query", () => {
       threshold: 0.9,
     });
 
-    const select = client.calls.find((call) =>
-      call.text.includes("SELECT key, value"),
-    );
+    const select = client.calls.find((call) => call.text.includes("SELECT key, value"));
 
     // similarity >= 0.9  ⇔  distance <= 0.1
     expect(select!.text).toContain("(embedding <=> $1::vector) <= $3");
@@ -380,9 +352,7 @@ describe("pgVectorStore.query", () => {
       tags: ["docs"],
     });
 
-    const select = client.calls.find((call) =>
-      call.text.includes("SELECT key, value"),
-    );
+    const select = client.calls.find((call) => call.text.includes("SELECT key, value"));
 
     expect(select!.text).toContain("tags && $3::text[]");
     expect(select!.params[2]).toEqual(["docs"]);
@@ -401,9 +371,7 @@ describe("pgVectorStore.query", () => {
       tags: ["docs"],
     });
 
-    const select = client.calls.find((call) =>
-      call.text.includes("SELECT key, value"),
-    );
+    const select = client.calls.find((call) => call.text.includes("SELECT key, value"));
 
     expect(select!.text).toContain("(embedding <=> $1::vector) <= $3");
     expect(select!.text).toContain("tags && $4::text[]");
@@ -418,9 +386,7 @@ describe("pgVectorStore.query", () => {
     await store.upsert("ns.a", { text: "alpha" }, [1, 0, 0]);
     await store.query<{ text: string }>([1, 0, 0], { topK: 5 });
 
-    const select = client.calls.find((call) =>
-      call.text.includes("SELECT key, value"),
-    );
+    const select = client.calls.find((call) => call.text.includes("SELECT key, value"));
 
     expect(select!.text).not.toContain("WHERE");
   });
@@ -505,8 +471,6 @@ describe("pgVectorStore lazy pg import", () => {
     // first operation that needs the client.
     const store = pgVectorStore({ connectionString: "postgres://localhost/db" });
 
-    await expect(
-      store.upsert("k", {}, [1, 0, 0]),
-    ).rejects.toThrow(/requires the pg package/);
+    await expect(store.upsert("k", {}, [1, 0, 0])).rejects.toThrow(/requires the pg package/);
   });
 });

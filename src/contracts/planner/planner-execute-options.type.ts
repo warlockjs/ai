@@ -16,9 +16,7 @@ import type { PlannerStepSnapshot } from "./planner-result.type";
  *   `replan` directive with no `replan` config is treated as `continue`.
  */
 export type PlannerStepDirective =
-  | { type: "continue" }
-  | { type: "abort" }
-  | { type: "replan"; feedback: string };
+  { type: "continue" } | { type: "abort" } | { type: "replan"; feedback: string };
 
 /**
  * Options accepted by `planner.execute(goal, options?)`.

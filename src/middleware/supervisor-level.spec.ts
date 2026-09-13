@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  AgentMiddleware,
-  MiddlewareSupervisorContext,
-} from "../contracts/middleware";
+import type { AgentMiddleware, MiddlewareSupervisorContext } from "../contracts/middleware";
 import { AIError } from "../errors";
 import { runPipeline } from "./pipeline";
 
@@ -44,12 +41,7 @@ describe("runPipeline — supervisor level", () => {
       },
     });
 
-    const result = await runPipeline(
-      [middleware],
-      "supervisor",
-      context,
-      async () => "core",
-    );
+    const result = await runPipeline([middleware], "supervisor", context, async () => "core");
 
     expect(result).toBe("core");
     expect(order).toEqual(["before", "after(core)"]);
@@ -82,14 +74,9 @@ describe("runPipeline — supervisor level", () => {
       },
     });
 
-    const result = await runPipeline(
-      [middleware],
-      "supervisor",
-      context,
-      async () => {
-        throw new AIError("SUPERVISOR_FAILED", "boom");
-      },
-    );
+    const result = await runPipeline([middleware], "supervisor", context, async () => {
+      throw new AIError("SUPERVISOR_FAILED", "boom");
+    });
 
     expect(result).toBe("recovered");
   });

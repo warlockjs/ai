@@ -1,4 +1,7 @@
-import type { EvaluateContext, EvaluateResult } from "../contracts/supervisor/evaluate-context.type";
+import type {
+  EvaluateContext,
+  EvaluateResult,
+} from "../contracts/supervisor/evaluate-context.type";
 
 /**
  * Build the `"quality"` gate — a review-then-fix `evaluate` callback.

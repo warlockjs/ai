@@ -74,7 +74,7 @@ describe("ai.workflow — failure halts + onFailure recovery", () => {
       name: "halt-checkpoint",
       snapshotStore: store,
       steps: [
-        step({ name: "a", run: ctx => (ctx.state.a = 1) }),
+        step({ name: "a", run: (ctx) => (ctx.state.a = 1) }),
         step({
           name: "b",
           run: () => {
@@ -404,7 +404,7 @@ describe("ai.workflow — ctx.startedAt", () => {
       steps: [
         step({
           name: "a",
-          run: ctx => {
+          run: (ctx) => {
             captured = ctx.startedAt;
           },
         }),
@@ -431,13 +431,13 @@ describe("ai.workflow — ctx.startedAt", () => {
         steps: [
           step({
             name: "a",
-            run: ctx => {
+            run: (ctx) => {
               if (firstStart === undefined) firstStart = ctx.startedAt;
             },
           }),
           step({
             name: "b",
-            run: ctx => {
+            run: (ctx) => {
               if (failOnce) {
                 failOnce = false;
                 throw new Error("transient");
@@ -453,7 +453,7 @@ describe("ai.workflow — ctx.startedAt", () => {
     await wf1.execute({ input: {}, runId: "sa-1" });
 
     // Wait long enough that "now" is measurably different from the original start.
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
 
     const wf2 = makeWf();
     await wf2.resume("sa-1");

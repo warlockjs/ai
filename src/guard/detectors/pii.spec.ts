@@ -16,7 +16,7 @@ describe("pii detector", () => {
       expect(verdict.type).toBe("flag");
 
       if (verdict.type === "flag") {
-        expect(verdict.matches.map(match => match.rule)).toContain("pii.ssn");
+        expect(verdict.matches.map((match) => match.rule)).toContain("pii.ssn");
       }
     });
 
@@ -29,7 +29,7 @@ describe("pii detector", () => {
       expect(verdict.type).toBe("flag");
 
       if (verdict.type === "flag") {
-        expect(verdict.matches.map(match => match.label)).toContain("email");
+        expect(verdict.matches.map((match) => match.label)).toContain("email");
       }
     });
 
@@ -42,7 +42,7 @@ describe("pii detector", () => {
       expect(verdict.type).toBe("flag");
 
       if (verdict.type === "flag") {
-        expect(verdict.matches.map(match => match.rule)).toContain("pii.phone");
+        expect(verdict.matches.map((match) => match.rule)).toContain("pii.phone");
       }
     });
 
@@ -55,7 +55,7 @@ describe("pii detector", () => {
       expect(verdict.type).toBe("flag");
 
       if (verdict.type === "flag") {
-        expect(verdict.matches.map(match => match.label)).toContain("credit-card");
+        expect(verdict.matches.map((match) => match.label)).toContain("credit-card");
       }
     });
 
@@ -68,15 +68,12 @@ describe("pii detector", () => {
       expect(verdict.type).toBe("flag");
 
       if (verdict.type === "flag") {
-        expect(verdict.matches.map(match => match.rule)).toContain("pii.ipv4");
+        expect(verdict.matches.map((match) => match.rule)).toContain("pii.ipv4");
       }
     });
 
     it("honours the detect allow-list (a category not requested does not match)", () => {
-      const verdict = pii({ detect: ["ssn"], onMatch: "flag" }).check(
-        "Email me at a@b.com.",
-        ctx,
-      );
+      const verdict = pii({ detect: ["ssn"], onMatch: "flag" }).check("Email me at a@b.com.", ctx);
 
       expect(verdict.type).toBe("allow");
     });
@@ -122,10 +119,7 @@ describe("pii detector", () => {
     });
 
     it("redacts multiple matches across categories in one pass", () => {
-      const verdict = pii({ mask: "[{label}]" }).check(
-        "a@b.com and 192.168.0.1 both leak",
-        ctx,
-      );
+      const verdict = pii({ mask: "[{label}]" }).check("a@b.com and 192.168.0.1 both leak", ctx);
 
       expect(verdict.type).toBe("redact");
 
@@ -138,10 +132,7 @@ describe("pii detector", () => {
     });
 
     it("uses a template without the {label} token verbatim", () => {
-      const verdict = pii({ detect: ["ssn"], mask: "***" }).check(
-        "id 123-45-6789",
-        ctx,
-      );
+      const verdict = pii({ detect: ["ssn"], mask: "***" }).check("id 123-45-6789", ctx);
 
       expect(verdict.type).toBe("redact");
 
@@ -153,10 +144,7 @@ describe("pii detector", () => {
 
   describe("no false positives on clean text", () => {
     it("allows ordinary prose", () => {
-      const verdict = pii().check(
-        "The quarterly report is due next Tuesday afternoon.",
-        ctx,
-      );
+      const verdict = pii().check("The quarterly report is due next Tuesday afternoon.", ctx);
 
       expect(verdict.type).toBe("allow");
     });
@@ -170,10 +158,7 @@ describe("pii detector", () => {
 
   describe("onMatch action", () => {
     it("blocks when onMatch is block", () => {
-      const verdict = pii({ detect: ["email"], onMatch: "block" }).check(
-        "reach a@b.com",
-        ctx,
-      );
+      const verdict = pii({ detect: ["email"], onMatch: "block" }).check("reach a@b.com", ctx);
 
       expect(verdict.type).toBe("block");
 

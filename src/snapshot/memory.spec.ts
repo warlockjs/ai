@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SupervisorSnapshot } from "../contracts/supervisor/supervisor-snapshot.type";
 import { memory } from "./memory";
 
-function makeSnapshot(
-  overrides: Partial<SupervisorSnapshot> = {},
-): SupervisorSnapshot {
+function makeSnapshot(overrides: Partial<SupervisorSnapshot> = {}): SupervisorSnapshot {
   return {
     runId: "sess-1.unversioned.0",
     supervisorName: "support",

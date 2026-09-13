@@ -223,7 +223,10 @@ function normalizeStep(raw: unknown): PlannerStep | undefined {
     step.reason = record.reason;
   }
 
-  if (Array.isArray(record.dependsOn) && record.dependsOn.every((entry) => typeof entry === "string")) {
+  if (
+    Array.isArray(record.dependsOn) &&
+    record.dependsOn.every((entry) => typeof entry === "string")
+  ) {
     step.dependsOn = record.dependsOn as string[];
   }
 

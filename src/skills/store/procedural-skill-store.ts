@@ -1,10 +1,7 @@
 import type { MemoryContract } from "../../contracts/memory/memory.contract";
 import type { ProceduralMemoryConfig } from "../../contracts/memory/memory-config.type";
 import { memory } from "../../memory";
-import type {
-  SkillCatalogEntry,
-  SkillRecord,
-} from "../contracts/skill-record.type";
+import type { SkillCatalogEntry, SkillRecord } from "../contracts/skill-record.type";
 import type { SkillsStoreContract } from "../contracts/skills-store.contract";
 
 /**

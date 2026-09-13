@@ -30,10 +30,7 @@ export class OrchestratorCancelledError extends OrchestratorFailedError {
   public readonly sessionId: string;
   public readonly reason?: string;
 
-  public constructor(
-    message: string,
-    options: OrchestratorCancelledErrorOptions,
-  ) {
+  public constructor(message: string, options: OrchestratorCancelledErrorOptions) {
     super(message, options, "ORCHESTRATOR_CANCELLED");
     this.name = "OrchestratorCancelledError";
     this.cancelledAt = options.cancelledAt;

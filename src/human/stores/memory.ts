@@ -1,7 +1,4 @@
-import type {
-  InterruptStore,
-  PendingInterrupt,
-} from "../contracts/interrupt-store.contract";
+import type { InterruptStore, PendingInterrupt } from "../contracts/interrupt-store.contract";
 
 /**
  * In-memory {@link InterruptStore} — pending interrupts held in a
@@ -35,9 +32,7 @@ class MemoryInterruptStore implements InterruptStore {
    * Return the interrupt for an `interruptId`, or `undefined` when none is
    * recorded (never raised, or already resolved + deleted).
    */
-  public async load(
-    interruptId: string,
-  ): Promise<PendingInterrupt | undefined> {
+  public async load(interruptId: string): Promise<PendingInterrupt | undefined> {
     return this.interrupts.get(interruptId);
   }
 

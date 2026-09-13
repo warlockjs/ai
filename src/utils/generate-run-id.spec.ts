@@ -51,9 +51,7 @@ describe("generateRunId", () => {
   });
 
   it("accepts an arbitrary prefix verbatim (never parsed)", () => {
-    expect(generateRunId("custom-prefix").startsWith("custom-prefix_")).toBe(
-      true,
-    );
+    expect(generateRunId("custom-prefix").startsWith("custom-prefix_")).toBe(true);
     expect(generateRunId("").startsWith("_")).toBe(true);
   });
 });

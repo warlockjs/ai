@@ -6,8 +6,4 @@
  * - `void` / `undefined` — fall through (next declared step, or next
  *   level of routing resolution)
  */
-export type NextStepResult =
-  | { goto: string }
-  | { end: true }
-  | void
-  | undefined;
+export type NextStepResult = { goto: string } | { end: true } | void | undefined;

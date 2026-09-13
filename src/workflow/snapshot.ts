@@ -51,9 +51,7 @@ export type PersistOutcome = { ok: true } | { ok: false; error: unknown };
  * No-op (returns `{ ok: true }`) when the workflow has no store
  * configured — the common in-memory test case.
  */
-export async function persistSnapshot<T>(
-  params: PersistParams<T>,
-): Promise<PersistOutcome> {
+export async function persistSnapshot<T>(params: PersistParams<T>): Promise<PersistOutcome> {
   const store = resolveSnapshotStore(params.definition);
 
   if (!store) return { ok: true };
@@ -109,14 +107,11 @@ export async function loadSnapshotForResume<T>(params: {
   }
 
   if (!params.options?.force && snap.signature !== params.signature) {
-    throw new WorkflowDriftError(
-      `workflow "${params.definition.name}" signature drift on resume`,
-      {
-        savedSignature: snap.signature,
-        currentSignature: params.signature,
-        runId: params.runId,
-      },
-    );
+    throw new WorkflowDriftError(`workflow "${params.definition.name}" signature drift on resume`, {
+      savedSignature: snap.signature,
+      currentSignature: params.signature,
+      runId: params.runId,
+    });
   }
 
   return snap;

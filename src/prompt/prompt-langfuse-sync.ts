@@ -1,8 +1,5 @@
 import type { PromptEntry, PromptLangfuseSyncOptions } from "./prompt.type";
-import type {
-  LangfuseClientLike,
-  LangfusePromptLike,
-} from "./prompt-langfuse-sync.type";
+import type { LangfuseClientLike, LangfusePromptLike } from "./prompt-langfuse-sync.type";
 
 // ============================================================
 // Lazily-loaded langfuse SDK (OPTIONAL peer)
@@ -56,9 +53,7 @@ function loadLangfuse(): Promise<void> {
  * otherwise a lazily-constructed client from credentials. Throws the curated
  * install error when the SDK is missing and no client was supplied.
  */
-async function resolveClient(
-  options: PromptLangfuseSyncOptions,
-): Promise<LangfuseClientLike> {
+async function resolveClient(options: PromptLangfuseSyncOptions): Promise<LangfuseClientLike> {
   if (options.client) {
     return options.client;
   }

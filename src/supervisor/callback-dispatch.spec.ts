@@ -16,9 +16,9 @@ describe("ai.supervisor — callback intent dispatch (stage 3b)", () => {
 
     const sup = supervisor({
       name: "callback-route",
-      route: ctx => (ctx.iteration === 0 ? "refund" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "refund" : END),
       intents: {
-        refund: async ctx => {
+        refund: async (ctx) => {
           callCount += 1;
           return { ok: true, intent: ctx.intent, iteration: ctx.iteration };
         },
@@ -38,9 +38,7 @@ describe("ai.supervisor — callback intent dispatch (stage 3b)", () => {
     });
     expect(branch?.usage).toEqual({ input: 0, output: 0, total: 0 });
 
-    const callbackReport = result.report.children.find(
-      child => child.type === "callback",
-    );
+    const callbackReport = result.report.children.find((child) => child.type === "callback");
     expect(callbackReport).toBeDefined();
     expect(callbackReport?.name).toBe("refund");
     expect(callbackReport?.status).toBe("completed");
@@ -81,7 +79,7 @@ describe("ai.supervisor — callback intent dispatch (stage 3b)", () => {
       router,
       intents: {
         refund: {
-          run: async ctx => ({ refunded: true, input: ctx.input }),
+          run: async (ctx) => ({ refunded: true, input: ctx.input }),
           description: "Process a refund via the billing API",
         },
       },
@@ -134,21 +132,17 @@ describe("ai.supervisor — callback intent dispatch (stage 3b)", () => {
 
     const branch = result.report.snapshots[0]?.result.refund;
     expect(branch?.error).toBeInstanceOf(SupervisorFailedError);
-    expect((branch?.error as SupervisorFailedError | undefined)?.cause).toBe(
-      original,
-    );
+    expect((branch?.error as SupervisorFailedError | undefined)?.cause).toBe(original);
     expect(branch?.error?.message).toMatch(/billing API exploded/);
 
-    const callbackReport = result.report.children.find(
-      child => child.type === "callback",
-    );
+    const callbackReport = result.report.children.find((child) => child.type === "callback");
     expect(callbackReport?.status).toBe("failed");
   });
 
   it("synthesizes a leaf report even when callback returns void", async () => {
     const sup = supervisor({
       name: "callback-void",
-      route: ctx => (ctx.iteration === 0 ? "noop" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "noop" : END),
       intents: {
         noop: async () => {
           /* returns undefined */
@@ -164,9 +158,7 @@ describe("ai.supervisor — callback intent dispatch (stage 3b)", () => {
     expect(branch?.output).toBeUndefined();
     expect(branch?.error).toBeUndefined();
 
-    const callbackReport = result.report.children.find(
-      child => child.type === "callback",
-    );
+    const callbackReport = result.report.children.find((child) => child.type === "callback");
     expect(callbackReport?.status).toBe("completed");
     expect(callbackReport?.duration).toBeGreaterThanOrEqual(0);
   });
@@ -232,9 +224,9 @@ describe("ai.supervisor — callback intent dispatch (stage 3b)", () => {
 
     const sup = supervisor({
       name: "ctx-shape",
-      route: ctx => (ctx.iteration < 2 ? "tick" : END),
+      route: (ctx) => (ctx.iteration < 2 ? "tick" : END),
       intents: {
-        tick: async ctx => {
+        tick: async (ctx) => {
           seen.push({
             iteration: ctx.iteration,
             intent: ctx.intent,
@@ -265,9 +257,9 @@ describe("ai.supervisor — ctx.intents.X.execute (Q5/Q6 — replaces ctx.dispat
 
     const sup = supervisor({
       name: "byname-agent",
-      route: ctx => (ctx.iteration === 0 ? "orchestrate" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "orchestrate" : END),
       intents: {
-        orchestrate: async ctx => {
+        orchestrate: async (ctx) => {
           const helperOutput = await ctx.intents.helper.execute();
           return { wrapped: helperOutput };
         },
@@ -279,7 +271,7 @@ describe("ai.supervisor — ctx.intents.X.execute (Q5/Q6 — replaces ctx.dispat
     expect(result.error).toBeUndefined();
 
     const callbackReport = result.report.children.find(
-      child => child.type === "callback" && child.name === "orchestrate",
+      (child) => child.type === "callback" && child.name === "orchestrate",
     );
 
     expect(callbackReport).toBeDefined();
@@ -288,14 +280,12 @@ describe("ai.supervisor — ctx.intents.X.execute (Q5/Q6 — replaces ctx.dispat
     expect(callbackReport?.children[0]?.name).toBe("helper");
 
     // Roll-up: callback's usage must equal the helper agent's usage.
-    expect(callbackReport?.usage.total).toBe(
-      callbackReport?.children[0]?.usage.total,
-    );
+    expect(callbackReport?.usage.total).toBe(callbackReport?.children[0]?.usage.total);
 
     // The dispatched agent's report must NOT also appear at the
     // top level — that would double-count usage.
     const helperAtTop = result.report.children.find(
-      child => child.type === "agent" && child.name === "helper",
+      (child) => child.type === "agent" && child.name === "helper",
     );
     expect(helperAtTop).toBeUndefined();
   });
@@ -303,9 +293,9 @@ describe("ai.supervisor — ctx.intents.X.execute (Q5/Q6 — replaces ctx.dispat
   it("dispatches a sibling callback and nests its report", async () => {
     const sup = supervisor({
       name: "byname-callback",
-      route: ctx => (ctx.iteration === 0 ? "outer" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "outer" : END),
       intents: {
-        outer: async ctx => {
+        outer: async (ctx) => {
           const inner = await ctx.intents.inner.execute();
           return { from: "outer", inner };
         },
@@ -317,7 +307,7 @@ describe("ai.supervisor — ctx.intents.X.execute (Q5/Q6 — replaces ctx.dispat
     expect(result.error).toBeUndefined();
 
     const outerReport = result.report.children.find(
-      child => child.type === "callback" && child.name === "outer",
+      (child) => child.type === "callback" && child.name === "outer",
     );
     expect(outerReport).toBeDefined();
     expect(outerReport?.children.length).toBe(1);
@@ -333,7 +323,7 @@ describe("ai.supervisor — ctx.intents.X.execute (Q5/Q6 — replaces ctx.dispat
       name: "self-cycle",
       route: () => "loop",
       intents: {
-        loop: async ctx => {
+        loop: async (ctx) => {
           await ctx.intents.loop.execute();
           return "unreachable";
         },
@@ -355,11 +345,11 @@ describe("ai.supervisor — ctx.intents.X.execute (Q5/Q6 — replaces ctx.dispat
       name: "indirect-cycle",
       route: () => "a",
       intents: {
-        a: async ctx => {
+        a: async (ctx) => {
           await ctx.intents.b.execute();
           return "a-done";
         },
-        b: async ctx => {
+        b: async (ctx) => {
           await ctx.intents.a.execute();
           return "b-done";
         },
@@ -394,11 +384,11 @@ describe("ai.supervisor — ctx.intents.X.execute (Q5/Q6 — replaces ctx.dispat
       router,
       intents: {
         left: {
-          run: async ctx => ctx.intents.shared.execute(),
+          run: async (ctx) => ctx.intents.shared.execute(),
           description: "Left-side branch — invokes shared via ctx.intents",
         },
         right: {
-          run: async ctx => ctx.intents.shared.execute(),
+          run: async (ctx) => ctx.intents.shared.execute(),
           description: "Right-side branch — invokes shared via ctx.intents",
         },
         shared: {
@@ -411,12 +401,8 @@ describe("ai.supervisor — ctx.intents.X.execute (Q5/Q6 — replaces ctx.dispat
     const result = await sup.execute("seed");
     expect(result.error).toBeUndefined();
 
-    expect(result.report.snapshots[0]?.result.left?.output).toBe(
-      "shared-output",
-    );
-    expect(result.report.snapshots[0]?.result.right?.output).toBe(
-      "shared-output",
-    );
+    expect(result.report.snapshots[0]?.result.left?.output).toBe("shared-output");
+    expect(result.report.snapshots[0]?.result.right?.output).toBe("shared-output");
     expect(result.report.snapshots[0]?.result.left?.error).toBeUndefined();
     expect(result.report.snapshots[0]?.result.right?.error).toBeUndefined();
   });

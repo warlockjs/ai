@@ -96,19 +96,13 @@ describe("topic detector", () => {
     });
 
     it("matches an allow term given as a RegExp", () => {
-      const verdict = topic({ allow: [/refund(s)?/i] }).check(
-        "How do I request a Refund?",
-        ctx,
-      );
+      const verdict = topic({ allow: [/refund(s)?/i] }).check("How do I request a Refund?", ctx);
 
       expect(verdict.type).toBe("allow");
     });
 
     it("flags an allow-list miss when onMatch is flag", () => {
-      const verdict = topic({ allow: ["billing"], onMatch: "flag" }).check(
-        "tell me a joke",
-        ctx,
-      );
+      const verdict = topic({ allow: ["billing"], onMatch: "flag" }).check("tell me a joke", ctx);
 
       expect(verdict.type).toBe("flag");
 

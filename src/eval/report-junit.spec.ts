@@ -52,9 +52,7 @@ describe("toJUnit", () => {
     );
 
     expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
-    expect(xml).toContain(
-      '<testsuite name="subject" tests="2" failures="1" time="1.500">',
-    );
+    expect(xml).toContain('<testsuite name="subject" tests="2" failures="1" time="1.500">');
     expect(xml).toContain('<testcase name="a" classname="subject" time="0.100"/>');
     expect(xml).toContain('<failure message="output did not match">output did not match</failure>');
     expect(xml).toContain("</testsuite>");
@@ -68,10 +66,7 @@ describe("toJUnit", () => {
 
   it("should escape XML-significant characters in names and reasons", () => {
     const xml = toJUnit(
-      report(
-        [caseResult('a & <b>', { passed: false, reason: 'reason "x" < y' })],
-        "agent <one>",
-      ),
+      report([caseResult("a & <b>", { passed: false, reason: 'reason "x" < y' })], "agent <one>"),
     );
 
     expect(xml).toContain("a &amp; &lt;b&gt;");

@@ -14,7 +14,5 @@
  * // → "tool_ld8x3m_7fq2j1kp"
  */
 export function generateRunId(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random()
-    .toString(36)
-    .slice(2, 10)}`;
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }

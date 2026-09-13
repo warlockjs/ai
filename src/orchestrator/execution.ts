@@ -23,10 +23,7 @@ import type { BaseReport } from "../contracts/result/base-report.type";
 import type { Usage } from "../contracts/result/usage.type";
 import type { SupervisorInput } from "../contracts/supervisor/supervisor-input.type";
 import type { EventIdentity } from "../contracts/events/event-identity.type";
-import {
-  resolveDefaultCheckpointStore,
-  resolveDefaultSnapshotStore,
-} from "../config";
+import { resolveDefaultCheckpointStore, resolveDefaultSnapshotStore } from "../config";
 import type { AIError } from "../errors/ai-error";
 import { OrchestratorConfigError, OrchestratorDriftError } from "../errors";
 import { notifyObservers } from "../observe/resolve-observers";
@@ -102,9 +99,7 @@ export type OrchestratorExecutionParams<TOutput, TState> = {
 export class OrchestratorExecution<TOutput, TState> {
   private readonly params: OrchestratorExecutionParams<TOutput, TState>;
   private readonly ctx: OrchestratorEngineContext<TOutput, TState>;
-  private readonly streamController?: OrchestratorStreamController<
-    OrchestratorResult<TOutput>
-  >;
+  private readonly streamController?: OrchestratorStreamController<OrchestratorResult<TOutput>>;
 
   public constructor(params: OrchestratorExecutionParams<TOutput, TState>) {
     this.params = params;
@@ -117,9 +112,7 @@ export class OrchestratorExecution<TOutput, TState> {
       emitter: adaptEmitter(
         params.emitter,
         generateRunId("orchestrator"),
-        this.streamController as
-          | OrchestratorStreamController<unknown>
-          | undefined,
+        this.streamController as OrchestratorStreamController<unknown> | undefined,
       ),
       memory: resolveOrchestratorMemory(params.config.memory),
     };
@@ -139,11 +132,7 @@ export class OrchestratorExecution<TOutput, TState> {
     }
 
     try {
-      const result = await runTurn(
-        this.ctx,
-        this.params.input,
-        this.params.options,
-      );
+      const result = await runTurn(this.ctx, this.params.input, this.params.options);
 
       // Route the orchestrator's report to observers (per-flow `observe` +
       // the global observe-all gate) — parity with agent/workflow/supervisor,
@@ -195,9 +184,7 @@ export class OrchestratorExecution<TOutput, TState> {
  * {@link OrchestratorConfigError} when neither resolves — persistence is
  * always on (§8.1), so a turn can never run without a checkpoint store.
  */
-function resolveCheckpointStore<TOutput, TState>(
-  config: OrchestratorConfig<TOutput, TState>,
-) {
+function resolveCheckpointStore<TOutput, TState>(config: OrchestratorConfig<TOutput, TState>) {
   const store = config.checkpointStore ?? resolveDefaultCheckpointStore();
 
   if (!store) {
@@ -218,9 +205,7 @@ function resolveCheckpointStore<TOutput, TState>(
  * snapshot). The factory already guarantees presence when
  * `iterate: true`, so the engine never asserts here.
  */
-function resolveSnapshotStore<TOutput, TState>(
-  config: OrchestratorConfig<TOutput, TState>,
-) {
+function resolveSnapshotStore<TOutput, TState>(config: OrchestratorConfig<TOutput, TState>) {
   if (config.iterate !== true) {
     return undefined;
   }
@@ -253,10 +238,7 @@ function adaptEmitter(
   let perCall: OrchestratorEventHandlers | undefined;
 
   return {
-    emit<K extends OrchestratorEventName>(
-      event: K,
-      payload: OrchestratorEventMap[K],
-    ): void {
+    emit<K extends OrchestratorEventName>(event: K, payload: OrchestratorEventMap[K]): void {
       const fullPayload = emitter.emit(event, payload, fullIdentity, perCall);
 
       // The discriminated-union correlation between `type` and the
@@ -287,8 +269,7 @@ function assertNoDrift(
   loadedSignature: string | undefined,
   force: boolean | undefined,
 ): void {
-  const drifted =
-    loadedSignature !== undefined && loadedSignature !== ctx.signature;
+  const drifted = loadedSignature !== undefined && loadedSignature !== ctx.signature;
 
   ctx.emitter.emit("orchestrator.drift.checked", {
     sessionId,
@@ -315,10 +296,7 @@ function assertNoDrift(
  * override) over the loaded session-state seed. The merged value
  * becomes the supervisor's seed for this turn.
  */
-function applyStatePatch<TState>(
-  seed: TState,
-  patch: Partial<TState> | undefined,
-): TState {
+function applyStatePatch<TState>(seed: TState, patch: Partial<TState> | undefined): TState {
   if (!patch) {
     return seed;
   }
@@ -463,11 +441,7 @@ export async function runTurn<TOutput, TState>(
     await acquireLock(ctx, sessionId, loaded.record);
 
     // Phase 4 — window history.
-    const windowed = windowHistory(
-      ctx as OrchestratorEngineContext,
-      sessionId,
-      options.history,
-    );
+    const windowed = windowHistory(ctx as OrchestratorEngineContext, sessionId, options.history);
 
     // Phase 5 — dispatch. When memory is configured, recall the
     // turn-relevant memories and inject them into the request-scoped
@@ -504,9 +478,7 @@ export async function runTurn<TOutput, TState>(
       raw: turnSnapshot.decision.raw,
     });
 
-    const status = result.error
-      ? deriveStatus(result.report.status)
-      : "awaiting-input";
+    const status = result.error ? deriveStatus(result.report.status) : "awaiting-input";
 
     // Cancelled / failed turns revert: no fresh checkpoint, no compaction.
     if (result.error) {
@@ -647,12 +619,7 @@ export async function runResume<TOutput, TState>(
   try {
     return await resolveResume(ctx, sessionId, options, {
       assertNoDrift: (loadedSignature) =>
-        assertNoDrift(
-          ctx as OrchestratorEngineContext,
-          sessionId,
-          loadedSignature,
-          options?.force,
-        ),
+        assertNoDrift(ctx as OrchestratorEngineContext, sessionId, loadedSignature, options?.force),
       buildReport: (turnIndex, status, turnSnapshot, childReport) =>
         buildReport(
           ctx as OrchestratorEngineContext,

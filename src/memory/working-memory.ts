@@ -1,7 +1,4 @@
-import type {
-  MemoryItem,
-  RecalledMemory,
-} from "../contracts/memory/memory-item.type";
+import type { MemoryItem, RecalledMemory } from "../contracts/memory/memory-item.type";
 import { deriveMemoryId } from "./derive-id";
 
 /**
@@ -126,9 +123,7 @@ export class WorkingMemory {
    * ignores any similarity threshold — it has no vector to compare.
    */
   public recall(k: number, scope?: string): RecalledMemory[] {
-    const ordered = [...this.entries.values()]
-      .reverse()
-      .filter((entry) => entry.scope === scope);
+    const ordered = [...this.entries.values()].reverse().filter((entry) => entry.scope === scope);
 
     const slice = ordered.slice(0, Math.max(0, k));
 

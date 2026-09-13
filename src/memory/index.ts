@@ -18,9 +18,5 @@ export type {
   SemanticMemoryConfig,
   WorkingMemoryConfig,
 } from "../contracts/memory/memory-config.type";
-export type {
-  MemoryItem,
-  MemoryTier,
-  RecalledMemory,
-} from "../contracts/memory/memory-item.type";
+export type { MemoryItem, MemoryTier, RecalledMemory } from "../contracts/memory/memory-item.type";
 export type { RecallOptions } from "../contracts/memory/recall-options.type";

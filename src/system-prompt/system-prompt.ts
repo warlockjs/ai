@@ -34,9 +34,7 @@ let displayIdCounter = 0;
  * registry-aware `merge` overload to tell a folded contract from a raw block
  * or a registry name string, robustly across duplicate package copies.
  */
-function isSystemPromptContract(
-  value: unknown,
-): value is SystemPromptContract {
+function isSystemPromptContract(value: unknown): value is SystemPromptContract {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -141,9 +139,7 @@ export class SystemPrompt implements SystemPromptContract {
    */
   public meta(): SystemPromptMeta | undefined;
   public meta(meta: SystemPromptMeta): SystemPromptContract;
-  public meta(
-    meta?: SystemPromptMeta,
-  ): SystemPromptMeta | undefined | SystemPromptContract {
+  public meta(meta?: SystemPromptMeta): SystemPromptMeta | undefined | SystemPromptContract {
     if (meta === undefined) {
       return this.metaData;
     }
@@ -203,9 +199,7 @@ export class SystemPrompt implements SystemPromptContract {
    */
   public persona(value: PersonaContract | string): SystemPromptContract {
     const block = typeof value === "string" ? new Persona(value) : value;
-    const existingIndex = this.blocks.findIndex(
-      candidate => candidate.type === "persona",
-    );
+    const existingIndex = this.blocks.findIndex((candidate) => candidate.type === "persona");
 
     if (existingIndex >= 0) {
       const next = [...this.blocks];
@@ -223,9 +217,7 @@ export class SystemPrompt implements SystemPromptContract {
    * `new Instruction`) or an existing `InstructionContract` instance for
    * cross-prompt reuse.
    */
-  public instruction(
-    value: InstructionContract | string,
-  ): SystemPromptContract {
+  public instruction(value: InstructionContract | string): SystemPromptContract {
     const block = typeof value === "string" ? new Instruction(value) : value;
 
     return new SystemPrompt([...this.blocks, block]);
@@ -250,27 +242,15 @@ export class SystemPrompt implements SystemPromptContract {
    * an equivalent builder. The folded result is anonymous (no `name`), so it
    * is never auto-registered even though it carries `composedFrom` provenance.
    */
-  public merge(
-    ...blocks: readonly SystemPromptBlockContract[]
-  ): SystemPromptContract;
+  public merge(...blocks: readonly SystemPromptBlockContract[]): SystemPromptContract;
   public merge(source: SystemPromptContract): SystemPromptContract;
+  public merge(name: string, options?: SystemPromptMergeOptions): SystemPromptContract;
   public merge(
-    name: string,
-    options?: SystemPromptMergeOptions,
-  ): SystemPromptContract;
-  public merge(
-    first?:
-      | SystemPromptBlockContract
-      | SystemPromptContract
-      | string,
+    first?: SystemPromptBlockContract | SystemPromptContract | string,
     // `undefined` is part of the element union so the `merge(name, options?)`
     // overload's optional trailing `options?` (i.e. `… | undefined`) stays
     // assignable to this implementation signature.
-    ...rest: readonly (
-      | SystemPromptBlockContract
-      | SystemPromptMergeOptions
-      | undefined
-    )[]
+    ...rest: readonly (SystemPromptBlockContract | SystemPromptMergeOptions | undefined)[]
   ): SystemPromptContract {
     // Registry-name form: resolve from ai.prompts at the chosen version.
     if (typeof first === "string") {
@@ -286,10 +266,7 @@ export class SystemPrompt implements SystemPromptContract {
     }
 
     // Variadic block form (the original behavior).
-    const all = [
-      ...(first ? [first] : []),
-      ...rest,
-    ] as readonly SystemPromptBlockContract[];
+    const all = [...(first ? [first] : []), ...rest] as readonly SystemPromptBlockContract[];
 
     return this.foldBlocks(this, all);
   }
@@ -318,14 +295,11 @@ export class SystemPrompt implements SystemPromptContract {
    * prompt's existing provenance (or its own label) followed by the folded
    * source's label. The result is anonymous so it never auto-registers.
    */
-  private mergeContract(
-    source: SystemPromptContract,
-  ): SystemPromptContract {
+  private mergeContract(source: SystemPromptContract): SystemPromptContract {
     const folded = this.foldBlocks(this, source.blocks);
 
     const baseProvenance =
-      this.metaData?.composedFrom ??
-      (this.metaData?.name ? [provenanceLabel(this)] : []);
+      this.metaData?.composedFrom ?? (this.metaData?.name ? [provenanceLabel(this)] : []);
 
     const composedFrom = [...baseProvenance, provenanceLabel(source)];
 
@@ -342,7 +316,7 @@ export class SystemPrompt implements SystemPromptContract {
    */
   public resolve(placeholders?: Placeholders): string {
     return this.blocks
-      .map(block => block.resolve(placeholders))
+      .map((block) => block.resolve(placeholders))
       .join("\n\n")
       .trim();
   }
@@ -354,9 +328,7 @@ export class SystemPrompt implements SystemPromptContract {
    * pass. Never throws on a judge failure; `ok` tracks the deterministic
    * verdict alone.
    */
-  public validate(
-    options?: PromptsValidateOptions,
-  ): Promise<PromptValidationResult> {
+  public validate(options?: PromptsValidateOptions): Promise<PromptValidationResult> {
     return defaultPromptsManager().validate(this, options);
   }
 
@@ -372,9 +344,7 @@ export class SystemPrompt implements SystemPromptContract {
    * `refined-system-prompt.ts` — importing this module (or the prompts
    * manager) back from there would close an import cycle.
    */
-  public refined(
-    options: RefinedSystemPromptOptions,
-  ): RefinedSystemPromptContract {
+  public refined(options: RefinedSystemPromptOptions): RefinedSystemPromptContract {
     return new RefinedSystemPrompt(this, options, {
       buildPrompt: (blocks, meta) => new SystemPrompt([...blocks], meta),
       validatePrompt: (target, validateOptions) =>
@@ -463,7 +433,6 @@ function systemPromptFactory(
  *   ai.instruction("Respond in {{language|English}}."),
  * ]);
  */
-export const systemPrompt: SystemPromptFactory = Object.assign(
-  systemPromptFactory,
-  { fromFile: SystemPrompt.fromFile },
-);
+export const systemPrompt: SystemPromptFactory = Object.assign(systemPromptFactory, {
+  fromFile: SystemPrompt.fromFile,
+});

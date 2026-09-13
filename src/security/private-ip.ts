@@ -22,8 +22,8 @@ function parseIpv4(ip: string): [number, number, number, number] | null {
   const parts = ip.split(".");
   if (parts.length !== 4) return null;
 
-  const octets = parts.map(part => Number(part));
-  if (octets.some(n => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+  const octets = parts.map((part) => Number(part));
+  if (octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
 
   return octets as [number, number, number, number];
 }

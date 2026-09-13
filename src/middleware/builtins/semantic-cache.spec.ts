@@ -27,8 +27,7 @@ function makeStore() {
   const countEntries = (): number => {
     let total = 0;
     const walk = (node: unknown): void => {
-      if (node === null || typeof node !== "object" || Array.isArray(node))
-        return;
+      if (node === null || typeof node !== "object" || Array.isArray(node)) return;
       const obj = node as Record<string, unknown>;
       // CacheData wrappers always carry a `data` key. Intermediate
       // namespace nodes (`ai.cache.<hash>` splits into nested
@@ -65,7 +64,7 @@ class DeterministicEmbedder implements EmbedderContract {
 
   public async embedMany(inputs: string[]): Promise<EmbeddingBatchResult> {
     return {
-      vectors: inputs.map(text => this.toVector(text)),
+      vectors: inputs.map((text) => this.toVector(text)),
       dimensions: 4,
       usage: { promptTokens: 0, totalTokens: 0 },
     };
@@ -78,10 +77,9 @@ class DeterministicEmbedder implements EmbedderContract {
       buckets[index % 4] += text.charCodeAt(index);
     }
 
-    const norm =
-      Math.sqrt(buckets.reduce((sum, value) => sum + value * value, 0)) || 1;
+    const norm = Math.sqrt(buckets.reduce((sum, value) => sum + value * value, 0)) || 1;
 
-    return buckets.map(value => value / norm);
+    return buckets.map((value) => value / norm);
   }
 }
 
@@ -180,9 +178,7 @@ describe("semanticCache — vector-match path", () => {
     });
 
     await ai.execute("how do I boil water");
-    const secondRun = await ai.execute(
-      "unrelated topic about JavaScript frameworks",
-    );
+    const secondRun = await ai.execute("unrelated topic about JavaScript frameworks");
 
     expect(secondRun.text).toBe("B");
     expect(mockModel.callCount).toBe(2);
@@ -326,7 +322,7 @@ describe("semanticCache — multi-trip / tool-using agents", () => {
       "~standard": {
         version: 1,
         vendor: "test",
-        validate: value =>
+        validate: (value) =>
           typeof value === "object" &&
           value !== null &&
           typeof (value as { value?: unknown }).value === "string"
@@ -375,9 +371,7 @@ describe("semanticCache — multi-trip / tool-using agents", () => {
     // Two real model calls: trip 0 (tool_calls) + trip 1 (final).
     expect(mockModel.callCount).toBe(2);
     // Tool ran exactly once — it didn't loop.
-    expect(result.report.children.filter(c => c.type === "tool")).toHaveLength(
-      1,
-    );
+    expect(result.report.children.filter((c) => c.type === "tool")).toHaveLength(1);
   });
 
   /**
@@ -390,7 +384,7 @@ describe("semanticCache — multi-trip / tool-using agents", () => {
       "~standard": {
         version: 1,
         vendor: "test",
-        validate: value =>
+        validate: (value) =>
           typeof value === "object" &&
           value !== null &&
           typeof (value as { value?: unknown }).value === "string"
@@ -597,7 +591,7 @@ describe("semanticCache — session scoping (security)", () => {
     expect(mockModel.callCount).toBe(4);
   });
 
-  it("scope: \"shared\" opts back into one pool across sessions", async () => {
+  it('scope: "shared" opts back into one pool across sessions', async () => {
     const sdk = MockSDK({
       responses: [
         { content: "public FAQ answer", finishReason: "stop" },

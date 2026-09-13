@@ -1,7 +1,4 @@
-import type {
-  EventIdentity,
-  WithoutIdentity,
-} from "../contracts/events/event-identity.type";
+import type { EventIdentity, WithoutIdentity } from "../contracts/events/event-identity.type";
 import type {
   OrchestratorEventHandler,
   OrchestratorEventHandlers,
@@ -10,8 +7,7 @@ import type {
 } from "../contracts/orchestrator/orchestrator-event.type";
 
 /** Full identity-stamped payload an orchestrator handler receives. */
-type EventPayload<K extends OrchestratorEventName> = OrchestratorEventMap[K] &
-  EventIdentity;
+type EventPayload<K extends OrchestratorEventName> = OrchestratorEventMap[K] & EventIdentity;
 
 /**
  * Erased handler shape for the instance registry. Per-event handlers
@@ -49,10 +45,7 @@ type AnyHandler = (payload: EventPayload<OrchestratorEventName>) => void;
  */
 export class OrchestratorEmitter {
   private readonly factoryHandlers?: OrchestratorEventHandlers;
-  private readonly instanceHandlers = new Map<
-    OrchestratorEventName,
-    Set<AnyHandler>
-  >();
+  private readonly instanceHandlers = new Map<OrchestratorEventName, Set<AnyHandler>>();
 
   public constructor(factoryHandlers?: OrchestratorEventHandlers) {
     this.factoryHandlers = factoryHandlers;

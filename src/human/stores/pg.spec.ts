@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  PendingInterrupt,
-  PgClientLike,
-} from "../contracts/interrupt-store.contract";
+import type { PendingInterrupt, PgClientLike } from "../contracts/interrupt-store.contract";
 import { pg } from "./pg";
 
 // Simulate `pg` NOT being installed: a dynamic `import("pg")` rejects, so
@@ -39,10 +36,7 @@ class FakePgClient implements PgClientLike {
 
   public queries: string[] = [];
 
-  public async query(
-    text: string,
-    params: unknown[] = [],
-  ): Promise<{ rows: unknown[] }> {
+  public async query(text: string, params: unknown[] = []): Promise<{ rows: unknown[] }> {
     this.queries.push(text);
     const sql = text.replace(/\s+/g, " ").trim();
 
@@ -66,12 +60,7 @@ class FakePgClient implements PgClientLike {
   }
 
   private handleUpsert(params: unknown[]): { rows: unknown[] } {
-    const [interruptId, request, status, savedAt] = params as [
-      string,
-      string,
-      string,
-      string,
-    ];
+    const [interruptId, request, status, savedAt] = params as [string, string, string, string];
 
     const existing = this.rows.find((row) => row.interrupt_id === interruptId);
 
@@ -125,9 +114,7 @@ class FakePgClient implements PgClientLike {
   }
 }
 
-function makeInterrupt(
-  overrides: Partial<PendingInterrupt> = {},
-): PendingInterrupt {
+function makeInterrupt(overrides: Partial<PendingInterrupt> = {}): PendingInterrupt {
   return {
     interruptId: "support.sess-1.0.abc",
     request: {
@@ -149,17 +136,13 @@ describe("pg interrupt store", () => {
   });
 
   it("should reject a client missing query()", () => {
-    expect(() =>
-      pg({ client: {} as unknown as PgClientLike }),
-    ).toThrow(/client/);
+    expect(() => pg({ client: {} as unknown as PgClientLike })).toThrow(/client/);
   });
 
   it("should reject an unsafe table name", () => {
     const client = new FakePgClient();
 
-    expect(() => pg({ client, table: "bad; DROP TABLE x" })).toThrow(
-      /invalid table name/,
-    );
+    expect(() => pg({ client, table: "bad; DROP TABLE x" })).toThrow(/invalid table name/);
   });
 
   it("should emit DDL for the configured table", () => {
@@ -168,9 +151,7 @@ describe("pg interrupt store", () => {
 
     const ddl = store.schema();
 
-    expect(ddl).toContain(
-      "CREATE TABLE IF NOT EXISTS warlock_ai_human_interrupts",
-    );
+    expect(ddl).toContain("CREATE TABLE IF NOT EXISTS warlock_ai_human_interrupts");
     expect(ddl).toContain("interrupt_id  TEXT PRIMARY KEY");
     expect(ddl).toContain("request       JSONB NOT NULL");
     expect(ddl).toContain("idx_warlock_ai_human_interrupts_saved_at");
@@ -250,8 +231,6 @@ describe("pg interrupt store", () => {
     // first operation that needs the client.
     const store = pg({ connectionString: "postgres://localhost/db" });
 
-    await expect(store.save(makeInterrupt())).rejects.toThrow(
-      /requires the pg package/,
-    );
+    await expect(store.save(makeInterrupt())).rejects.toThrow(/requires the pg package/);
   });
 });

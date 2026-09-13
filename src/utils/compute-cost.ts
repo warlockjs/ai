@@ -37,7 +37,10 @@ import type { Usage } from "../contracts/result/usage.type";
  * //   cachedInput: (90_000 * 0.075) / 1e6 = 0.00675,
  * // }
  */
-export function computeCost(usage: Usage, pricing: ModelPricing | undefined): ModelPricing | undefined {
+export function computeCost(
+  usage: Usage,
+  pricing: ModelPricing | undefined,
+): ModelPricing | undefined {
   if (!pricing) {
     return undefined;
   }

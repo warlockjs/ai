@@ -16,8 +16,7 @@ function scripted(name: string) {
 describe("mockRouter", () => {
   it("should replay decisions one per iteration", () => {
     const route = mockRouter(["writer", "critic", END]);
-    const ctx = (iteration: number): RouteContext =>
-      ({ iteration }) as unknown as RouteContext;
+    const ctx = (iteration: number): RouteContext => ({ iteration }) as unknown as RouteContext;
 
     expect(route(ctx(0))).toBe("writer");
     expect(route(ctx(1))).toBe("critic");
@@ -25,9 +24,7 @@ describe("mockRouter", () => {
   });
 
   it("should evaluate a function decision against the live context", () => {
-    const route = mockRouter<{ done?: boolean }>([
-      (ctx) => (ctx.state.done ? END : "writer"),
-    ]);
+    const route = mockRouter<{ done?: boolean }>([(ctx) => (ctx.state.done ? END : "writer")]);
 
     const decision = route({ iteration: 0, state: { done: true } } as RouteContext<{
       done?: boolean;
@@ -38,8 +35,7 @@ describe("mockRouter", () => {
 
   it("should END by default once decisions are exhausted", () => {
     const route = mockRouter(["writer"]);
-    const ctx = (iteration: number): RouteContext =>
-      ({ iteration }) as unknown as RouteContext;
+    const ctx = (iteration: number): RouteContext => ({ iteration }) as unknown as RouteContext;
 
     expect(route(ctx(0))).toBe("writer");
     expect(route(ctx(1))).toBe(END);
@@ -48,8 +44,7 @@ describe("mockRouter", () => {
 
   it("should repeat the last decision when onExhausted is repeat", () => {
     const route = mockRouter(["writer"], { onExhausted: "repeat" });
-    const ctx = (iteration: number): RouteContext =>
-      ({ iteration }) as unknown as RouteContext;
+    const ctx = (iteration: number): RouteContext => ({ iteration }) as unknown as RouteContext;
 
     expect(route(ctx(0))).toBe("writer");
     expect(route(ctx(1))).toBe("writer");
@@ -58,8 +53,7 @@ describe("mockRouter", () => {
 
   it("should throw when onExhausted is throw and the queue runs out", () => {
     const route = mockRouter(["writer"], { onExhausted: "throw" });
-    const ctx = (iteration: number): RouteContext =>
-      ({ iteration }) as unknown as RouteContext;
+    const ctx = (iteration: number): RouteContext => ({ iteration }) as unknown as RouteContext;
 
     expect(route(ctx(0))).toBe("writer");
     expect(() => route(ctx(1))).toThrow(/exhausted/);
@@ -80,9 +74,7 @@ describe("mockRouter", () => {
     expect(result.error).toBeUndefined();
     expect(result.report.status).toBe("completed");
 
-    const dispatched = result.report.snapshots.flatMap((snapshot) =>
-      Object.keys(snapshot.result),
-    );
+    const dispatched = result.report.snapshots.flatMap((snapshot) => Object.keys(snapshot.result));
 
     expect(dispatched).toContain("writer");
     expect(dispatched).toContain("critic");

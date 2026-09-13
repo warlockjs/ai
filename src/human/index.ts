@@ -41,10 +41,7 @@ export type { PgInterruptOptions, RedisInterruptOptions } from "./stores";
 export { resume } from "./resume";
 
 // Errors
-export {
-  ApprovalRejectedError,
-  InterruptSuspendedError,
-} from "./errors";
+export { ApprovalRejectedError, InterruptSuspendedError } from "./errors";
 export type {
   ApprovalRejectedErrorOptions,
   HumanErrorCode,

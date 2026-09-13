@@ -10,13 +10,7 @@ import type { BaseResult } from "./base-result.type";
  * error object.
  */
 export type SupervisorTerminatedBy =
-  | "router"
-  | "route"
-  | "classifier"
-  | "evaluate"
-  | "max-iterations"
-  | "cancelled"
-  | "error";
+  "router" | "route" | "classifier" | "evaluate" | "max-iterations" | "cancelled" | "error";
 
 /**
  * Supervisor-specific execution report. Extends {@link BaseReport}

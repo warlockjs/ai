@@ -62,12 +62,7 @@ export type ReportType =
  *   reports.
  */
 export type ReportStatus =
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "max-iterations"
-  | "awaiting-input"
-  | "awaiting-approval";
+  "completed" | "failed" | "cancelled" | "max-iterations" | "awaiting-input" | "awaiting-approval";
 
 /**
  * Universal execution report shared by every primitive. Per-primitive

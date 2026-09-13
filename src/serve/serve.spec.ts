@@ -18,7 +18,10 @@ describe("encodeSSE", () => {
 });
 
 /** Build a StreamLike from a fixed event list + result. */
-function fakeStream(events: Array<{ type: string }>, result: unknown): StreamLike<{ type: string }, unknown> {
+function fakeStream(
+  events: Array<{ type: string }>,
+  result: unknown,
+): StreamLike<{ type: string }, unknown> {
   return {
     async *[Symbol.asyncIterator]() {
       for (const e of events) yield e;
@@ -70,7 +73,11 @@ function fakeRes() {
 }
 
 /** Drive a POST request with a JSON body through a handler. */
-function post(handler: (req: IncomingMessage, res: ServerResponse) => void, body: unknown, headers: Record<string, string> = {}) {
+function post(
+  handler: (req: IncomingMessage, res: ServerResponse) => void,
+  body: unknown,
+  headers: Record<string, string> = {},
+) {
   const req = new EventEmitter() as unknown as IncomingMessage;
   req.method = "POST";
   req.headers = headers;
@@ -83,17 +90,16 @@ function post(handler: (req: IncomingMessage, res: ServerResponse) => void, body
 
 const mockAgent: ServableExecutable = {
   stream(input: unknown) {
-    return fakeStream(
-      [{ type: "agent.trip.streaming" }, { type: "agent.completed" }],
-      { echoed: input },
-    );
+    return fakeStream([{ type: "agent.trip.streaming" }, { type: "agent.completed" }], {
+      echoed: input,
+    });
   },
 };
 
 describe("serve (A3)", () => {
   it("streams an executable run as SSE over POST", async () => {
     const res = post(serve(mockAgent), { input: "hello" });
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 10));
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("text/event-stream");
@@ -114,15 +120,19 @@ describe("serve (A3)", () => {
 
   it("requires the bearer token when authToken is set", async () => {
     const res = post(serve(mockAgent, { authToken: "t" }), { input: "x" });
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 10));
     expect(res.status).toBe(401);
   });
 
   it("accepts the request with a valid bearer token", async () => {
-    const res = post(serve(mockAgent, { authToken: "t" }), { input: "x" }, {
-      authorization: "Bearer t",
-    });
-    await new Promise(r => setTimeout(r, 10));
+    const res = post(
+      serve(mockAgent, { authToken: "t" }),
+      { input: "x" },
+      {
+        authorization: "Bearer t",
+      },
+    );
+    await new Promise((r) => setTimeout(r, 10));
     expect(res.status).toBe(200);
   });
 });

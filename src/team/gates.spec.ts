@@ -33,11 +33,7 @@ describe("buildQualityGate", () => {
   });
 
   it("honors a custom gateKey, fixerRole, and feedbackKey", () => {
-    const gate = buildQualityGate<Record<string, unknown>>(
-      "ok",
-      "repairman",
-      "remarks",
-    );
+    const gate = buildQualityGate<Record<string, unknown>>("ok", "repairman", "remarks");
 
     expect(gate(ctx({ ok: false, remarks: "fix it" }))).toEqual({
       reassignTo: "repairman",

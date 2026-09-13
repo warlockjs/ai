@@ -43,9 +43,7 @@ function makeToolContext(
 }
 
 /** Type guard narrowing a `before` return to a short-circuit result. */
-function isResult(
-  value: ToolInvokeResult<unknown> | void,
-): value is ToolInvokeResult<unknown> {
+function isResult(value: ToolInvokeResult<unknown> | void): value is ToolInvokeResult<unknown> {
   return value !== undefined;
 }
 
@@ -108,7 +106,7 @@ describe("humanApproval", () => {
     const mw = humanApproval({
       policy: {
         type: "predicate",
-        requiresApproval: c => c.toolName === "refundCustomer",
+        requiresApproval: (c) => c.toolName === "refundCustomer",
       },
       handler,
     });
@@ -127,7 +125,7 @@ describe("humanApproval", () => {
         tools: ["refundCustomer"],
         tags: () => ["money"],
       },
-      handler: req => {
+      handler: (req) => {
         captured = req;
 
         return { type: "approve" };
@@ -239,9 +237,7 @@ describe("humanApproval", () => {
         },
       });
 
-      await expect(mw.tool!.before!(makeToolContext())).rejects.toThrow(
-        "handler crashed",
-      );
+      await expect(mw.tool!.before!(makeToolContext())).rejects.toThrow("handler crashed");
     });
   });
 

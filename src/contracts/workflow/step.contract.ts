@@ -52,9 +52,7 @@ export type StepOutputSpec<
   TState = Record<string, unknown>,
   TContext = unknown,
 > = {
-  extract: (
-    ctx: WorkflowContext<TInput, TState, TContext>,
-  ) => TOutput | Promise<TOutput>;
+  extract: (ctx: WorkflowContext<TInput, TState, TContext>) => TOutput | Promise<TOutput>;
   schema?: StandardSchemaV1<TOutput>;
 };
 
@@ -127,7 +125,9 @@ export type StepDefinition<
    * incorporate fresh context (e.g., loop-back feedback on
    * `ctx.state.qaFeedback`).
    */
-  input?: (ctx: WorkflowContext<TInput, TState, TContext>) => StepAgentInput | Promise<StepAgentInput>;
+  input?: (
+    ctx: WorkflowContext<TInput, TState, TContext>,
+  ) => StepAgentInput | Promise<StepAgentInput>;
 
   /**
    * Output extraction spec. Runs after `run` / `agent`. Without this
@@ -154,7 +154,9 @@ export type StepDefinition<
    * authoritative, so a throw terminates the workflow with
    * `RoutingError`.
    */
-  nextStep?: (ctx: WorkflowContext<TInput, TState, TContext>) => NextStepResult | Promise<NextStepResult>;
+  nextStep?: (
+    ctx: WorkflowContext<TInput, TState, TContext>,
+  ) => NextStepResult | Promise<NextStepResult>;
 
   /**
    * Failure-routing hook. Runs OUTSIDE the retry loop, once after all

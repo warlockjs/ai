@@ -3,9 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { extractJsonSchema } from "./json-schema";
 
 /** Build a StandardSchemaV1 shell with a valid `~standard` slot. */
-function makeStandardShell(
-  extension: Record<string, unknown> = {},
-): StandardSchemaV1<unknown> {
+function makeStandardShell(extension: Record<string, unknown> = {}): StandardSchemaV1<unknown> {
   return {
     "~standard": {
       version: 1,

@@ -10,15 +10,11 @@ import { SystemPrompt, systemPrompt } from "./system-prompt";
 
 describe("renderPlaceholders", () => {
   it("substitutes a simple key", () => {
-    expect(renderPlaceholders("Hello {{name}}", { name: "Hasan" })).toBe(
-      "Hello Hasan",
-    );
+    expect(renderPlaceholders("Hello {{name}}", { name: "Hasan" })).toBe("Hello Hasan");
   });
 
   it("ignores surrounding whitespace inside braces", () => {
-    expect(renderPlaceholders("Hello {{  name  }}", { name: "Hasan" })).toBe(
-      "Hello Hasan",
-    );
+    expect(renderPlaceholders("Hello {{  name  }}", { name: "Hasan" })).toBe("Hello Hasan");
   });
 
   it("resolves nested dot paths", () => {
@@ -34,15 +30,11 @@ describe("renderPlaceholders", () => {
   });
 
   it("uses fallback when value is empty string", () => {
-    expect(renderPlaceholders("{{language|English}}", { language: "" })).toBe(
-      "English",
-    );
+    expect(renderPlaceholders("{{language|English}}", { language: "" })).toBe("English");
   });
 
   it("uses fallback when value is null", () => {
-    expect(renderPlaceholders("{{language|English}}", { language: null })).toBe(
-      "English",
-    );
+    expect(renderPlaceholders("{{language|English}}", { language: null })).toBe("English");
   });
 
   it("leaves placeholder untouched when no fallback and key is missing", () => {
@@ -50,9 +42,7 @@ describe("renderPlaceholders", () => {
   });
 
   it("coerces non-string values to string", () => {
-    expect(renderPlaceholders("Count: {{count}}", { count: 42 })).toBe(
-      "Count: 42",
-    );
+    expect(renderPlaceholders("Count: {{count}}", { count: 42 })).toBe("Count: 42");
   });
 
   it("returns undefined for blocked traversal (segment on non-object)", () => {
@@ -64,10 +54,10 @@ describe("renderPlaceholders", () => {
   });
 
   it("replaces multiple placeholders in one template", () => {
-    const rendered = renderPlaceholders(
-      "{{greeting}}, {{user.name}}! Lang: {{language|English}}",
-      { greeting: "Hi", user: { name: "Hasan" } },
-    );
+    const rendered = renderPlaceholders("{{greeting}}, {{user.name}}! Lang: {{language|English}}", {
+      greeting: "Hi",
+      user: { name: "Hasan" },
+    });
 
     expect(rendered).toBe("Hi, Hasan! Lang: English");
   });
@@ -83,9 +73,7 @@ describe("persona", () => {
   });
 
   it("resolves placeholders", () => {
-    expect(persona("You are {{name}}").resolve({ name: "Alex" })).toBe(
-      "You are Alex",
-    );
+    expect(persona("You are {{name}}").resolve({ name: "Alex" })).toBe("You are Alex");
   });
 
   it("leaves unresolved placeholders literal when no fallback", () => {
@@ -136,18 +124,14 @@ describe("systemPrompt", () => {
     const alex = persona("You are {{name}}");
     const prompt = systemPrompt().persona(alex).instruction("Be concise.");
 
-    expect(prompt.resolve({ name: "Alex" })).toBe(
-      "You are Alex\n\nBe concise.",
-    );
+    expect(prompt.resolve({ name: "Alex" })).toBe("You are Alex\n\nBe concise.");
   });
 
   it("accepts a pre-built Instruction instance", () => {
     const replyIn = instruction("Reply in {{language|English}}");
     const prompt = systemPrompt().persona("You are Alex.").instruction(replyIn);
 
-    expect(prompt.resolve({ language: "Arabic" })).toBe(
-      "You are Alex.\n\nReply in Arabic",
-    );
+    expect(prompt.resolve({ language: "Arabic" })).toBe("You are Alex.\n\nReply in Arabic");
   });
 
   it("resolves placeholders across every block", () => {
@@ -182,12 +166,8 @@ describe("systemPrompt", () => {
 
   it("lets the same Instruction instance render differently in different prompts", () => {
     const replyIn = instruction("Reply in {{language|English}}");
-    const english = systemPrompt()
-      .instruction(replyIn)
-      .resolve({ language: "English" });
-    const arabic = systemPrompt()
-      .instruction(replyIn)
-      .resolve({ language: "Arabic" });
+    const english = systemPrompt().instruction(replyIn).resolve({ language: "English" });
+    const arabic = systemPrompt().instruction(replyIn).resolve({ language: "Arabic" });
 
     expect(english).toBe("Reply in English");
     expect(arabic).toBe("Reply in Arabic");
@@ -206,19 +186,13 @@ describe("block discriminators", () => {
 
 describe("systemPrompt (array form)", () => {
   it("accepts an array of blocks", () => {
-    const prompt = systemPrompt([
-      persona("You are Alex."),
-      instruction("Be concise."),
-    ]);
+    const prompt = systemPrompt([persona("You are Alex."), instruction("Be concise.")]);
 
     expect(prompt.resolve()).toBe("You are Alex.\n\nBe concise.");
   });
 
   it("preserves insertion order exactly (instruction before persona)", () => {
-    const prompt = systemPrompt([
-      instruction("Be concise."),
-      persona("You are Alex."),
-    ]);
+    const prompt = systemPrompt([instruction("Be concise."), persona("You are Alex.")]);
 
     expect(prompt.resolve()).toBe("Be concise.\n\nYou are Alex.");
   });
@@ -237,9 +211,7 @@ describe("systemPrompt (array form)", () => {
       instruction("Reply in {{language|English}}."),
     ]);
 
-    expect(prompt.resolve({ name: "Alex" })).toBe(
-      "You are Alex.\n\nReply in English.",
-    );
+    expect(prompt.resolve({ name: "Alex" })).toBe("You are Alex.\n\nReply in English.");
   });
 
   it("is empty when given an empty array", () => {
@@ -297,9 +269,7 @@ describe("systemPrompt.fromFile / SystemPrompt.fromFile", () => {
       .persona("You are Alex.")
       .instruction("Cite sources.");
 
-    expect(prompt.resolve()).toBe(
-      "You are Alex.\n\nBase instruction.\n\nCite sources.",
-    );
+    expect(prompt.resolve()).toBe("You are Alex.\n\nBase instruction.\n\nCite sources.");
   });
 
   it("reads the file once at construction, not on each resolve", async () => {
@@ -317,12 +287,8 @@ describe("systemPrompt.fromFile / SystemPrompt.fromFile", () => {
   it("throws InvalidRequestError when the file does not exist", () => {
     const missingPath = join(tempDir, "does-not-exist.md");
 
-    expect(() => SystemPrompt.fromFile(missingPath)).toThrow(
-      InvalidRequestError,
-    );
-    expect(() => SystemPrompt.fromFile(missingPath)).toThrow(
-      /Failed to read system prompt file/,
-    );
+    expect(() => SystemPrompt.fromFile(missingPath)).toThrow(InvalidRequestError);
+    expect(() => SystemPrompt.fromFile(missingPath)).toThrow(/Failed to read system prompt file/);
   });
 
   it("preserves the path in the error context and the original cause", async () => {
@@ -365,9 +331,7 @@ describe("systemPrompt.persona() — replace-in-place behavior", () => {
   });
 
   it("prepends a new persona when none exists", () => {
-    const prompt = systemPrompt([instruction("Be concise.")]).persona(
-      "You are Alex.",
-    );
+    const prompt = systemPrompt([instruction("Be concise.")]).persona("You are Alex.");
 
     expect(prompt.resolve()).toBe("You are Alex.\n\nBe concise.");
   });
@@ -381,9 +345,7 @@ describe("systemPrompt.merge()", () => {
       instruction("Cite sources."),
     );
 
-    expect(prompt.resolve()).toBe(
-      "You are Alex.\n\nBe concise.\n\nCite sources.",
-    );
+    expect(prompt.resolve()).toBe("You are Alex.\n\nBe concise.\n\nCite sources.");
   });
 
   it("is equivalent to chaining persona()/instruction()", () => {
@@ -392,21 +354,13 @@ describe("systemPrompt.merge()", () => {
     const lang = instruction("Reply in {{language|English}}.");
 
     const merged = systemPrompt().merge(reviewer, style, lang);
-    const chained = systemPrompt()
-      .persona(reviewer)
-      .instruction(style)
-      .instruction(lang);
+    const chained = systemPrompt().persona(reviewer).instruction(style).instruction(lang);
 
-    expect(merged.resolve({ language: "Arabic" })).toBe(
-      chained.resolve({ language: "Arabic" }),
-    );
+    expect(merged.resolve({ language: "Arabic" })).toBe(chained.resolve({ language: "Arabic" }));
   });
 
   it("folds a persona to the front even when passed after instructions", () => {
-    const prompt = systemPrompt().merge(
-      instruction("Be concise."),
-      persona("You are Alex."),
-    );
+    const prompt = systemPrompt().merge(instruction("Be concise."), persona("You are Alex."));
 
     expect(prompt.resolve()).toBe("You are Alex.\n\nBe concise.");
   });
@@ -446,9 +400,7 @@ describe("systemPrompt.merge()", () => {
   });
 
   it("returns an equivalent builder when given no blocks", () => {
-    const base = systemPrompt()
-      .persona("You are Alex.")
-      .instruction("Be concise.");
+    const base = systemPrompt().persona("You are Alex.").instruction("Be concise.");
 
     expect(base.merge().resolve()).toBe(base.resolve());
   });

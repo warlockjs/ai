@@ -35,7 +35,10 @@ describe("rag — index → retrieve", () => {
 
     expect(chunks).toBeGreaterThan(0);
 
-    const result = await kb.retrieve("caching configuration drivers tags", { topK: 3, threshold: 0 });
+    const result = await kb.retrieve("caching configuration drivers tags", {
+      topK: 3,
+      threshold: 0,
+    });
 
     expect(result.chunks.length).toBeGreaterThan(0);
     expect(result.chunks[0].citation.sourceId).toBe("caching");
@@ -68,10 +71,12 @@ describe("rag — index → retrieve", () => {
     const kb = rag({ name: "docs", embedder, store: makeStore(), chunk: { size: 1000 } });
 
     try {
-      await kb.index(makeDocs([
-        { id: "first", text: "first document" },
-        { id: "missing", text: "missing document" },
-      ]));
+      await kb.index(
+        makeDocs([
+          { id: "first", text: "first document" },
+          { id: "missing", text: "missing document" },
+        ]),
+      );
       throw new Error("Expected index() to reject a short embedding response");
     } catch (error) {
       expect(error).toBeInstanceOf(EmbeddingVectorCountMismatchError);
@@ -150,7 +155,12 @@ describe("rag — index → retrieve", () => {
   });
 
   it("clear() drops everything under the rag namespace", async () => {
-    const kb = rag({ name: "docs", embedder: new FakeEmbedder(), store: makeStore(), chunk: { size: 1000 } });
+    const kb = rag({
+      name: "docs",
+      embedder: new FakeEmbedder(),
+      store: makeStore(),
+      chunk: { size: 1000 },
+    });
 
     await kb.index(makeDocs([{ id: "a", text: "alpha beta gamma" }]));
     await kb.clear();
@@ -176,7 +186,9 @@ describe("rag — index → retrieve", () => {
       },
       async embedMany(inputs: string[]): Promise<EmbeddingBatchResult> {
         return {
-          vectors: inputs.map(() => new Array(8).fill(0).map((_, position) => (position === 0 ? 1 : 0))),
+          vectors: inputs.map(() =>
+            new Array(8).fill(0).map((_, position) => (position === 0 ? 1 : 0)),
+          ),
           dimensions: 8,
           usage: { promptTokens: 0, totalTokens: 0 },
         };
@@ -187,7 +199,9 @@ describe("rag — index → retrieve", () => {
 
     await kb.index(makeDocs([{ id: "a", text: "alpha beta" }]));
 
-    await expect(kb.retrieve("alpha beta", { topK: 3, threshold: 0 })).rejects.toThrow(/dimension/i);
+    await expect(kb.retrieve("alpha beta", { topK: 3, threshold: 0 })).rejects.toThrow(
+      /dimension/i,
+    );
   });
 
   it("throws at construction when no embedder is given", () => {

@@ -277,12 +277,7 @@ describe("supervisor — supervisor-level middleware", () => {
 
     await sup.execute("hi");
 
-    expect(order).toEqual([
-      "outer.before",
-      "inner.before",
-      "inner.after",
-      "outer.after",
-    ]);
+    expect(order).toEqual(["outer.before", "inner.before", "inner.after", "outer.after"]);
   });
 
   it("skips middleware that declares no supervisor hook map", async () => {

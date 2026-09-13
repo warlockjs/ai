@@ -25,9 +25,7 @@ describe("agent — event handler error surfacing (C5)", () => {
 
     // Surfaced — no longer a silent swallow. The failure was logged
     // under the dedicated `event.handler.error` code.
-    const handlerWarn = warn.mock.calls.find(
-      call => call[1] === "event.handler.error",
-    );
+    const handlerWarn = warn.mock.calls.find((call) => call[1] === "event.handler.error");
     expect(handlerWarn).toBeDefined();
     expect(String(handlerWarn?.[3] && (handlerWarn[3] as { error?: unknown }).error)).toContain(
       "handler boom",

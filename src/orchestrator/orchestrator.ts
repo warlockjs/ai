@@ -63,13 +63,8 @@ import { computeOrchestratorSignature } from "./signature";
 export function orchestrator<
   TOutput = unknown,
   TState = TOutput,
-  TIntents extends Record<string, SupervisorIntentValue> = Record<
-    string,
-    SupervisorIntentValue
-  >,
->(
-  config: OrchestratorConfig<TOutput, TState, TIntents>,
-): OrchestratorContract<TOutput, TState> {
+  TIntents extends Record<string, SupervisorIntentValue> = Record<string, SupervisorIntentValue>,
+>(config: OrchestratorConfig<TOutput, TState, TIntents>): OrchestratorContract<TOutput, TState> {
   validateFactoryConfig(config as unknown as OrchestratorConfig<unknown>);
 
   const entries = resolveEntries(config as unknown as OrchestratorConfig<unknown>);
@@ -113,9 +108,8 @@ export function orchestrator<
     input: SupervisorInput,
     options: OrchestratorExecuteOptions<TState>,
   ): StreamContract<OrchestratorResult<TOutput>, OrchestratorEvent> {
-    const { controller, stream: contract } = createOrchestratorStream<
-      OrchestratorResult<TOutput>
-    >();
+    const { controller, stream: contract } =
+      createOrchestratorStream<OrchestratorResult<TOutput>>();
 
     const execution = new OrchestratorExecution<TOutput, TState>({
       config: config as unknown as OrchestratorConfig<TOutput, TState>,
@@ -190,10 +184,7 @@ export function orchestrator<
     ): () => void {
       return emitter.on(event, handler);
     },
-    off<K extends OrchestratorEventName>(
-      event: K,
-      handler: OrchestratorEventHandler<K>,
-    ): void {
+    off<K extends OrchestratorEventName>(event: K, handler: OrchestratorEventHandler<K>): void {
       emitter.off(event, handler);
     },
   };
@@ -220,10 +211,9 @@ export function orchestrator<
  */
 function validateFactoryConfig(config: OrchestratorConfig<unknown>): void {
   if (!config.name || typeof config.name !== "string") {
-    throw new OrchestratorConfigError(
-      "ai.orchestrator: `name` is required and must be a string",
-      { context: { authoring: true } },
-    );
+    throw new OrchestratorConfigError("ai.orchestrator: `name` is required and must be a string", {
+      context: { authoring: true },
+    });
   }
 
   if (!config.intents || typeof config.intents !== "object") {
@@ -287,9 +277,7 @@ function validateFactoryConfig(config: OrchestratorConfig<unknown>): void {
  * {@link OrchestratorConfigError} so misuse surfaces under the
  * orchestrator's error family rather than the supervisor's.
  */
-function resolveEntries(
-  config: OrchestratorConfig<unknown>,
-): Map<string, ResolvedIntentEntry> {
+function resolveEntries(config: OrchestratorConfig<unknown>): Map<string, ResolvedIntentEntry> {
   try {
     return resolveIntentEntries(config.intents, config.name);
   } catch (error) {

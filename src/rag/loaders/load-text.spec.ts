@@ -42,16 +42,9 @@ describe("loadText", () => {
   });
 
   it("loads an array, suffixing ids for strings and keeping record ids", () => {
-    const docs = loadText(
-      ["one", { id: "named", text: "two" }, "three"],
-      { id: "batch" },
-    );
+    const docs = loadText(["one", { id: "named", text: "two" }, "three"], { id: "batch" });
 
-    expect(docs.map((doc) => doc.id)).toEqual([
-      "batch#0",
-      "named",
-      "batch#2",
-    ]);
+    expect(docs.map((doc) => doc.id)).toEqual(["batch#0", "named", "batch#2"]);
   });
 
   it("drops empty / whitespace-only items so index() never gets a no-op doc", () => {

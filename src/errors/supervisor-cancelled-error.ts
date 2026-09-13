@@ -26,10 +26,7 @@ export class SupervisorCancelledError extends SupervisorFailedError {
   public readonly cancelledAt: string;
   public readonly reason?: string;
 
-  public constructor(
-    message: string,
-    options: SupervisorCancelledErrorOptions,
-  ) {
+  public constructor(message: string, options: SupervisorCancelledErrorOptions) {
     super(message, options, "SUPERVISOR_CANCELLED");
     this.name = "SupervisorCancelledError";
     this.cancelledAt = options.cancelledAt;

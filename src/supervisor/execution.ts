@@ -818,9 +818,7 @@ export class SupervisorExecution<TOutput> {
         intents: carried.intents,
         source: "route",
         raw:
-          carried.intents.length === 1
-            ? (carried.intents[0] ?? carried.intents)
-            : carried.intents,
+          carried.intents.length === 1 ? (carried.intents[0] ?? carried.intents) : carried.intents,
         durationMs: 0,
       };
 

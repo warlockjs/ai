@@ -10,9 +10,7 @@ export const DEFAULT_ROUTER_WINDOW = 5;
 export const DEFAULT_AGENTS_WINDOW = 15;
 
 /** A history window: keep the last N messages, or a custom slicer. */
-export type HistoryWindowValue =
-  | number
-  | ((messages: Message[]) => Message[]);
+export type HistoryWindowValue = number | ((messages: Message[]) => Message[]);
 
 /**
  * The windowed history bound into each consumer for a turn (§4 Phase
@@ -32,10 +30,7 @@ export type WindowedHistory = {
  * takes full control of the slice (the escape hatch for token-counting
  * or semantic windowing — §4 Phase 4). `N <= 0` keeps nothing.
  */
-export function applyWindow(
-  messages: Message[],
-  window: HistoryWindowValue,
-): Message[] {
+export function applyWindow(messages: Message[], window: HistoryWindowValue): Message[] {
   if (typeof window === "function") {
     return window(messages);
   }

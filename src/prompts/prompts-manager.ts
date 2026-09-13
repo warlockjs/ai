@@ -48,9 +48,7 @@ export function promptKey(name: string, version: string): string {
  * excluded: provenance / description should not defeat idempotency.
  */
 function contentSignature(contract: SystemPromptContract): string {
-  return JSON.stringify(
-    contract.blocks.map(block => [block.type, block.text]),
-  );
+  return JSON.stringify(contract.blocks.map((block) => [block.type, block.text]));
 }
 
 /**
@@ -59,9 +57,7 @@ function contentSignature(contract: SystemPromptContract): string {
  * flattening `export()` performs, so an imported registry resolves identically.
  */
 function blockFromSnapshot(block: PromptDiffBlock): SystemPromptBlockContract {
-  return block.type === "persona"
-    ? new Persona(block.text)
-    : new Instruction(block.text);
+  return block.type === "persona" ? new Persona(block.text) : new Instruction(block.text);
 }
 
 /**
@@ -136,8 +132,7 @@ class PromptsManager implements PromptsManagerContract {
       );
     }
 
-    const version =
-      options.version ?? meta?.version ?? this.nextVersion(name);
+    const version = options.version ?? meta?.version ?? this.nextVersion(name);
     const key = promptKey(name, version);
     const existing = this.entries.get(key);
 
@@ -148,10 +143,9 @@ class PromptsManager implements PromptsManagerContract {
         return this;
       }
 
-      throw new InvalidRequestError(
-        `A different prompt is already registered as "${key}".`,
-        { context: { name, version } },
-      );
+      throw new InvalidRequestError(`A different prompt is already registered as "${key}".`, {
+        context: { name, version },
+      });
     }
 
     if (!this.names.includes(name)) {
@@ -208,23 +202,16 @@ class PromptsManager implements PromptsManagerContract {
 
   public versions(name: string): string[] {
     return [...this.entries.values()]
-      .filter(entry => entry.name === name)
+      .filter((entry) => entry.name === name)
       .sort((a, b) => a.addedAt - b.addedAt)
-      .map(entry => entry.version);
+      .map((entry) => entry.version);
   }
 
-  public resolve(
-    name: string,
-    versionOrTag?: string,
-    placeholders?: Placeholders,
-  ): string {
+  public resolve(name: string, versionOrTag?: string, placeholders?: Placeholders): string {
     return this.requireEntry(name, versionOrTag).contract.resolve(placeholders);
   }
 
-  public define(
-    name: string,
-    versions: readonly PromptTemplateVersion[],
-  ): PromptsManagerContract {
+  public define(name: string, versions: readonly PromptTemplateVersion[]): PromptsManagerContract {
     for (const entry of versions) {
       const blocks = blocksFromTemplate(entry.template);
       // Anonymous contract (no name in meta ⇒ no SystemPrompt constructor
@@ -238,19 +225,12 @@ class PromptsManager implements PromptsManagerContract {
     return this;
   }
 
-  public tag(
-    name: string,
-    tag: string,
-    version: string,
-  ): PromptsManagerContract {
+  public tag(name: string, tag: string, version: string): PromptsManagerContract {
     // Validate the target exists before pinning — a tag to a missing version is
     // an authoring mistake, not a silent dangling pin.
     if (!this.entries.has(promptKey(name, version))) {
       throw new InvalidRequestError(
-        `Cannot tag "${tag}" — no prompt registered as "${promptKey(
-          name,
-          version,
-        )}".`,
+        `Cannot tag "${tag}" — no prompt registered as "${promptKey(name, version)}".`,
         { context: { name, tag, version } },
       );
     }
@@ -269,10 +249,7 @@ class PromptsManager implements PromptsManagerContract {
     const { text, required } = this.describeTarget(target);
 
     const provided = new Set(Object.keys(options.placeholders ?? {}));
-    const declared = new Set<string>([
-      ...required,
-      ...(options.declare ?? []),
-    ]);
+    const declared = new Set<string>([...required, ...(options.declare ?? [])]);
 
     const missing = findMissingPlaceholders(text, provided, declared);
 
@@ -292,7 +269,7 @@ class PromptsManager implements PromptsManagerContract {
         ok,
         missing,
         issues: unreferenced.map(
-          key => `Required key "${key}" is never referenced in the prompt.`,
+          (key) => `Required key "${key}" is never referenced in the prompt.`,
         ),
       };
     }
@@ -300,17 +277,10 @@ class PromptsManager implements PromptsManagerContract {
     // Per-call cache override wins over the manager-level memo. `criteria`
     // (when set) replaces the built-in rubric the judge grades against.
     const cache = options.judgeCache ?? this.judgeCache;
-    const judgeOutcome = await judgePromptBodyCached(
-      text,
-      options.judge,
-      cache,
-      options.criteria,
-    );
+    const judgeOutcome = await judgePromptBodyCached(text, options.judge, cache, options.criteria);
 
     const issues = [
-      ...unreferenced.map(
-        key => `Required key "${key}" is never referenced in the prompt.`,
-      ),
+      ...unreferenced.map((key) => `Required key "${key}" is never referenced in the prompt.`),
       ...judgeOutcome.issues,
     ];
 
@@ -358,18 +328,15 @@ class PromptsManager implements PromptsManagerContract {
       added,
       removed,
       changed,
-      identical:
-        added.length === 0 && removed.length === 0 && changed.length === 0,
+      identical: added.length === 0 && removed.length === 0 && changed.length === 0,
     };
   }
 
   public export(): ExportedRegistry {
     return {
-      prompts: this.names.map(name => ({
+      prompts: this.names.map((name) => ({
         name,
-        versions: this.versions(name).map(version =>
-          this.exportVersion(name, version),
-        ),
+        versions: this.versions(name).map((version) => this.exportVersion(name, version)),
       })),
     };
   }
@@ -440,7 +407,7 @@ class PromptsManager implements PromptsManagerContract {
 
   /** Flatten an entry's blocks to `{ type, text }` snapshots. */
   private snapshotBlocks(entry: PromptsManagerEntry): PromptDiffBlock[] {
-    return entry.contract.blocks.map(block => ({
+    return entry.contract.blocks.map((block) => ({
       type: block.type,
       text: block.text,
     }));
@@ -491,9 +458,7 @@ class PromptsManager implements PromptsManagerContract {
    * `version` label shape.
    */
   private nextVersion(name: string): string {
-    const count = [...this.entries.values()].filter(
-      entry => entry.name === name,
-    ).length;
+    const count = [...this.entries.values()].filter((entry) => entry.name === name).length;
 
     return String(count + 1);
   }
@@ -542,10 +507,7 @@ class PromptsManager implements PromptsManagerContract {
    * Version labels win over tags when both could match — the explicit label is
    * the more specific intent. Returns `undefined` when neither resolves.
    */
-  private resolveSelector(
-    name: string,
-    selector: string,
-  ): PromptsManagerEntry | undefined {
+  private resolveSelector(name: string, selector: string): PromptsManagerEntry | undefined {
     const byVersion = this.entries.get(promptKey(name, selector));
 
     if (byVersion) {
@@ -566,10 +528,7 @@ class PromptsManager implements PromptsManagerContract {
    * throwing {@link InvalidRequestError} when the name or the requested
    * selector is unknown. The single lookup path `get` / `resolve` share.
    */
-  private requireEntry(
-    name: string,
-    versionOrTag?: string,
-  ): PromptsManagerEntry {
+  private requireEntry(name: string, versionOrTag?: string): PromptsManagerEntry {
     const { baseName, selector } = this.parseSelector(name, versionOrTag);
 
     if (selector !== undefined) {
@@ -588,10 +547,9 @@ class PromptsManager implements PromptsManagerContract {
     const latest = this.latestEntry(baseName);
 
     if (!latest) {
-      throw new InvalidRequestError(
-        `No prompt registered under name "${baseName}".`,
-        { context: { name: baseName } },
-      );
+      throw new InvalidRequestError(`No prompt registered under name "${baseName}".`, {
+        context: { name: baseName },
+      });
     }
 
     return latest;
@@ -606,10 +564,9 @@ class PromptsManager implements PromptsManagerContract {
     const entry = this.entries.get(promptKey(name, version));
 
     if (!entry) {
-      throw new InvalidRequestError(
-        `No prompt registered as "${promptKey(name, version)}".`,
-        { context: { name, version } },
-      );
+      throw new InvalidRequestError(`No prompt registered as "${promptKey(name, version)}".`, {
+        context: { name, version },
+      });
     }
 
     return entry;
@@ -621,9 +578,7 @@ class PromptsManager implements PromptsManagerContract {
  * the builder surface (`blocks` array + a callable `resolve`) AND a callable
  * `meta`. Robust across duplicate package copies (no `instanceof`).
  */
-function isSystemPromptContract(
-  value: unknown,
-): value is SystemPromptContract {
+function isSystemPromptContract(value: unknown): value is SystemPromptContract {
   return (
     typeof value === "object" &&
     value !== null &&

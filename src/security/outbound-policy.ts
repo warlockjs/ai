@@ -2,10 +2,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { OutboundPolicyError } from "../errors";
 import { isPrivateOrReservedIp } from "./private-ip";
-import type {
-  OutboundPolicy,
-  ResolvedOutboundPolicy,
-} from "./outbound-policy.type";
+import type { OutboundPolicy, ResolvedOutboundPolicy } from "./outbound-policy.type";
 
 /** 5 MiB — default cap on an outbound response body. */
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
@@ -18,20 +15,14 @@ const DEFAULT_MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /** Credential headers that must not survive a cross-origin redirect. */
-const CROSS_ORIGIN_STRIP_HEADERS = [
-  "authorization",
-  "cookie",
-  "proxy-authorization",
-];
+const CROSS_ORIGIN_STRIP_HEADERS = ["authorization", "cookie", "proxy-authorization"];
 
 /**
  * Fill an {@link OutboundPolicy} with strict defaults: https-only,
  * private-IP deny on, 10s timeout, 5 MiB cap, global `fetch`. Idempotent
  * — resolving an already-resolved policy yields the same shape.
  */
-export function resolveOutboundPolicy(
-  policy: OutboundPolicy = {},
-): ResolvedOutboundPolicy {
+export function resolveOutboundPolicy(policy: OutboundPolicy = {}): ResolvedOutboundPolicy {
   return {
     allowedSchemes: policy.allowedSchemes ?? ["https"],
     hostAllowlist: policy.hostAllowlist,
@@ -52,7 +43,7 @@ function stripBrackets(host: string): string {
 /** Whether `host` equals or is a subdomain of any allowlist entry. */
 function hostAllowed(host: string, allowlist: string[]): boolean {
   const lower = host.toLowerCase();
-  return allowlist.some(entry => {
+  return allowlist.some((entry) => {
     const e = entry.toLowerCase();
     return lower === e || lower.endsWith(`.${e}`);
   });
@@ -79,7 +70,7 @@ export async function assertUrlAllowed(
   }
 
   const scheme = url.protocol.replace(/:$/, "").toLowerCase();
-  if (!policy.allowedSchemes.some(s => s.toLowerCase() === scheme)) {
+  if (!policy.allowedSchemes.some((s) => s.toLowerCase() === scheme)) {
     throw new OutboundPolicyError(
       `outbound request blocked — scheme "${scheme}" is not allowed (allowed: ${policy.allowedSchemes.join(", ")})`,
       { context: { url: rawUrl, scheme } },
@@ -140,10 +131,7 @@ async function assertHostNotPrivate(host: string, rawUrl: string): Promise<void>
 }
 
 /** Merge the internal timeout signal with an optional caller signal. */
-function mergeSignals(
-  timeout: AbortSignal,
-  external?: AbortSignal,
-): AbortSignal {
+function mergeSignals(timeout: AbortSignal, external?: AbortSignal): AbortSignal {
   if (!external) return timeout;
 
   const controller = new AbortController();
@@ -159,9 +147,7 @@ function mergeSignals(
 }
 
 /** Flatten a headers init into a mutable lower-cased-key record. */
-function headersToRecord(
-  headersInit?: RequestInit["headers"],
-): Record<string, string> {
+function headersToRecord(headersInit?: RequestInit["headers"]): Record<string, string> {
   const record: Record<string, string> = {};
   new Headers(headersInit).forEach((value, key) => {
     record[key] = value;
@@ -196,10 +182,9 @@ export async function guardedFetch(
   const timeoutController = new AbortController();
   const timer = setTimeout(() => {
     timeoutController.abort(
-      new OutboundPolicyError(
-        `outbound request timed out after ${policy.timeoutMs}ms`,
-        { context: { url: rawUrl, timeoutMs: policy.timeoutMs } },
-      ),
+      new OutboundPolicyError(`outbound request timed out after ${policy.timeoutMs}ms`, {
+        context: { url: rawUrl, timeoutMs: policy.timeoutMs },
+      }),
     );
   }, policy.timeoutMs);
 
@@ -293,10 +278,7 @@ export async function guardedFetch(
  * chunk-by-chunk and aborted the moment the running total exceeds
  * `maxBytes`. Throws {@link OutboundPolicyError} on overflow.
  */
-export async function readTextCapped(
-  response: Response,
-  maxBytes: number,
-): Promise<string> {
+export async function readTextCapped(response: Response, maxBytes: number): Promise<string> {
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > maxBytes) {
     throw new OutboundPolicyError(
@@ -308,10 +290,9 @@ export async function readTextCapped(
   if (!response.body) {
     const text = await response.text();
     if (Buffer.byteLength(text) > maxBytes) {
-      throw new OutboundPolicyError(
-        `outbound response body exceeded the ${maxBytes}-byte cap`,
-        { context: { maxBytes } },
-      );
+      throw new OutboundPolicyError(`outbound response body exceeded the ${maxBytes}-byte cap`, {
+        context: { maxBytes },
+      });
     }
     return text;
   }
@@ -328,10 +309,9 @@ export async function readTextCapped(
     total += value.byteLength;
     if (total > maxBytes) {
       await reader.cancel();
-      throw new OutboundPolicyError(
-        `outbound response body exceeded the ${maxBytes}-byte cap`,
-        { context: { maxBytes } },
-      );
+      throw new OutboundPolicyError(`outbound response body exceeded the ${maxBytes}-byte cap`, {
+        context: { maxBytes },
+      });
     }
     chunks.push(value);
   }

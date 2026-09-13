@@ -43,7 +43,7 @@ describe("supervisor — goal field", () => {
       name: "goal-route-ctx",
       goal: "Recommend the best AC unit for the user's home.",
       intents: { noop: unit },
-      route: ctx => {
+      route: (ctx) => {
         seen = ctx.goal;
         return ctx.iteration === 0 ? "noop" : END;
       },
@@ -65,8 +65,8 @@ describe("supervisor — goal field", () => {
       name: "goal-evaluate-ctx",
       goal: "Produce a complete BTU calculation.",
       intents: { noop: unit },
-      route: ctx => (ctx.iteration === 0 ? "noop" : END),
-      evaluate: ctx => {
+      route: (ctx) => (ctx.iteration === 0 ? "noop" : END),
+      evaluate: (ctx) => {
         seen = ctx.goal;
         return { satisfied: true };
       },
@@ -87,7 +87,7 @@ describe("supervisor — goal field", () => {
     const sup = supervisor({
       name: "no-goal",
       intents: { noop: unit },
-      route: ctx => {
+      route: (ctx) => {
         seen = ctx.goal;
         return ctx.iteration === 0 ? "noop" : END;
       },
@@ -113,7 +113,7 @@ describe("supervisor — goal field", () => {
       name: "goal-system-prompt",
       goal: goalPrompt,
       intents: { noop: unit },
-      route: ctx => {
+      route: (ctx) => {
         seen = ctx.goal;
         return ctx.iteration === 0 ? "noop" : END;
       },
@@ -149,12 +149,10 @@ describe("supervisor — goal field", () => {
     // Router's user message is the last `user` role message in the
     // first call's messages array.
     const routerCall = routerModel.callHistory[0].messages;
-    const userMsg = [...routerCall].reverse().find(m => m.role === "user");
+    const userMsg = [...routerCall].reverse().find((m) => m.role === "user");
     expect(userMsg).toBeDefined();
     expect(userMsg?.content).toContain("Goal:");
-    expect(userMsg?.content).toContain(
-      "Resolve the customer's complaint efficiently.",
-    );
+    expect(userMsg?.content).toContain("Resolve the customer's complaint efficiently.");
   });
 
   it("router prompt has no Goal section when goal is unset", async () => {
@@ -180,7 +178,7 @@ describe("supervisor — goal field", () => {
     await sup.execute("hi");
 
     const routerCall = routerModel.callHistory[0].messages;
-    const userMsg = [...routerCall].reverse().find(m => m.role === "user");
+    const userMsg = [...routerCall].reverse().find((m) => m.role === "user");
     expect(userMsg?.content).not.toContain("Goal:");
   });
 });

@@ -8,10 +8,7 @@ import { loadPdf } from "./load-pdf";
 const FAKE_PAGES = ["Page one text.", "Page two text."];
 
 const parse = vi.fn(
-  async (
-    _data: Buffer,
-    options?: { pagerender?: (page: unknown) => unknown },
-  ) => {
+  async (_data: Buffer, options?: { pagerender?: (page: unknown) => unknown }) => {
     if (options?.pagerender) {
       for (const pageText of FAKE_PAGES) {
         // Each fake page exposes a getTextContent the loader's renderer calls.

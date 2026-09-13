@@ -55,7 +55,9 @@ export type OrchestratorSessionScope = "fresh" | "shared";
  */
 export type OrchestratorToolSession =
   | string
-  | ((ctx: ToolContext | undefined) =>
+  | ((
+      ctx: ToolContext | undefined,
+    ) =>
       | string
       | OrchestratorToolSessionBinding
       | undefined
@@ -221,17 +223,11 @@ export interface OrchestratorContract<TOutput = unknown, TState = TOutput> {
    * Subscribe an instance-level handler — tier 2 of the 3-tier model.
    * Returns an unsubscribe function equivalent to `off(event, handler)`.
    */
-  on<K extends OrchestratorEventName>(
-    event: K,
-    handler: OrchestratorEventHandler<K>,
-  ): () => void;
+  on<K extends OrchestratorEventName>(event: K, handler: OrchestratorEventHandler<K>): () => void;
 
   /**
    * Remove a previously-subscribed instance-level handler. No-op when
    * the handler was never registered or already removed.
    */
-  off<K extends OrchestratorEventName>(
-    event: K,
-    handler: OrchestratorEventHandler<K>,
-  ): void;
+  off<K extends OrchestratorEventName>(event: K, handler: OrchestratorEventHandler<K>): void;
 }

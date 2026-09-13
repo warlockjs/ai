@@ -157,10 +157,7 @@ export type PromptRegistryContract = {
    * `judge` scorer. With no judge model, returns the static-lint findings only
    * and never throws.
    */
-  validate(
-    textOrName: string,
-    options?: PromptValidateOptions,
-  ): Promise<PromptValidationReport>;
+  validate(textOrName: string, options?: PromptValidateOptions): Promise<PromptValidationReport>;
   /**
    * Synchronize named prompts with Langfuse-prompts. Lazily imports the
    * optional `langfuse` peer; pulls named prompts into the catalog and/or

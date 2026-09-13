@@ -1,9 +1,6 @@
 import type { CacheDriver, CacheSimilarHit } from "@warlock.js/cache";
 import type { EmbedderContract } from "../contracts/embedder.contract";
-import type {
-  MemoryItem,
-  RecalledMemory,
-} from "../contracts/memory/memory-item.type";
+import type { MemoryItem, RecalledMemory } from "../contracts/memory/memory-item.type";
 import { deriveMemoryId } from "./derive-id";
 
 /**
@@ -141,10 +138,7 @@ export class ProceduralMemory {
   private blend(similarity: number, uses: number): number {
     const reinforcement = uses / (uses + 1);
 
-    return (
-      (1 - this.reinforcementWeight) * similarity +
-      this.reinforcementWeight * reinforcement
-    );
+    return (1 - this.reinforcementWeight) * similarity + this.reinforcementWeight * reinforcement;
   }
 
   /**

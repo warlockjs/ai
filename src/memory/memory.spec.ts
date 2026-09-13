@@ -54,8 +54,7 @@ class DeterministicEmbedder implements EmbedderContract {
       buckets[index % 4] += text.charCodeAt(index);
     }
 
-    const norm =
-      Math.sqrt(buckets.reduce((sum, value) => sum + value * value, 0)) || 1;
+    const norm = Math.sqrt(buckets.reduce((sum, value) => sum + value * value, 0)) || 1;
 
     return buckets.map((value) => value / norm);
   }
@@ -84,9 +83,7 @@ describe("memory — construction", () => {
   });
 
   it("throws when defaultTier references a disabled tier", () => {
-    expect(() => memory({ defaultTier: "semantic" })).toThrow(
-      /semantic tier is not configured/,
-    );
+    expect(() => memory({ defaultTier: "semantic" })).toThrow(/semantic tier is not configured/);
   });
 });
 
@@ -385,9 +382,7 @@ describe("memory — procedural tier", () => {
     await mem.remember({ text: "a learned procedure" });
     await mem.clear("procedural");
 
-    expect(
-      await mem.recall("a learned procedure", { tier: "procedural" }),
-    ).toHaveLength(0);
+    expect(await mem.recall("a learned procedure", { tier: "procedural" })).toHaveLength(0);
   });
 });
 
@@ -444,12 +439,8 @@ describe("memory — scope isolation (security)", () => {
 
     await mem.remember({ text: "deployed the billing service", scope: "tenant-a" });
 
-    expect(
-      await mem.recall("deployed the billing service", { scope: "tenant-b" }),
-    ).toHaveLength(0);
-    expect(
-      await mem.recall("deployed the billing service", { scope: "tenant-a" }),
-    ).toHaveLength(1);
+    expect(await mem.recall("deployed the billing service", { scope: "tenant-b" })).toHaveLength(0);
+    expect(await mem.recall("deployed the billing service", { scope: "tenant-a" })).toHaveLength(1);
   });
 
   it("procedural tier: a scope never recalls another scope's entries", async () => {
@@ -462,12 +453,8 @@ describe("memory — scope isolation (security)", () => {
 
     await mem.remember({ text: "escalate refunds over $500", scope: "tenant-a" });
 
-    expect(
-      await mem.recall("escalate refunds over $500", { scope: "tenant-b" }),
-    ).toHaveLength(0);
-    expect(
-      await mem.recall("escalate refunds over $500", { scope: "tenant-a" }),
-    ).toHaveLength(1);
+    expect(await mem.recall("escalate refunds over $500", { scope: "tenant-b" })).toHaveLength(0);
+    expect(await mem.recall("escalate refunds over $500", { scope: "tenant-a" })).toHaveLength(1);
   });
 
   it("an unscoped recall reads only the unscoped pool — it is not a wildcard", async () => {
@@ -483,10 +470,7 @@ describe("memory — scope isolation (security)", () => {
 
     const hits = await mem.recall("fact", { k: 10 });
 
-    expect(hits.map((hit) => hit.text).sort()).toEqual([
-      "global fact",
-      "global note",
-    ]);
+    expect(hits.map((hit) => hit.text).sort()).toEqual(["global fact", "global note"]);
   });
 
   it("identical text under two scopes stays two independent entries in every tier", async () => {
@@ -587,9 +571,10 @@ describe("memory — working tier size bound (security)", () => {
     // The bound is global, so A's older entry is the one evicted — but a
     // scoped recall still only ever sees its own scope.
     expect(await mem.recall("query", { scope: "session:a" })).toHaveLength(0);
-    expect(
-      (await mem.recall("query", { scope: "session:b" })).map((hit) => hit.text),
-    ).toEqual(["B two", "B one"]);
+    expect((await mem.recall("query", { scope: "session:b" })).map((hit) => hit.text)).toEqual([
+      "B two",
+      "B one",
+    ]);
   });
 
   it("overwriting an existing id keeps its slot instead of consuming a new one", async () => {

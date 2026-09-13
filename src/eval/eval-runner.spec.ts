@@ -177,9 +177,7 @@ describe("agent.eval", () => {
     });
 
     const report = await subject.eval({
-      cases: [
-        { name: "always", input: "?", scorers: [predicate(() => true)] },
-      ],
+      cases: [{ name: "always", input: "?", scorers: [predicate(() => true)] }],
       scorers: [exact()],
     });
 
@@ -189,9 +187,9 @@ describe("agent.eval", () => {
   it("should throw at author time when a case has no scorer", async () => {
     const subject = mockAgent({ name: "writer" });
 
-    await expect(
-      subject.eval({ cases: [{ name: "orphan", input: "?" }] }),
-    ).rejects.toThrow(/no scorer/);
+    await expect(subject.eval({ cases: [{ name: "orphan", input: "?" }] })).rejects.toThrow(
+      /no scorer/,
+    );
   });
 
   it("should fail a case when the agent itself errors", async () => {

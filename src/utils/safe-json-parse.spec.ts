@@ -13,9 +13,7 @@ describe("safeJsonParse", () => {
   it("parses valid JSON primitives", () => {
     expect(safeJsonParse<number>("42", 0)).toBe(42);
     expect(safeJsonParse<boolean>("true", false)).toBe(true);
-    expect(
-      safeJsonParse<null>("null", undefined as unknown as null),
-    ).toBeNull();
+    expect(safeJsonParse<null>("null", undefined as unknown as null)).toBeNull();
   });
 
   it("returns the default for null input", () => {

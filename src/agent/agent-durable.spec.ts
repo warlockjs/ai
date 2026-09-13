@@ -53,10 +53,7 @@ class FlakyModel implements ModelContract {
     this.name = name;
   }
 
-  public async complete(
-    _messages: Message[],
-    _options?: ModelCallOptions,
-  ): Promise<ModelResponse> {
+  public async complete(_messages: Message[], _options?: ModelCallOptions): Promise<ModelResponse> {
     this.completeCalls++;
 
     // Trip 0 — request the tool. Always succeeds, gets checkpointed.

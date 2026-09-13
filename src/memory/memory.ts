@@ -1,13 +1,6 @@
 import { resolveDefaultStore } from "../config";
-import type {
-  MemoryConfig,
-  WorkingMemoryConfig,
-} from "../contracts/memory/memory-config.type";
-import type {
-  MemoryItem,
-  MemoryTier,
-  RecalledMemory,
-} from "../contracts/memory/memory-item.type";
+import type { MemoryConfig, WorkingMemoryConfig } from "../contracts/memory/memory-config.type";
+import type { MemoryItem, MemoryTier, RecalledMemory } from "../contracts/memory/memory-item.type";
 import type { MemoryContract } from "../contracts/memory/memory.contract";
 import type { RecallOptions } from "../contracts/memory/recall-options.type";
 import { EpisodicMemory } from "./episodic-memory";
@@ -91,17 +84,11 @@ export function memory(config: MemoryConfig = {}): MemoryContract {
       ? undefined
       : new WorkingMemory(resolveWorkingMaxItems(workingConfig, name));
 
-  const semantic = config.semantic
-    ? buildSemanticTier(config.semantic, name)
-    : undefined;
+  const semantic = config.semantic ? buildSemanticTier(config.semantic, name) : undefined;
 
-  const episodic = config.episodic
-    ? buildEpisodicTier(config.episodic, name)
-    : undefined;
+  const episodic = config.episodic ? buildEpisodicTier(config.episodic, name) : undefined;
 
-  const procedural = config.procedural
-    ? buildProceduralTier(config.procedural, name)
-    : undefined;
+  const procedural = config.procedural ? buildProceduralTier(config.procedural, name) : undefined;
 
   const tiers: Tiers = { working, semantic, episodic, procedural };
 
@@ -150,10 +137,7 @@ export function memory(config: MemoryConfig = {}): MemoryContract {
 
       await Promise.all(writes);
     },
-    async recall(
-      query: string,
-      options: RecallOptions = {},
-    ): Promise<RecalledMemory[]> {
+    async recall(query: string, options: RecallOptions = {}): Promise<RecalledMemory[]> {
       const k = options.k ?? defaultK;
       const threshold = options.threshold ?? defaultThreshold;
 
@@ -161,36 +145,29 @@ export function memory(config: MemoryConfig = {}): MemoryContract {
         assertTierEnabled(options.tier, tiers, name);
       }
 
-      const wants = (tier: MemoryTier): boolean =>
-        !options.tier || options.tier === tier;
+      const wants = (tier: MemoryTier): boolean => !options.tier || options.tier === tier;
 
       // `options.scope` is the isolation key — each tier applies it as an
       // exact-equality filter internally, BEFORE its own scoring and
       // slicing, so nothing outside the scope reaches this merge.
       const scope = options.scope;
 
-      const [workingHits, semanticHits, episodicHits, proceduralHits] =
-        await Promise.all([
-          working && wants("working")
-            ? Promise.resolve(working.recall(k, scope))
-            : Promise.resolve([] as RecalledMemory[]),
-          semantic && wants("semantic")
-            ? semantic.recall(query, k, threshold, scope)
-            : Promise.resolve([] as RecalledMemory[]),
-          episodic && wants("episodic")
-            ? episodic.recall(query, k, threshold, scope)
-            : Promise.resolve([] as RecalledMemory[]),
-          procedural && wants("procedural")
-            ? procedural.recall(query, k, threshold, scope)
-            : Promise.resolve([] as RecalledMemory[]),
-        ]);
+      const [workingHits, semanticHits, episodicHits, proceduralHits] = await Promise.all([
+        working && wants("working")
+          ? Promise.resolve(working.recall(k, scope))
+          : Promise.resolve([] as RecalledMemory[]),
+        semantic && wants("semantic")
+          ? semantic.recall(query, k, threshold, scope)
+          : Promise.resolve([] as RecalledMemory[]),
+        episodic && wants("episodic")
+          ? episodic.recall(query, k, threshold, scope)
+          : Promise.resolve([] as RecalledMemory[]),
+        procedural && wants("procedural")
+          ? procedural.recall(query, k, threshold, scope)
+          : Promise.resolve([] as RecalledMemory[]),
+      ]);
 
-      return [
-        ...workingHits,
-        ...semanticHits,
-        ...episodicHits,
-        ...proceduralHits,
-      ]
+      return [...workingHits, ...semanticHits, ...episodicHits, ...proceduralHits]
         .sort((first, second) => second.score - first.score)
         .slice(0, k);
     },
@@ -234,10 +211,7 @@ type Tiers = {
  * process-resident for the life of the memory instance, so "no cap" is
  * a memory-exhaustion vector, not a configuration choice.
  */
-function resolveWorkingMaxItems(
-  workingConfig: true | WorkingMemoryConfig,
-  name: string,
-): number {
+function resolveWorkingMaxItems(workingConfig: true | WorkingMemoryConfig, name: string): number {
   const maxItems =
     workingConfig === true
       ? DEFAULT_WORKING_MAX_ITEMS

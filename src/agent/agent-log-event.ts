@@ -88,8 +88,7 @@ export function logAgentEvent<K extends keyof AgentEventMap>(
     }
 
     case "agent.tool.calling": {
-      const { tool, tripIndex } =
-        payload as AgentEventMap["agent.tool.calling"];
+      const { tool, tripIndex } = payload as AgentEventMap["agent.tool.calling"];
       logger.debug(ctx.module, action, `calling tool "${tool.name}"`, {
         tool: tool.name,
         action: tool.action,
@@ -109,8 +108,7 @@ export function logAgentEvent<K extends keyof AgentEventMap>(
     }
 
     case "agent.tool.failed": {
-      const { tool, error, tripIndex } =
-        payload as AgentEventMap["agent.tool.failed"];
+      const { tool, error, tripIndex } = payload as AgentEventMap["agent.tool.failed"];
 
       logger.warn(ctx.module, action, `tool "${tool.name}" failed`, {
         tool: tool.name,

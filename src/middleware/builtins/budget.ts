@@ -1,7 +1,4 @@
-import type {
-  AgentMiddleware,
-  MiddlewareExecuteContext,
-} from "../../contracts/middleware";
+import type { AgentMiddleware, MiddlewareExecuteContext } from "../../contracts/middleware";
 import { BudgetExceededError, type BudgetUnit } from "../../errors";
 import { namespacedState } from "../utils";
 import type {
@@ -122,16 +119,12 @@ const DIMENSION_UNIT: Record<BudgetContractDimension, BudgetUnit> = {
   latency: "requests",
 };
 
-function breach(
-  limit: number,
-  actual: number,
-  unit: BudgetUnit,
-  name: string,
-): never {
-  throw new BudgetExceededError(
-    `budget "${name}" exceeded — ${actual} ${unit} (cap: ${limit})`,
-    { limit, actual, unit },
-  );
+function breach(limit: number, actual: number, unit: BudgetUnit, name: string): never {
+  throw new BudgetExceededError(`budget "${name}" exceeded — ${actual} ${unit} (cap: ${limit})`, {
+    limit,
+    actual,
+    unit,
+  });
 }
 
 function breachContract(
@@ -180,10 +173,7 @@ export function readBudgetFallbackSignal(
   state: MiddlewareExecuteContext["state"],
   name = "budget",
 ): BudgetFallbackSignal | undefined {
-  return namespacedState<BudgetFallbackSignal>(
-    { state },
-    `${name}.fallback`,
-  ).get();
+  return namespacedState<BudgetFallbackSignal>({ state }, `${name}.fallback`).get();
 }
 
 /**
@@ -426,9 +416,7 @@ async function enforceContract(
     mode,
   };
 
-  namespacedState<BudgetContractViolation>(context, `${name}.fallback`).set(
-    violation,
-  );
+  namespacedState<BudgetContractViolation>(context, `${name}.fallback`).set(violation);
 
   if (!contract.fallback) {
     return;

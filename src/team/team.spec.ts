@@ -20,10 +20,7 @@ function member(entry: IntentRunEntry): TeamMemberValue {
 }
 
 /** A member that writes a fixed state slice via its `output` schema. */
-function writes<T extends Record<string, unknown>>(
-  description: string,
-  slice: T,
-): TeamMemberValue {
+function writes<T extends Record<string, unknown>>(description: string, slice: T): TeamMemberValue {
   return member({
     run: async () => slice,
     description,
@@ -104,9 +101,7 @@ describe("ai.team — desugaring to a real supervisor", () => {
     const result = await built.execute("build it");
 
     expect(result.error).toBeUndefined();
-    const dispatched = result.report.snapshots.flatMap((snapshot) =>
-      Object.keys(snapshot.result),
-    );
+    const dispatched = result.report.snapshots.flatMap((snapshot) => Object.keys(snapshot.result));
     expect(dispatched).toContain("builder");
   });
 

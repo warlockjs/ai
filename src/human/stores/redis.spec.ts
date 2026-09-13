@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  PendingInterrupt,
-  RedisClientLike,
-} from "../contracts/interrupt-store.contract";
+import type { PendingInterrupt, RedisClientLike } from "../contracts/interrupt-store.contract";
 import { redis } from "./redis";
 
 // Simulate `redis` NOT being installed: a dynamic `import("redis")`
@@ -39,9 +36,7 @@ function makeFakeRedis(): RedisClientLike & { store: Map<string, string> } {
   };
 }
 
-function makeInterrupt(
-  overrides: Partial<PendingInterrupt> = {},
-): PendingInterrupt {
+function makeInterrupt(overrides: Partial<PendingInterrupt> = {}): PendingInterrupt {
   return {
     interruptId: "support.sess-1.0.abc",
     request: {
@@ -93,9 +88,7 @@ describe("redis interrupt store", () => {
     await store.save(makeInterrupt({ status: "pending" }));
     await store.save(makeInterrupt({ status: "resolved" }));
 
-    expect((await store.load("support.sess-1.0.abc"))?.status).toBe(
-      "resolved",
-    );
+    expect((await store.load("support.sess-1.0.abc"))?.status).toBe("resolved");
   });
 
   it("should namespace keys under the default prefix", async () => {
@@ -149,10 +142,7 @@ describe("redis interrupt store", () => {
     await store.save(makeInterrupt({ interruptId: "support.2" }));
     await store.save(makeInterrupt({ interruptId: "billing.1" }));
 
-    expect((await store.list?.("support."))?.sort()).toEqual([
-      "support.1",
-      "support.2",
-    ]);
+    expect((await store.list?.("support."))?.sort()).toEqual(["support.1", "support.2"]);
   });
 
   it("should not double-index a re-saved id", async () => {
@@ -176,8 +166,6 @@ describe("redis interrupt store", () => {
     // on the first operation that needs the client.
     const store = redis({ url: "redis://localhost:6379" });
 
-    await expect(store.save(makeInterrupt())).rejects.toThrow(
-      /requires the redis package/,
-    );
+    await expect(store.save(makeInterrupt())).rejects.toThrow(/requires the redis package/);
   });
 });

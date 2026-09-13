@@ -113,21 +113,16 @@ export async function runPipeline<Level extends MiddlewareLevel, TResult>(
           });
         }
 
-        const shortCircuit = await (
-          hooks.before as (ctx: unknown) => Promise<unknown> | unknown
-        )(context);
+        const shortCircuit = await (hooks.before as (ctx: unknown) => Promise<unknown> | unknown)(
+          context,
+        );
 
         if (shortCircuit !== undefined) {
           if (logEnabled) {
-            activeLogger.debug(
-              LOG_MODULE,
-              `${level}.short-circuit`,
-              middleware.name,
-              {
-                middleware: middleware.name,
-                level,
-              },
-            );
+            activeLogger.debug(LOG_MODULE, `${level}.short-circuit`, middleware.name, {
+              middleware: middleware.name,
+              level,
+            });
           }
 
           return shortCircuit as TResult;
@@ -144,10 +139,7 @@ export async function runPipeline<Level extends MiddlewareLevel, TResult>(
         }
 
         const recovered = await (
-          hooks.onError as (
-            ctx: unknown,
-            error: unknown,
-          ) => Promise<unknown> | unknown
+          hooks.onError as (ctx: unknown, error: unknown) => Promise<unknown> | unknown
         )(context, thrown);
 
         if (recovered === undefined) {
@@ -166,10 +158,7 @@ export async function runPipeline<Level extends MiddlewareLevel, TResult>(
 
       if (hooks.after) {
         const replacement = await (
-          hooks.after as (
-            ctx: unknown,
-            value: unknown,
-          ) => Promise<unknown> | unknown
+          hooks.after as (ctx: unknown, value: unknown) => Promise<unknown> | unknown
         )(context, result);
 
         if (replacement !== undefined) {

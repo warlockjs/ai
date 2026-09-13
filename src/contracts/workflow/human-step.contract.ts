@@ -53,11 +53,7 @@ export type HumanStepContract<
   /** Marks this as a human-input suspend step (discriminator). */
   type: "human";
   /** Prompt/instructions shown to the reviewer; may read `ctx`. */
-  prompt:
-    | string
-    | ((
-        ctx: WorkflowContext<TInput, TState, TContext>,
-      ) => string | Promise<string>);
+  prompt: string | ((ctx: WorkflowContext<TInput, TState, TContext>) => string | Promise<string>);
   /** Schema the resume payload (`resume(runId, { resumeWith })`) is validated against. */
   resumeSchema?: StandardSchemaV1<TResume>;
   /** Applies the human's resume payload back into `ctx.state` on resume. */

@@ -12,29 +12,29 @@ import type { PromptValidationNote } from "./prompt.type";
 describe("staticLint", () => {
   it("flags a too-short prompt", () => {
     const notes = staticLint("Hi");
-    expect(notes.some(n => n.message.includes("very short"))).toBe(true);
+    expect(notes.some((n) => n.message.includes("very short"))).toBe(true);
   });
 
   it("flags an over-length prompt", () => {
     const notes = staticLint("You are A. " + "x".repeat(9000));
-    expect(notes.some(n => n.message.includes("very long"))).toBe(true);
+    expect(notes.some((n) => n.message.includes("very long"))).toBe(true);
   });
 
   it("flags an unresolved placeholder", () => {
     const notes = staticLint("You are a helpful agent for {{product}} support.");
-    const note = notes.find(n => n.message.includes("{{product}}"));
+    const note = notes.find((n) => n.message.includes("{{product}}"));
     expect(note).toBeDefined();
     expect(note?.severity).toBe("info");
   });
 
   it("does not flag a placeholder that carries a default", () => {
     const notes = staticLint("You are a helpful agent. Reply in {{language|English}}.");
-    expect(notes.find(n => n.message.includes("Unresolved placeholder"))).toBeDefined();
+    expect(notes.find((n) => n.message.includes("Unresolved placeholder"))).toBeDefined();
   });
 
   it("flags a missing role line", () => {
     const notes = staticLint("Always answer concisely and cite a source.");
-    expect(notes.some(n => n.message.includes("No role line"))).toBe(true);
+    expect(notes.some((n) => n.message.includes("No role line"))).toBe(true);
   });
 
   it("passes a well-formed prompt with a role and no placeholders", () => {
@@ -55,7 +55,7 @@ describe("sortNotesBySeverity", () => {
     ];
 
     const sorted = sortNotesBySeverity(input);
-    expect(sorted.map(n => n.message)).toEqual(["e1", "e2", "w1", "i1"]);
+    expect(sorted.map((n) => n.message)).toEqual(["e1", "e2", "w1", "i1"]);
   });
 });
 
@@ -93,18 +93,16 @@ describe("prompt().validate — static only (no model)", () => {
     const registry = prompt();
     const report = await registry.validate("Always answer concisely.");
     expect(report.score).toBeGreaterThanOrEqual(0);
-    expect(report.notes.some(n => n.message.includes("No role line"))).toBe(true);
+    expect(report.notes.some((n) => n.message.includes("No role line"))).toBe(true);
   });
 
   it("validates a registered prompt by name (latest version)", async () => {
     const registry = prompt({
-      prompts: [
-        { name: "a", versions: [{ version: "1", template: "Always concise." }] },
-      ],
+      prompts: [{ name: "a", versions: [{ version: "1", template: "Always concise." }] }],
     });
 
     const report = await registry.validate("a");
-    expect(report.notes.some(n => n.message.includes("No role line"))).toBe(true);
+    expect(report.notes.some((n) => n.message.includes("No role line"))).toBe(true);
   });
 
   it("validates a specific registered version", async () => {
@@ -113,7 +111,10 @@ describe("prompt().validate — static only (no model)", () => {
         {
           name: "a",
           versions: [
-            { version: "1", template: "You are a clear, helpful senior engineer answering questions." },
+            {
+              version: "1",
+              template: "You are a clear, helpful senior engineer answering questions.",
+            },
             { version: "2", template: "x" },
           ],
         },
@@ -121,7 +122,7 @@ describe("prompt().validate — static only (no model)", () => {
     });
 
     const report = await registry.validate("a", { version: "2" });
-    expect(report.notes.some(n => n.message.includes("very short"))).toBe(true);
+    expect(report.notes.some((n) => n.message.includes("very short"))).toBe(true);
   });
 });
 
@@ -137,7 +138,7 @@ describe("prompt().validate — with judge model", () => {
       { model },
     );
 
-    expect(report.notes.some(n => n.message.includes("LLM-as-judge"))).toBe(true);
+    expect(report.notes.some((n) => n.message.includes("LLM-as-judge"))).toBe(true);
     // static is 1.0 (clean), judge is 0.9 → mean 0.95
     expect(report.score).toBe(0.95);
   });
@@ -146,11 +147,9 @@ describe("prompt().validate — with judge model", () => {
     const model = new MockModel("judge", [{ content: judgeJson }]);
     const registry = prompt({ judgeModel: model });
 
-    const report = await registry.validate(
-      "You are a senior support engineer. Answer concisely.",
-    );
+    const report = await registry.validate("You are a senior support engineer. Answer concisely.");
 
-    expect(report.notes.some(n => n.message.includes("LLM-as-judge"))).toBe(true);
+    expect(report.notes.some((n) => n.message.includes("LLM-as-judge"))).toBe(true);
   });
 
   it("marks a low-scoring judge finding as a warning", async () => {
@@ -159,12 +158,11 @@ describe("prompt().validate — with judge model", () => {
     ]);
     const registry = prompt();
 
-    const report = await registry.validate(
-      "You are a senior support engineer. Answer concisely.",
-      { model },
-    );
+    const report = await registry.validate("You are a senior support engineer. Answer concisely.", {
+      model,
+    });
 
-    const judgeNote = report.notes.find(n => n.message.includes("LLM-as-judge"));
+    const judgeNote = report.notes.find((n) => n.message.includes("LLM-as-judge"));
     expect(judgeNote?.severity).toBe("warn");
   });
 });

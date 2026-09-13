@@ -10,11 +10,7 @@ export type {
   AgentTripStartedPayload,
   ToolEventMeta,
 } from "./agent-events.type";
-export type {
-  AgentEventMap,
-  SupervisorEventMap,
-  WorkflowEventMap,
-} from "./event-map.type";
+export type { AgentEventMap, SupervisorEventMap, WorkflowEventMap } from "./event-map.type";
 export type { CompleteEvent } from "./complete-event.type";
 export type { EventIdentity, WithoutIdentity } from "./event-identity.type";
 export type { UsageEvent } from "./usage-event.type";

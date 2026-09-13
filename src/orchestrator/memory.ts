@@ -1,8 +1,5 @@
 import type { MemoryContract } from "../contracts/memory/memory.contract";
-import type {
-  MemoryItem,
-  RecalledMemory,
-} from "../contracts/memory/memory-item.type";
+import type { MemoryItem, RecalledMemory } from "../contracts/memory/memory-item.type";
 import type {
   OrchestratorMemoryConfig,
   OrchestratorMemoryScope,
@@ -60,9 +57,7 @@ type ResolvedTier = NonNullable<OrchestratorMemoryConfig["recall"]>["tier"];
  * presence of `recall` — a method on the contract, absent on the config
  * (whose own `recall` is a plain options object, never a function).
  */
-function isBareMemory(
-  value: MemoryContract | OrchestratorMemoryConfig,
-): value is MemoryContract {
+function isBareMemory(value: MemoryContract | OrchestratorMemoryConfig): value is MemoryContract {
   return typeof (value as MemoryContract).recall === "function";
 }
 
@@ -270,10 +265,7 @@ function buildOutcomeText(
  * contributes every output. Returns `undefined` when the turn produced
  * no usable text — the caller then remembers the input alone.
  */
-export function outcomeTextFromTurn(
-  data: unknown,
-  turnSnapshot: TurnSnapshot,
-): string | undefined {
+export function outcomeTextFromTurn(data: unknown, turnSnapshot: TurnSnapshot): string | undefined {
   const fromData = stringifyOutcome(data);
 
   if (fromData) {

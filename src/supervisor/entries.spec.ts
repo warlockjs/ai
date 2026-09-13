@@ -4,11 +4,7 @@ import type { WorkflowResult } from "../contracts/result/workflow-result.type";
 import type { SupervisorIntentValue } from "../contracts/supervisor/intent-entry.type";
 import type { WorkflowInstance } from "../contracts/workflow/workflow.contract";
 import { buildScriptedAgent } from "./_test-helpers";
-import {
-  isAgentResult,
-  isWorkflowResult,
-  resolveIntentEntries,
-} from "./entries";
+import { isAgentResult, isWorkflowResult, resolveIntentEntries } from "./entries";
 
 /** A minimal workflow-shaped unit — `signature: string` is the discriminant. */
 function fakeWorkflow(
@@ -69,10 +65,7 @@ describe("resolveIntentEntries — happy resolution", () => {
   });
 
   it("resolves a workflow unit into a workflow entry", () => {
-    const map = resolveIntentEntries(
-      { research: fakeWorkflow("research") },
-      "sup",
-    );
+    const map = resolveIntentEntries({ research: fakeWorkflow("research") }, "sup");
 
     expect(map.get("research")?.type).toBe("workflow");
   });
@@ -80,17 +73,12 @@ describe("resolveIntentEntries — happy resolution", () => {
 
 describe("resolveIntentEntries — author-time validation", () => {
   it("throws when the intents map is empty", () => {
-    expect(() => resolveIntentEntries({}, "sup")).toThrow(
-      /must contain at least one entry/,
-    );
+    expect(() => resolveIntentEntries({}, "sup")).toThrow(/must contain at least one entry/);
   });
 
   it("throws when a value is neither agent, workflow, callback, nor entry object", () => {
     expect(() =>
-      resolveIntentEntries(
-        { bad: 42 as unknown as SupervisorIntentValue },
-        "sup",
-      ),
+      resolveIntentEntries({ bad: 42 as unknown as SupervisorIntentValue }, "sup"),
     ).toThrow(/is not an agent, workflow, callback, or entry object/);
   });
 
@@ -144,7 +132,7 @@ describe("resolveIntentEntries — author-time validation", () => {
 });
 
 describe("isAgentResult / isWorkflowResult", () => {
-  it("isAgentResult narrows on the `type: \"agent\"` discriminant", () => {
+  it('isAgentResult narrows on the `type: "agent"` discriminant', () => {
     const agentRaw = { type: "agent" } as AgentResult<unknown>;
     const workflowRaw = { type: "workflow" } as WorkflowResult<unknown>;
 
@@ -152,7 +140,7 @@ describe("isAgentResult / isWorkflowResult", () => {
     expect(isAgentResult(workflowRaw)).toBe(false);
   });
 
-  it("isWorkflowResult narrows on the `type: \"workflow\"` discriminant", () => {
+  it('isWorkflowResult narrows on the `type: "workflow"` discriminant', () => {
     const agentRaw = { type: "agent" } as AgentResult<unknown>;
     const workflowRaw = { type: "workflow" } as WorkflowResult<unknown>;
 

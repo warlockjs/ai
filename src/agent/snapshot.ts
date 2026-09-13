@@ -1,11 +1,6 @@
 import { resolveDefaultSnapshotStore } from "../config";
-import type {
-  AgentResumeOptions,
-} from "../contracts/agent/agent-options.type";
-import type {
-  AgentSnapshot,
-  AgentSnapshotStatus,
-} from "../contracts/agent/agent-snapshot.type";
+import type { AgentResumeOptions } from "../contracts/agent/agent-options.type";
+import type { AgentSnapshot, AgentSnapshotStatus } from "../contracts/agent/agent-snapshot.type";
 import type { SnapshotStore } from "../contracts/orchestrator/snapshot-store.contract";
 import type { Message } from "../contracts/conversation-message.type";
 import type { LLMTrip } from "../contracts/result/llm-trip.type";
@@ -38,8 +33,7 @@ function resolveSnapshotStore(
   durable: AgentDurableConfig | undefined,
 ): SnapshotStore<AgentSnapshot> | undefined {
   return (
-    durable?.store ??
-    (resolveDefaultSnapshotStore() as SnapshotStore<AgentSnapshot> | undefined)
+    durable?.store ?? (resolveDefaultSnapshotStore() as SnapshotStore<AgentSnapshot> | undefined)
   );
 }
 
@@ -73,9 +67,7 @@ export type PersistOutcome = { ok: true } | { ok: false; error: unknown };
  * checkpoint loses resume-ability from that point but never breaks an
  * otherwise-healthy run.
  */
-export async function persistAgentSnapshot(
-  params: PersistAgentParams,
-): Promise<PersistOutcome> {
+export async function persistAgentSnapshot(params: PersistAgentParams): Promise<PersistOutcome> {
   const store = resolveSnapshotStore(params.durable);
 
   if (!store) {
@@ -167,14 +159,11 @@ export async function loadAgentSnapshotForResume(params: {
   }
 
   if (!params.options?.force && snapshot.signature !== params.signature) {
-    throw new AgentDriftError(
-      `agent "${params.agentName}" signature drift on resume`,
-      {
-        savedSignature: snapshot.signature,
-        currentSignature: params.signature,
-        runId: params.runId,
-      },
-    );
+    throw new AgentDriftError(`agent "${params.agentName}" signature drift on resume`, {
+      savedSignature: snapshot.signature,
+      currentSignature: params.signature,
+      runId: params.runId,
+    });
   }
 
   return snapshot;

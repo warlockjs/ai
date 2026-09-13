@@ -12,11 +12,7 @@ import type { IterationSnapshot } from "./iteration-snapshot.type";
  *   (the caller decides whether to retry).
  * - `"failed"` — terminated with an error; resume after the fix.
  */
-export type SupervisorSnapshotStatus =
-  | "running"
-  | "completed"
-  | "cancelled"
-  | "failed";
+export type SupervisorSnapshotStatus = "running" | "completed" | "cancelled" | "failed";
 
 /**
  * Persisted shape written to the configured `KVStore` after every

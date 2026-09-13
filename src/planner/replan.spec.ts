@@ -19,10 +19,7 @@ describe("ai.planner — adaptive re-planning", () => {
       name: "replan-directive",
       planner: planningAgent,
       replan: { maxReplans: 2 },
-      capabilities: [
-        fakeCapability("a", [{ data: "A" }]),
-        fakeCapability("b", [{ data: "B" }]),
-      ],
+      capabilities: [fakeCapability("a", [{ data: "A" }]), fakeCapability("b", [{ data: "B" }])],
     });
 
     let replanned = false;
@@ -134,15 +131,11 @@ describe("ai.planner — adaptive re-planning", () => {
     const instance = planner({
       name: "abort-directive",
       planner: fakePlanningAgent([plan]),
-      capabilities: [
-        fakeCapability("a", [{ data: "A" }]),
-        fakeCapability("b", [{ data: "B" }]),
-      ],
+      capabilities: [fakeCapability("a", [{ data: "A" }]), fakeCapability("b", [{ data: "B" }])],
     });
 
     const result = await instance.execute("go", {
-      onStep: (snapshot) =>
-        snapshot.step.capability === "a" ? { type: "abort" } : undefined,
+      onStep: (snapshot) => (snapshot.step.capability === "a" ? { type: "abort" } : undefined),
     });
 
     expect(result.report.executedSteps[0].status).toBe("completed");

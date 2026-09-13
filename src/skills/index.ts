@@ -36,12 +36,7 @@ export { parseFrontmatter, parseTags } from "./sources/parse-frontmatter";
 export type { ParsedFrontmatter } from "./sources/parse-frontmatter";
 
 // Catalog helpers (advanced)
-export {
-  buildCatalog,
-  renderCatalogPrompt,
-  loadRecord,
-  semanticPreselect,
-} from "./catalog";
+export { buildCatalog, renderCatalogPrompt, loadRecord, semanticPreselect } from "./catalog";
 
 // Contracts
 export type { SkillsContract } from "./contracts/skills.contract";
@@ -53,8 +48,4 @@ export type {
   SkillAnalyticsEvent,
 } from "./contracts/skills-config.type";
 export type { SkillsStoreContract } from "./contracts/skills-store.contract";
-export type {
-  SkillRecord,
-  SkillCatalogEntry,
-  LoadSkillInput,
-} from "./contracts/skill-record.type";
+export type { SkillRecord, SkillCatalogEntry, LoadSkillInput } from "./contracts/skill-record.type";

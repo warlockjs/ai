@@ -52,7 +52,7 @@ describe("supervisor state merge guard — branch outputs", () => {
           description: "worker",
         },
       },
-      route: ctx => {
+      route: (ctx) => {
         live = ctx.state as Record<string, unknown>;
 
         return ctx.iteration === 0 ? "worker" : END;
@@ -70,7 +70,7 @@ describe("supervisor state merge guard — branch outputs", () => {
   it("strips prototype keys from an agent branch validated by a permissive output schema", async () => {
     const passthroughSchema: StandardSchemaV1<Record<string, unknown>> = schema<
       Record<string, unknown>
-    >(value => ({ value: value as Record<string, unknown> }));
+    >((value) => ({ value: value as Record<string, unknown> }));
 
     const injected = buildScriptedAgent({
       name: "injected",
@@ -91,7 +91,7 @@ describe("supervisor state merge guard — branch outputs", () => {
       intents: {
         injected: { agent: injected, output: passthroughSchema, description: "injected" },
       },
-      route: ctx => {
+      route: (ctx) => {
         live = ctx.state as Record<string, unknown>;
 
         return ctx.iteration === 0 ? "injected" : END;
@@ -120,7 +120,7 @@ describe("supervisor state merge guard — receptionist (ack)", () => {
       name: "guard-ack",
       intents: { triage },
       ack: () => tainted({ ack: "one moment" }),
-      route: ctx => {
+      route: (ctx) => {
         live = ctx.state as Record<string, unknown>;
 
         return ctx.iteration === 0 ? "triage" : END;
@@ -154,7 +154,7 @@ describe("supervisor state merge guard — classifier", () => {
           reasoning: "refund wording",
           confidence: 0.9,
         }) as never,
-      evaluate: ctx => {
+      evaluate: (ctx) => {
         live = ctx.state as Record<string, unknown>;
 
         return { satisfied: true };
@@ -184,7 +184,7 @@ describe("supervisor state merge guard — classifier", () => {
         run: () => ({ intent: "billing", reasoning: "seed", confidence: 0.4 }),
         refine: () => tainted({ language: "ar" }) as never,
       },
-      evaluate: ctx => {
+      evaluate: (ctx) => {
         live = ctx.state as Record<string, unknown>;
 
         return { satisfied: true };
@@ -200,7 +200,7 @@ describe("supervisor state merge guard — classifier", () => {
 });
 
 describe("supervisor state merge guard — artifacts", () => {
-  const querySchema: StandardSchemaV1<{ query: string }> = schema<{ query: string }>(value => {
+  const querySchema: StandardSchemaV1<{ query: string }> = schema<{ query: string }>((value) => {
     if (
       !value ||
       typeof value !== "object" ||
@@ -264,7 +264,7 @@ describe("supervisor state merge guard — artifacts", () => {
     const supervisorInstance = supervisor({
       name: "guard-artifacts-auto",
       intents: { searcher: buildToolCallingAgent("searcher", poisonTool) },
-      route: ctx => {
+      route: (ctx) => {
         live = ctx.state as Record<string, unknown>;
 
         return ctx.iteration === 0 ? "searcher" : END;
@@ -299,7 +299,7 @@ describe("supervisor state merge guard — artifacts", () => {
     const supervisorInstance = supervisor({
       name: "guard-artifacts-finalize",
       intents: { searcher: buildToolCallingAgent("searcher", writeTool) },
-      route: ctx => {
+      route: (ctx) => {
         live = ctx.state as Record<string, unknown>;
 
         return ctx.iteration === 0 ? "searcher" : END;

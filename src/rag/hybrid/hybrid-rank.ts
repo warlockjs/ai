@@ -25,8 +25,8 @@ export function hybridRank(params: {
   candidates: ReadonlyArray<LexicalDoc>;
   k?: number;
 }): RankedItem[] {
-  const denseIds = params.dense.map(d => d.id);
-  const lexicalIds = bm25Rank(params.query, params.candidates).map(r => r.id);
+  const denseIds = params.dense.map((d) => d.id);
+  const lexicalIds = bm25Rank(params.query, params.candidates).map((r) => r.id);
 
   return reciprocalRankFusion([denseIds, lexicalIds], params.k);
 }

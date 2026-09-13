@@ -72,10 +72,7 @@ describe("computeCost", () => {
   });
 
   it("treats over-reporting of cachedTokens as zero uncached input", () => {
-    const result = computeCost(
-      usage({ input: 1000, output: 0, cachedTokens: 9999 }),
-      PRICING,
-    );
+    const result = computeCost(usage({ input: 1000, output: 0, cachedTokens: 9999 }), PRICING);
 
     expect(result?.input).toBe(0); // Math.max(0, ...) clamps the negative
     expect(result?.cachedInput).toBeGreaterThan(0);

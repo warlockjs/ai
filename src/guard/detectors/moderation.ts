@@ -194,8 +194,6 @@ class OpenAiModerationDetector implements GuardrailDetector {
  *   ],
  * });
  */
-export function moderation(
-  options?: OpenAiModerationOptions,
-): GuardrailDetector {
+export function moderation(options?: OpenAiModerationOptions): GuardrailDetector {
   return new OpenAiModerationDetector(options);
 }

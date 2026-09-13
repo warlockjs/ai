@@ -73,9 +73,7 @@ describe("sleep", () => {
     const controller = new AbortController();
     controller.abort("already gone");
 
-    await expect(sleep(1000, controller.signal)).rejects.toBeInstanceOf(
-      WorkflowCancelledError,
-    );
+    await expect(sleep(1000, controller.signal)).rejects.toBeInstanceOf(WorkflowCancelledError);
   });
 
   it("rejects with WorkflowCancelledError when aborted mid-wait", async () => {

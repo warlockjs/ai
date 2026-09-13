@@ -70,14 +70,12 @@ export function loadText(
       return;
     }
 
-    const itemId =
-      typeof item === "string" ? undefined : item.id;
+    const itemId = typeof item === "string" ? undefined : item.id;
     // A single input keeps the bare base id; multiple inputs are suffixed so
     // every emitted document has a distinct, stable id.
     const id = itemId ?? (multiple ? `${baseId}#${index}` : baseId);
 
-    const itemMetadata =
-      typeof item === "string" ? undefined : item.metadata;
+    const itemMetadata = typeof item === "string" ? undefined : item.metadata;
     const itemTags = typeof item === "string" ? undefined : item.tags;
 
     docs.push({

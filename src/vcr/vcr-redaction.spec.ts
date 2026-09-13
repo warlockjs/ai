@@ -68,7 +68,7 @@ describe("vcr — request/response redaction (S2)", () => {
     const rec = vcr(new FakeModel("m", "p", [{ response }]), {
       path,
       mode: "record",
-      redactResponse: r => ({ ...r, content: "[redacted]" }),
+      redactResponse: (r) => ({ ...r, content: "[redacted]" }),
     });
     await rec.complete(messages);
     await rec.save();
@@ -94,8 +94,6 @@ describe("vcr — request/response redaction (S2)", () => {
     await rec.complete(messages);
     await rec.save();
 
-    expect(readCassette().entries[0].request.messages[0].content).toBe(
-      "my password is hunter2",
-    );
+    expect(readCassette().entries[0].request.messages[0].content).toBe("my password is hunter2");
   });
 });

@@ -48,9 +48,7 @@ describe("dag-scheduler — buildDag", () => {
   });
 
   it("throws PlannerPlanInvalidError on a dependsOn naming an unknown step", () => {
-    const steps: PlannerStep[] = [
-      { id: "a", capability: "a", input: "1", dependsOn: ["ghost"] },
-    ];
+    const steps: PlannerStep[] = [{ id: "a", capability: "a", input: "1", dependsOn: ["ghost"] }];
 
     expect(() => buildDag(steps, "p")).toThrow(PlannerPlanInvalidError);
     expect(() => buildDag(steps, "p")).toThrow(/unknown step "ghost"/);

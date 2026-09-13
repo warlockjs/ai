@@ -8,11 +8,7 @@ import { workflow } from "../workflow/workflow";
 import { buildScriptedAgent, routerDecision, schema } from "./_test-helpers";
 import { supervisor } from "./supervisor";
 
-function makeScripted(
-  name: string,
-  description: string,
-  content: string,
-): AgentContract {
+function makeScripted(name: string, description: string, content: string): AgentContract {
   return buildScriptedAgent({
     name,
     description,
@@ -59,7 +55,7 @@ describe("ai.supervisor — factory validation", () => {
     const supervisorInstance = supervisor({
       name: "evaluate-with-route",
       intents: { a: makeScripted("a", "a", "ok") },
-      route: ctx => (ctx.iteration === 0 ? "a" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "a" : END),
       evaluate: () => {
         evaluateCalls += 1;
         return { satisfied: true };
@@ -123,7 +119,7 @@ describe("ai.supervisor — deterministic route dispatch", () => {
     const supervisorInstance = supervisor({
       name: "single",
       intents: { writer },
-      route: ctx => {
+      route: (ctx) => {
         decisions.push(ctx.iteration);
         return ctx.iteration === 0 ? "writer" : END;
       },
@@ -140,17 +136,13 @@ describe("ai.supervisor — deterministic route dispatch", () => {
 
   it("dispatches fan-out when route returns string[]", async () => {
     const market = makeScripted("market", "market analysis", "market-result");
-    const pricing = makeScripted(
-      "pricing",
-      "pricing analysis",
-      "pricing-result",
-    );
+    const pricing = makeScripted("pricing", "pricing analysis", "pricing-result");
     const synth = makeScripted("synth", "synthesizer", "synth-result");
 
     const supervisorInstance = supervisor({
       name: "fan-out-flow",
       intents: { market, pricing, synth },
-      route: ctx => {
+      route: (ctx) => {
         if (ctx.iteration === 0) {
           return ["market", "pricing"];
         }
@@ -169,10 +161,7 @@ describe("ai.supervisor — deterministic route dispatch", () => {
     expect(result.report.iterations).toBe(3);
 
     const firstIteration = result.report.snapshots[0];
-    expect(Object.keys(firstIteration.result).sort()).toEqual([
-      "market",
-      "pricing",
-    ]);
+    expect(Object.keys(firstIteration.result).sort()).toEqual(["market", "pricing"]);
 
     const lastIteration = result.report.snapshots[1];
     expect(Object.keys(lastIteration.result)).toEqual(["synth"]);
@@ -183,15 +172,13 @@ describe("ai.supervisor — deterministic route dispatch", () => {
     const bad = buildScriptedAgent({
       name: "bad",
       description: "always throws",
-      responses: [
-        { content: "", finishReason: "error", error: new Error("boom") },
-      ],
+      responses: [{ content: "", finishReason: "error", error: new Error("boom") }],
     });
 
     const supervisorInstance = supervisor({
       name: "resilient-fanout",
       intents: { good, bad },
-      route: ctx => (ctx.iteration === 0 ? ["good", "bad"] : END),
+      route: (ctx) => (ctx.iteration === 0 ? ["good", "bad"] : END),
     });
 
     const result = await supervisorInstance.execute("x");
@@ -232,9 +219,7 @@ describe("ai.supervisor — deterministic route dispatch", () => {
     const result = await supervisorInstance.execute("x");
 
     expect(result.error?.code).toBe("SUPERVISOR_INVALID_ROUTE");
-    expect((result.error as SupervisorRoutingError).availableKeys).toEqual([
-      "worker",
-    ]);
+    expect((result.error as SupervisorRoutingError).availableKeys).toEqual(["worker"]);
   });
 
   it("terminates immediately when first decision is END", async () => {
@@ -263,7 +248,7 @@ describe("ai.supervisor — deterministic route dispatch", () => {
       name: "with-initial",
       intents: { triage, resolver },
       initialAgent: "triage",
-      route: ctx => {
+      route: (ctx) => {
         seen.push(ctx.iteration);
         return ctx.iteration >= 1 ? END : "resolver";
       },
@@ -291,7 +276,7 @@ describe("ai.supervisor — output schema + state validation (Stage 4b/4c)", () 
         classify: {
           run: async () => ({ category: "billing" }),
           description: "classifies",
-          output: schema<{ category: string }>(v =>
+          output: schema<{ category: string }>((v) =>
             typeof (v as { category?: unknown })?.category === "string"
               ? { value: { category: (v as { category: string }).category } }
               : { issues: [{ message: "missing category" }] },
@@ -300,25 +285,17 @@ describe("ai.supervisor — output schema + state validation (Stage 4b/4c)", () 
         respond: {
           run: async () => ({ reply: "Got it." }),
           description: "responds",
-          output: schema<{ reply: string }>(v =>
+          output: schema<{ reply: string }>((v) =>
             typeof (v as { reply?: unknown })?.reply === "string"
               ? { value: { reply: (v as { reply: string }).reply } }
               : { issues: [{ message: "missing reply" }] },
           ),
         },
       },
-      route: ctx =>
-        ctx.iteration === 0
-          ? "classify"
-          : ctx.iteration === 1
-            ? "respond"
-            : END,
-      output: schema<{ category: string; reply: string }>(v => {
+      route: (ctx) => (ctx.iteration === 0 ? "classify" : ctx.iteration === 1 ? "respond" : END),
+      output: schema<{ category: string; reply: string }>((v) => {
         const obj = v as { category?: unknown; reply?: unknown };
-        if (
-          typeof obj?.category === "string" &&
-          typeof obj?.reply === "string"
-        ) {
+        if (typeof obj?.category === "string" && typeof obj?.reply === "string") {
           return { value: { category: obj.category, reply: obj.reply } };
         }
         return { issues: [{ message: "incomplete state" }] };
@@ -340,7 +317,7 @@ describe("ai.supervisor — output schema + state validation (Stage 4b/4c)", () 
         first: {
           run: async () => ({ winner: "first" }),
           description: "writes winner=first",
-          output: schema<{ winner: string }>(v =>
+          output: schema<{ winner: string }>((v) =>
             typeof (v as { winner?: unknown })?.winner === "string"
               ? { value: { winner: (v as { winner: string }).winner } }
               : { issues: [{ message: "no winner" }] },
@@ -349,15 +326,15 @@ describe("ai.supervisor — output schema + state validation (Stage 4b/4c)", () 
         last: {
           run: async () => ({ winner: "last" }),
           description: "writes winner=last",
-          output: schema<{ winner: string }>(v =>
+          output: schema<{ winner: string }>((v) =>
             typeof (v as { winner?: unknown })?.winner === "string"
               ? { value: { winner: (v as { winner: string }).winner } }
               : { issues: [{ message: "no winner" }] },
           ),
         },
       },
-      route: ctx => (ctx.iteration === 0 ? ["first", "last"] : END),
-      output: schema<{ winner: string }>(v =>
+      route: (ctx) => (ctx.iteration === 0 ? ["first", "last"] : END),
+      output: schema<{ winner: string }>((v) =>
         typeof (v as { winner?: unknown })?.winner === "string"
           ? { value: { winner: (v as { winner: string }).winner } }
           : { issues: [{ message: "no winner" }] },
@@ -378,8 +355,8 @@ describe("ai.supervisor — output schema + state validation (Stage 4b/4c)", () 
           description: "writes nothing matching the schema",
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "partial" : END),
-      output: schema<{ required: string }>(v =>
+      route: (ctx) => (ctx.iteration === 0 ? "partial" : END),
+      output: schema<{ required: string }>((v) =>
         typeof (v as { required?: unknown })?.required === "string"
           ? { value: { required: (v as { required: string }).required } }
           : { issues: [{ message: "missing required key" }] },
@@ -400,34 +377,33 @@ describe("ai.supervisor — state-aware contexts (Stage 4b)", () => {
       name: "state-thread",
       intents: {
         first: {
-          run: async ctx => {
+          run: async (ctx) => {
             seen.push({ phase: "first", state: { ...(ctx.state as object) } });
             return { count: 1 };
           },
           description: "writes count=1",
-          output: schema<{ count: number }>(v =>
+          output: schema<{ count: number }>((v) =>
             typeof (v as { count?: unknown })?.count === "number"
               ? { value: { count: (v as { count: number }).count } }
               : { issues: [{ message: "no count" }] },
           ),
         },
         second: {
-          run: async ctx => {
+          run: async (ctx) => {
             seen.push({ phase: "second", state: { ...(ctx.state as object) } });
             return {
               doubled: ((ctx.state as { count?: number }).count ?? 0) * 2,
             };
           },
           description: "reads count, writes doubled",
-          output: schema<{ doubled: number }>(v =>
+          output: schema<{ doubled: number }>((v) =>
             typeof (v as { doubled?: unknown })?.doubled === "number"
               ? { value: { doubled: (v as { doubled: number }).doubled } }
               : { issues: [{ message: "no doubled" }] },
           ),
         },
       },
-      route: ctx =>
-        ctx.iteration === 0 ? "first" : ctx.iteration === 1 ? "second" : END,
+      route: (ctx) => (ctx.iteration === 0 ? "first" : ctx.iteration === 1 ? "second" : END),
     });
 
     await supervisorInstance.execute("seed");
@@ -445,19 +421,17 @@ describe("ai.supervisor — state-aware contexts (Stage 4b)", () => {
         worker: {
           run: async () => ({ done: true }),
           description: "marks done",
-          output: schema<{ done: boolean }>(v =>
+          output: schema<{ done: boolean }>((v) =>
             typeof (v as { done?: unknown })?.done === "boolean"
               ? { value: { done: (v as { done: boolean }).done } }
               : { issues: [{ message: "no done" }] },
           ),
         },
       },
-      route: ctx => (ctx.iteration < 3 ? "worker" : END),
-      evaluate: ctx => {
+      route: (ctx) => (ctx.iteration < 3 ? "worker" : END),
+      evaluate: (ctx) => {
         stateSnapshots.push({ ...(ctx.state as object) });
-        return (ctx.state as { done?: boolean }).done
-          ? { satisfied: true }
-          : undefined;
+        return (ctx.state as { done?: boolean }).done ? { satisfied: true } : undefined;
       },
     });
 
@@ -477,14 +451,14 @@ describe("ai.supervisor — state-aware contexts (Stage 4b)", () => {
         worker: {
           run: async () => ({ value: 42 }),
           description: "writes value",
-          output: schema<{ value: number }>(v =>
+          output: schema<{ value: number }>((v) =>
             typeof (v as { value?: unknown })?.value === "number"
               ? { value: { value: (v as { value: number }).value } }
               : { issues: [{ message: "no value" }] },
           ),
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "worker" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "worker" : END),
     });
 
     const result = await supervisorInstance.execute("x");
@@ -512,7 +486,7 @@ describe("ai.supervisor — per-agent input and output overrides", () => {
           input: (ctx: RouteContext) => `CUSTOM:${ctx.input}`,
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "writer" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "writer" : END),
     });
 
     const supervisorExecution = await supervisorInstance.execute("topic");
@@ -532,7 +506,7 @@ describe("ai.supervisor — per-agent input and output overrides", () => {
     // easiest to test — they return objects directly.
     const supervisorInstance = supervisor<{ category: string }>({
       name: "output-schema",
-      output: schema<{ category: string }>(value => {
+      output: schema<{ category: string }>((value) => {
         if (
           value &&
           typeof value === "object" &&
@@ -548,7 +522,7 @@ describe("ai.supervisor — per-agent input and output overrides", () => {
         classify: {
           run: async () => ({ category: "billing", confidence: 0.97 }),
           description: "classifies",
-          output: schema<{ category: string }>(value => {
+          output: schema<{ category: string }>((value) => {
             if (
               value &&
               typeof value === "object" &&
@@ -562,7 +536,7 @@ describe("ai.supervisor — per-agent input and output overrides", () => {
           }),
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "classify" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "classify" : END),
     });
 
     const result = await supervisorInstance.execute("x");
@@ -596,7 +570,7 @@ describe("ai.supervisor — workflow as dispatchable unit", () => {
     const supervisorInstance = supervisor({
       name: "mixed",
       intents: { research, resolver },
-      route: ctx => {
+      route: (ctx) => {
         if (ctx.iteration === 0) {
           return "research";
         }
@@ -620,11 +594,7 @@ describe("ai.supervisor — workflow as dispatchable unit", () => {
 describe("ai.supervisor — router-agent dispatch", () => {
   it("dispatches based on router agent output", async () => {
     const triage = makeScripted("triage", "classifies tickets", "triage-data");
-    const resolver = makeScripted(
-      "resolver",
-      "final response drafter",
-      "resolver-data",
-    );
+    const resolver = makeScripted("resolver", "final response drafter", "resolver-data");
 
     const routerAgent = buildScriptedAgent({
       name: "router",
@@ -674,12 +644,12 @@ describe("ai.supervisor — router-agent dispatch", () => {
       name: "router-entry-form",
       router: {
         agent: routerAgent,
-        placeholders: ctx => {
+        placeholders: (ctx) => {
           placeholdersCalled = true;
           // ctx.iteration is typed as number, ctx.input is SupervisorInput
           return { tone: ctx.iteration === 0 ? "fresh" : "follow-up" };
         },
-        input: ctx => {
+        input: (ctx) => {
           inputOverrideCalled = true;
           return `pick next intent for: ${typeof ctx.input === "string" ? ctx.input : "structured"}`;
         },
@@ -706,14 +676,14 @@ describe("ai.supervisor — router-agent dispatch", () => {
     const supervisorInstance = supervisor({
       name: "context-thread",
       intents: {
-        echo: async ctx => {
+        echo: async (ctx) => {
           captured.push(ctx.context);
           frozen = Object.isFrozen(ctx.context);
           return { traceId: ctx.context.traceId };
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "echo" : END),
-      evaluate: ctx => {
+      route: (ctx) => (ctx.iteration === 0 ? "echo" : END),
+      evaluate: (ctx) => {
         captured.push(ctx.context);
         return undefined;
       },
@@ -743,12 +713,12 @@ describe("ai.supervisor — router-agent dispatch", () => {
     const supervisorInstance = supervisor({
       name: "context-default",
       intents: {
-        echo: async ctx => {
+        echo: async (ctx) => {
           observed = ctx.context;
           return {};
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "echo" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "echo" : END),
     });
 
     await supervisorInstance.execute("hi");
@@ -788,15 +758,13 @@ describe("ai.supervisor — router-agent dispatch", () => {
     // Snapshot input mirrors the original payload — object preserved
     // at the supervisor surface, stringified only when forwarded to
     // child agents.
-    expect(typeof result.report.snapshots[0].result.triage.input).toBe(
-      "string",
-    );
+    expect(typeof result.report.snapshots[0].result.triage.input).toBe("string");
     expect(result.report.snapshots[0].result.triage.input).toContain("orderId");
   });
 });
 
 describe("ai.supervisor — receptionist (ack)", () => {
-  const ackOutputSchema = schema<{ ack: string }>(value => {
+  const ackOutputSchema = schema<{ ack: string }>((value) => {
     if (
       !value ||
       typeof value !== "object" ||
@@ -813,9 +781,7 @@ describe("ai.supervisor — receptionist (ack)", () => {
     const receptionist = buildScriptedAgent({
       name: "receptionist",
       description: "receptionist",
-      responses: [
-        { content: '{"ack":"Looking into it now"}', finishReason: "stop" },
-      ],
+      responses: [{ content: '{"ack":"Looking into it now"}', finishReason: "stop" }],
     });
 
     let ackCompletedCalled = false;
@@ -823,7 +789,7 @@ describe("ai.supervisor — receptionist (ack)", () => {
     const supervisorInstance = supervisor({
       name: "with-ack-agent",
       intents: { triage },
-      route: ctx => (ctx.iteration === 0 ? "triage" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "triage" : END),
       ack: {
         agent: receptionist,
         output: ackOutputSchema,
@@ -842,9 +808,7 @@ describe("ai.supervisor — receptionist (ack)", () => {
     expect(result.report.ack).toBeDefined();
     expect(result.report.ack?.error).toBeUndefined();
     expect((result.data as { ack?: string })?.ack).toBe("Looking into it now");
-    expect(
-      result.report.children.some(child => child.name === "receptionist"),
-    ).toBe(true);
+    expect(result.report.children.some((child) => child.name === "receptionist")).toBe(true);
     expect(result.usage.total).toBeGreaterThan(0);
   });
 
@@ -854,7 +818,7 @@ describe("ai.supervisor — receptionist (ack)", () => {
     const supervisorInstance = supervisor({
       name: "with-ack-run",
       intents: { triage },
-      route: ctx => (ctx.iteration === 0 ? "triage" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "triage" : END),
       ack: {
         run: () => ({ ack: "Got it, one moment..." }),
         output: ackOutputSchema,
@@ -866,9 +830,7 @@ describe("ai.supervisor — receptionist (ack)", () => {
     expect(result.error).toBeUndefined();
     expect(result.report.ack).toBeDefined();
     expect(result.report.ack?.error).toBeUndefined();
-    expect((result.data as { ack?: string })?.ack).toBe(
-      "Got it, one moment...",
-    );
+    expect((result.data as { ack?: string })?.ack).toBe("Got it, one moment...");
     // Pure-code ack contributes no LLM usage.
     expect(result.report.ack?.usage.total).toBe(0);
   });
@@ -879,7 +841,7 @@ describe("ai.supervisor — receptionist (ack)", () => {
     const supervisorInstance = supervisor({
       name: "with-ack-callback",
       intents: { triage },
-      route: ctx => (ctx.iteration === 0 ? "triage" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "triage" : END),
       ack: () => ({ ack: "Bare-callback ack" }),
     });
 
@@ -902,7 +864,7 @@ describe("ai.supervisor — receptionist (ack)", () => {
     const supervisorInstance = supervisor({
       name: "ack-failure",
       intents: { triage },
-      route: ctx => (ctx.iteration === 0 ? "triage" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "triage" : END),
       ack: {
         agent: receptionist,
         output: ackOutputSchema,
@@ -936,7 +898,7 @@ describe("ai.supervisor — evaluate verdicts", () => {
       name: "satisfied",
       router: routerAgent as any,
       intents: { triage, resolver },
-      evaluate: ctx => (ctx.result.resolver ? { satisfied: true } : undefined),
+      evaluate: (ctx) => (ctx.result.resolver ? { satisfied: true } : undefined),
     });
 
     const result = await supervisorInstance.execute("x");
@@ -1005,7 +967,7 @@ describe("ai.supervisor — evaluate verdicts", () => {
       name: "with-feedback",
       router: routerAgent as any,
       intents: { triage, resolver },
-      evaluate: ctx => {
+      evaluate: (ctx) => {
         if (ctx.result.triage) {
           return { feedback: "be concise" };
         }
@@ -1071,7 +1033,7 @@ describe("ai.supervisor — per-intent next directive (Stage 4d / Q24)", () => {
       },
       // route() would normally pick — but `next` should bypass it
       // entirely after `first` runs.
-      route: ctx => {
+      route: (ctx) => {
         routeCalls += 1;
         return ctx.iteration === 0 ? "first" : END;
       },
@@ -1084,7 +1046,7 @@ describe("ai.supervisor — per-intent next directive (Stage 4d / Q24)", () => {
     // route() fired once on iteration 0 (no carriedNextDispatch yet);
     // iteration 1 was driven by first.next → skip route.
     expect(routeCalls).toBe(1);
-    const intents = result.report.snapshots.map(s => Object.keys(s.result));
+    const intents = result.report.snapshots.map((s) => Object.keys(s.result));
     expect(intents).toEqual([["first"], ["second"]]);
   });
 
@@ -1098,7 +1060,7 @@ describe("ai.supervisor — per-intent next directive (Stage 4d / Q24)", () => {
           next: () => END,
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "worker" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "worker" : END),
     });
 
     const result = await supervisorInstance.execute("seed");
@@ -1135,7 +1097,7 @@ describe("ai.supervisor — per-intent next directive (Stage 4d / Q24)", () => {
           next: () => END,
         },
       },
-      route: ctx => {
+      route: (ctx) => {
         routeCalls += 1;
         return ctx.iteration === 0 ? ["a", "b"] : END;
       },
@@ -1171,7 +1133,7 @@ describe("ai.supervisor — per-intent next directive (Stage 4d / Q24)", () => {
           description: "follow-up — should NOT run",
         },
       },
-      route: ctx => (ctx.iteration === 0 ? ["a", "b"] : END),
+      route: (ctx) => (ctx.iteration === 0 ? ["a", "b"] : END),
     });
 
     const result = await supervisorInstance.execute("seed");
@@ -1180,10 +1142,7 @@ describe("ai.supervisor — per-intent next directive (Stage 4d / Q24)", () => {
     expect(result.report.terminatedBy).toBe("route");
     expect(result.report.iterations).toBe(1);
     // x must not have run.
-    expect(Object.keys(result.report.snapshots[0].result).sort()).toEqual([
-      "a",
-      "b",
-    ]);
+    expect(Object.keys(result.report.snapshots[0].result).sort()).toEqual(["a", "b"]);
   });
 
   it("fan-out: silent branches abstain — defined branches still drive the union", async () => {
@@ -1207,7 +1166,7 @@ describe("ai.supervisor — per-intent next directive (Stage 4d / Q24)", () => {
           next: () => END,
         },
       },
-      route: ctx => {
+      route: (ctx) => {
         routeCalls += 1;
         return ctx.iteration === 0 ? ["opinionated", "silent"] : END;
       },
@@ -1219,9 +1178,7 @@ describe("ai.supervisor — per-intent next directive (Stage 4d / Q24)", () => {
     // Silent branch did NOT drag the iteration to the router; the
     // opinionated branch's `next` drove iter 1 directly.
     expect(routeCalls).toBe(1);
-    expect(Object.keys(result.report.snapshots[1].result)).toEqual([
-      "follow-up",
-    ]);
+    expect(Object.keys(result.report.snapshots[1].result)).toEqual(["follow-up"]);
   });
 
   it("evaluate.reassignTo outranks intent.next (precedence)", async () => {
@@ -1252,7 +1209,7 @@ describe("ai.supervisor — per-intent next directive (Stage 4d / Q24)", () => {
           description: "what evaluate forces",
         },
       },
-      evaluate: ctx => {
+      evaluate: (ctx) => {
         if (ctx.iteration === 0) return { reassignTo: "y" };
         return { satisfied: true };
       },

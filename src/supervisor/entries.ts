@@ -33,9 +33,7 @@ import { SupervisorFailedError } from "../errors";
  * `type`.
  */
 export type ResolvedIntentEntry =
-  | ResolvedAgentEntry
-  | ResolvedWorkflowEntry
-  | ResolvedCallbackEntry;
+  ResolvedAgentEntry | ResolvedWorkflowEntry | ResolvedCallbackEntry;
 
 /**
  * Successor directive function type — the resolver-time projection of

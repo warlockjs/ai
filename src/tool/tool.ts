@@ -127,7 +127,10 @@ export function compositeAsTool<TInput, TOutput>(contract: {
    * cancelled parent aborts the nested primitive instead of letting it
    * outlive the cancellation (C2).
    */
-  execute: (input: TInput, ctx?: ToolContext) => Promise<{
+  execute: (
+    input: TInput,
+    ctx?: ToolContext,
+  ) => Promise<{
     data?: TOutput;
     error?: AIError;
     usage: Usage;

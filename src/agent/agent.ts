@@ -64,11 +64,7 @@ import { createAgentStream, type StreamController } from "./agent-stream";
 import { agentEventToStreamEvent } from "./agent-to-stream-event";
 import { JsonStreamGuard } from "./json-stream-guard";
 import { computeAgentSignature } from "./signature";
-import {
-  deleteAgentSnapshot,
-  loadAgentSnapshotForResume,
-  persistAgentSnapshot,
-} from "./snapshot";
+import { deleteAgentSnapshot, loadAgentSnapshotForResume, persistAgentSnapshot } from "./snapshot";
 
 const LOG_MODULE = "ai.agent";
 
@@ -276,9 +272,7 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
   // `ToolContract`s (from `.asTool()` / `ai.tool()`) pass through
   // untouched, so this is a no-op for the existing surface.
   const tools = normalizeAgentTools(config.tools);
-  const name = isAnonymous
-    ? synthesizeAgentName({ ...config, tools })
-    : (config.name as string);
+  const name = isAnonymous ? synthesizeAgentName({ ...config, tools }) : (config.name as string);
 
   // Resolve the `skills` option to a `SkillsContract` ONCE, here, so every
   // `execute()` / `stream()` call reuses the same library (and its
@@ -631,7 +625,7 @@ class Execution<TOutput> {
     // so no special-casing is needed here. `normalizeAgentTools` is a
     // passthrough for already-built `ToolContract`s — called for uniformity.
     const skillTools = config.skillsLib
-      ? normalizeAgentTools(config.skillsLib.tools(this.runId)) ?? []
+      ? (normalizeAgentTools(config.skillsLib.tools(this.runId)) ?? [])
       : [];
 
     this.effectiveTools = [...(config.tools ?? []), ...skillTools];
@@ -1605,9 +1599,7 @@ class Execution<TOutput> {
       // normalize the real assembled turn array (assistant turns with
       // toolCalls + tool-result turns) onto the report. Off ⇒ field
       // absent, so the report is byte-for-byte as before.
-      ...(this.config.captureMessages
-        ? { messages: this.captureMessages() }
-        : {}),
+      ...(this.config.captureMessages ? { messages: this.captureMessages() } : {}),
     };
 
     // Stamp lineage on the assembled tree exactly once per run.
@@ -1719,9 +1711,7 @@ class Execution<TOutput> {
       const captured: CapturedMessage = {
         role: message.role,
         content:
-          typeof message.content === "string"
-            ? message.content
-            : JSON.stringify(message.content),
+          typeof message.content === "string" ? message.content : JSON.stringify(message.content),
       };
 
       if (message.toolCalls !== undefined) {

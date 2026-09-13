@@ -26,9 +26,7 @@ describe("resolveOutboundPolicy", () => {
 
 describe("guardedFetch — SSRF guards (S1/S3 foundation)", () => {
   it("rejects a disallowed scheme (http blocked by default)", async () => {
-    await expect(guardedFetch("http://8.8.8.8/x", {})).rejects.toBeInstanceOf(
-      OutboundPolicyError,
-    );
+    await expect(guardedFetch("http://8.8.8.8/x", {})).rejects.toBeInstanceOf(OutboundPolicyError);
   });
 
   it("rejects private / loopback / metadata IP literals", async () => {
@@ -38,9 +36,7 @@ describe("guardedFetch — SSRF guards (S1/S3 foundation)", () => {
       "https://10.0.0.5/x",
       "https://[::1]/x",
     ]) {
-      await expect(guardedFetch(url, {}), url).rejects.toBeInstanceOf(
-        OutboundPolicyError,
-      );
+      await expect(guardedFetch(url, {}), url).rejects.toBeInstanceOf(OutboundPolicyError);
     }
   });
 
@@ -163,7 +159,7 @@ describe("guardedFetch — redirect re-validation (SSRF hardening)", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
-  it("returns the raw 3xx when the caller asked for redirect: \"manual\"", async () => {
+  it('returns the raw 3xx when the caller asked for redirect: "manual"', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(redirectResponse("https://169.254.169.254/"));
 
     const response = await guardedFetch(
@@ -213,9 +209,7 @@ describe("readTextCapped — body size cap", () => {
     const response = new Response("hi", {
       headers: { "content-length": "99999" },
     });
-    await expect(readTextCapped(response, 100)).rejects.toBeInstanceOf(
-      OutboundPolicyError,
-    );
+    await expect(readTextCapped(response, 100)).rejects.toBeInstanceOf(OutboundPolicyError);
   });
 });
 

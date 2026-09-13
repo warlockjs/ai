@@ -37,9 +37,5 @@ export interface SessionLock {
    * section once acquired): a caller cancelled while queued rejects with
    * the signal's reason instead of deadlocking behind a stuck holder.
    */
-  withLock<T>(
-    key: string,
-    fn: () => Promise<T>,
-    options?: { signal?: AbortSignal },
-  ): Promise<T>;
+  withLock<T>(key: string, fn: () => Promise<T>, options?: { signal?: AbortSignal }): Promise<T>;
 }

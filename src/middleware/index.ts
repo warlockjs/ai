@@ -24,8 +24,4 @@ export {
 export { composeMiddleware, forTool } from "./helpers";
 export { runPipeline } from "./pipeline";
 export type { MiddlewareContextByLevel, MiddlewareLevel } from "./pipeline";
-export {
-  extractUserText,
-  namespacedState,
-  type NamespacedStateAccessor,
-} from "./utils";
+export { extractUserText, namespacedState, type NamespacedStateAccessor } from "./utils";

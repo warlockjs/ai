@@ -35,8 +35,7 @@ function resolveSnapshotStore(
   durable: PlannerDurableConfig | undefined,
 ): SnapshotStore<PlannerSnapshot> | undefined {
   return (
-    durable?.store ??
-    (resolveDefaultSnapshotStore() as SnapshotStore<PlannerSnapshot> | undefined)
+    durable?.store ?? (resolveDefaultSnapshotStore() as SnapshotStore<PlannerSnapshot> | undefined)
   );
 }
 
@@ -155,14 +154,11 @@ export async function loadPlannerSnapshotForResume(params: {
   }
 
   if (!params.options?.force && snapshot.signature !== params.signature) {
-    throw new PlannerDriftError(
-      `ai.planner("${params.plannerName}") signature drift on resume`,
-      {
-        savedSignature: snapshot.signature,
-        currentSignature: params.signature,
-        runId: params.runId,
-      },
-    );
+    throw new PlannerDriftError(`ai.planner("${params.plannerName}") signature drift on resume`, {
+      savedSignature: snapshot.signature,
+      currentSignature: params.signature,
+      runId: params.runId,
+    });
   }
 
   return snapshot;

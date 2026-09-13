@@ -1,8 +1,5 @@
 import type { ExecutableContract } from "../executable.contract";
-import type {
-  PlannerExecuteOptions,
-  PlannerResumeOptions,
-} from "./planner-execute-options.type";
+import type { PlannerExecuteOptions, PlannerResumeOptions } from "./planner-execute-options.type";
 import type { PlannerResult } from "./planner-result.type";
 
 /**
@@ -60,10 +57,7 @@ export interface PlannerContract<TOutput = unknown> extends ExecutableContract<
    * end-to-end. Returns the uniform `{ data, report, usage, error }`
    * shape; runtime failures surface on `result.error`.
    */
-  execute(
-    goal: string,
-    options?: PlannerExecuteOptions<TOutput>,
-  ): Promise<PlannerResult<TOutput>>;
+  execute(goal: string, options?: PlannerExecuteOptions<TOutput>): Promise<PlannerResult<TOutput>>;
 
   /**
    * Resume a durable run after a crash. Loads the snapshot persisted
@@ -84,8 +78,5 @@ export interface PlannerContract<TOutput = unknown> extends ExecutableContract<
    * // ...process crashes mid-run...
    * const recovered = await research.resume("plan-7");
    */
-  resume(
-    runId: string,
-    options?: PlannerResumeOptions<TOutput>,
-  ): Promise<PlannerResult<TOutput>>;
+  resume(runId: string, options?: PlannerResumeOptions<TOutput>): Promise<PlannerResult<TOutput>>;
 }

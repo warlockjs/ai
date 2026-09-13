@@ -44,7 +44,7 @@ describe("ai.prompts.define — bulk version registration", () => {
     ]);
 
     const blocks = registry.get("agent", "1").blocks;
-    expect(blocks.map(b => [b.type, b.text])).toEqual([
+    expect(blocks.map((b) => [b.type, b.text])).toEqual([
       ["persona", "You are Alex."],
       ["instruction", "Be concise."],
     ]);
@@ -65,9 +65,9 @@ describe("ai.prompts.define — bulk version registration", () => {
     const registry = prompts();
     registry.define("agent", [{ version: "1", template: "first" }]);
 
-    expect(() =>
-      registry.define("agent", [{ version: "1", template: "different" }]),
-    ).toThrow(InvalidRequestError);
+    expect(() => registry.define("agent", [{ version: "1", template: "different" }])).toThrow(
+      InvalidRequestError,
+    );
   });
 });
 
@@ -135,9 +135,7 @@ describe("ai.prompts.tag — pin + resolve by tag", () => {
     const registry = prompts();
     registry.define("agent", [{ version: "1", template: "body." }]);
 
-    expect(() => registry.tag("agent", "production", "99")).toThrow(
-      InvalidRequestError,
-    );
+    expect(() => registry.tag("agent", "production", "99")).toThrow(InvalidRequestError);
   });
 
   it("throws when resolving an unknown tag", () => {
@@ -206,14 +204,12 @@ describe("ai.prompts.validate — deterministic placeholder check", () => {
 
     const result = await registry.validate(contract);
     expect(result.ok).toBe(true);
-    expect(result.issues?.some(i => i.includes("product"))).toBe(true);
+    expect(result.issues?.some((i) => i.includes("product"))).toBe(true);
   });
 
   it("validates a registered name (latest) by string target", async () => {
     const registry = prompts();
-    registry.define("agent", [
-      { version: "1", template: "You are support for {{product}}." },
-    ]);
+    registry.define("agent", [{ version: "1", template: "You are support for {{product}}." }]);
 
     const result = await registry.validate("agent");
     expect(result.missing).toEqual(["product"]);
@@ -251,10 +247,9 @@ describe("ai.prompts.validate — optional LLM judge (Nova-safe)", () => {
     const registry = prompts();
     const judge = new MockModel("judge", [{ content: judgeJson }]);
 
-    const result = await registry.validate(
-      "You are a senior support engineer. Answer concisely.",
-      { judge },
-    );
+    const result = await registry.validate("You are a senior support engineer. Answer concisely.", {
+      judge,
+    });
 
     expect(result.score).toBe(0.9);
     expect(result.issues).toContain("clear and well scoped");
@@ -272,16 +267,14 @@ describe("ai.prompts.validate — optional LLM judge (Nova-safe)", () => {
     });
 
     expect(result.score).toBeUndefined();
-    expect(result.issues?.some(i => i.includes("unavailable"))).toBe(true);
+    expect(result.issues?.some((i) => i.includes("unavailable"))).toBe(true);
     // The deterministic verdict still stands.
     expect(result.ok).toBe(true);
   });
 
   it("degrades to score=undefined on unparseable judge output", async () => {
     const registry = prompts();
-    const judge = new MockModel("judge", [
-      { content: "not json at all", finishReason: "stop" },
-    ]);
+    const judge = new MockModel("judge", [{ content: "not json at all", finishReason: "stop" }]);
 
     const result = await registry.validate("You are a clear support agent.", {
       judge,
@@ -397,10 +390,7 @@ describe("ai.prompts.validate — judge-verdict cache (item 2)", () => {
 
   it("is a no-op when no cache is injected", async () => {
     const registry = prompts();
-    const judge = new MockModel("judge", [
-      { content: judgeJson },
-      { content: judgeJson },
-    ]);
+    const judge = new MockModel("judge", [{ content: judgeJson }, { content: judgeJson }]);
 
     const body = "You are a careful, concise support engineer.";
     await registry.validate(body, { judge });
@@ -511,11 +501,11 @@ describe("ai.prompts.diff — block-level diff", () => {
     ]);
 
     const diff = registry.diff("agent", "1", "2");
-    expect(diff.added.map(b => b.text)).toEqual(["Plus two."]);
+    expect(diff.added.map((b) => b.text)).toEqual(["Plus two."]);
     expect(diff.removed).toEqual([]);
 
     const reverse = registry.diff("agent", "2", "1");
-    expect(reverse.removed.map(b => b.text)).toEqual(["Plus two."]);
+    expect(reverse.removed.map((b) => b.text)).toEqual(["Plus two."]);
     expect(reverse.added).toEqual([]);
   });
 
@@ -541,7 +531,7 @@ describe("ai.prompts.export / import — round-trip", () => {
 
     const exported = snapshot.prompts[0];
     expect(exported.name).toBe("agent");
-    expect(exported.versions.map(v => v.version)).toEqual(["1", "2"]);
+    expect(exported.versions.map((v) => v.version)).toEqual(["1", "2"]);
     expect(exported.versions[0].blocks).toEqual([
       { type: "persona", text: "You are Alex." },
       { type: "instruction", text: "Be terse." },

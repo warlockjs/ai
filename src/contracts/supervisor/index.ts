@@ -1,11 +1,6 @@
 export { END } from "../end.type";
 export type { EndSentinel } from "../end.type";
-export type {
-  AckCallback,
-  AckConfig,
-  AckEntry,
-  AckRunEntry,
-} from "./ack-entry.type";
+export type { AckCallback, AckConfig, AckEntry, AckRunEntry } from "./ack-entry.type";
 export type {
   ClassifierAgentEntry,
   ClassifierCallback,
@@ -17,11 +12,7 @@ export type {
   ClassifierRunEntry,
   ClassifierSnapshot,
 } from "./classifier-context.type";
-export type {
-  DispatchContext,
-  IntentRunner,
-  IntentRunnerMap,
-} from "./dispatch-context.type";
+export type { DispatchContext, IntentRunner, IntentRunnerMap } from "./dispatch-context.type";
 export type {
   EvaluateBranchResult,
   EvaluateContext,
@@ -54,12 +45,6 @@ export type {
   SupervisorResumeOptions,
 } from "./supervisor-execute-options.type";
 export type { SupervisorInput } from "./supervisor-input.type";
-export type {
-  SupervisorSnapshot,
-  SupervisorSnapshotStatus,
-} from "./supervisor-snapshot.type";
+export type { SupervisorSnapshot, SupervisorSnapshotStatus } from "./supervisor-snapshot.type";
 export type { SupervisorStreamEvent } from "./supervisor-stream-event.type";
-export type {
-  SupervisorAsToolOptions,
-  SupervisorContract,
-} from "./supervisor.contract";
+export type { SupervisorAsToolOptions, SupervisorContract } from "./supervisor.contract";

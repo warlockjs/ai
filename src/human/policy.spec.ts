@@ -37,7 +37,7 @@ describe("evaluatePolicy", () => {
       const policy: InterruptPolicy = {
         type: "allowlist",
         tools: ["refundCustomer"],
-        tags: name => (name === "refundCustomer" ? ["money"] : []),
+        tags: (name) => (name === "refundCustomer" ? ["money"] : []),
       };
 
       expect(evaluatePolicy(policy, ctx())).toEqual({
@@ -82,7 +82,7 @@ describe("evaluatePolicy", () => {
       const policy: InterruptPolicy = {
         type: "denylist",
         tools: ["lookupOrder"],
-        tags: name => [`tool:${name}`],
+        tags: (name) => [`tool:${name}`],
       };
 
       expect(evaluatePolicy(policy, ctx())).toEqual({
@@ -105,7 +105,7 @@ describe("evaluatePolicy", () => {
     it("gates with no tags when the predicate returns true", () => {
       const policy: InterruptPolicy = {
         type: "predicate",
-        requiresApproval: c => c.toolName === "refundCustomer",
+        requiresApproval: (c) => c.toolName === "refundCustomer",
       };
 
       expect(evaluatePolicy(policy, ctx())).toEqual({ requiresApproval: true });
@@ -114,7 +114,7 @@ describe("evaluatePolicy", () => {
     it("gates AND surfaces tags when the predicate returns a non-empty string[]", () => {
       const policy: InterruptPolicy = {
         type: "predicate",
-        requiresApproval: c =>
+        requiresApproval: (c) =>
           (c.args as { amount: number }).amount > 10 ? ["high-value"] : false,
       };
 
@@ -137,7 +137,7 @@ describe("evaluatePolicy", () => {
       let seen: PolicyContext | undefined;
       const policy: InterruptPolicy = {
         type: "predicate",
-        requiresApproval: c => {
+        requiresApproval: (c) => {
           seen = c;
 
           return false;

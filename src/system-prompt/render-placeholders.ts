@@ -26,30 +26,24 @@ const PLACEHOLDER_PATTERN = /\{\{\s*([^{}]+?)\s*\}\}/g;
  * renderPlaceholders("Hello {{user.name|friend}}", {});
  * // "Hello friend"
  */
-export function renderPlaceholders(
-  template: string,
-  placeholders: Placeholders = {},
-): string {
-  return template.replace(
-    PLACEHOLDER_PATTERN,
-    (match, rawExpression: string) => {
-      const [rawPath = "", rawFallback] = rawExpression.split("|");
-      const path = rawPath.trim();
-      const fallback = rawFallback?.trim();
+export function renderPlaceholders(template: string, placeholders: Placeholders = {}): string {
+  return template.replace(PLACEHOLDER_PATTERN, (match, rawExpression: string) => {
+    const [rawPath = "", rawFallback] = rawExpression.split("|");
+    const path = rawPath.trim();
+    const fallback = rawFallback?.trim();
 
-      const value = lookupPath(placeholders, path);
+    const value = lookupPath(placeholders, path);
 
-      if (value === undefined || value === null || value === "") {
-        if (fallback !== undefined) {
-          return fallback;
-        }
-
-        return match;
+    if (value === undefined || value === null || value === "") {
+      if (fallback !== undefined) {
+        return fallback;
       }
 
-      return String(value);
-    },
-  );
+      return match;
+    }
+
+    return String(value);
+  });
 }
 
 /**

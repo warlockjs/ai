@@ -21,8 +21,12 @@ describe("supervisor — intent stream mode", () => {
       responses: [{ content: replyText, finishReason: "stop" }],
     });
 
-    const replyShape = schema<{ reply: string }>(value => {
-      if (!value || typeof value !== "object" || typeof (value as { reply?: unknown }).reply !== "string") {
+    const replyShape = schema<{ reply: string }>((value) => {
+      if (
+        !value ||
+        typeof value !== "object" ||
+        typeof (value as { reply?: unknown }).reply !== "string"
+      ) {
         return { issues: [{ message: "reply must be a string" }] };
       }
 
@@ -38,7 +42,7 @@ describe("supervisor — intent stream mode", () => {
           streamTo: "reply",
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "smalltalk" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "smalltalk" : END),
       output: replyShape,
     });
 
@@ -62,7 +66,7 @@ describe("supervisor — intent stream mode", () => {
       ],
     });
 
-    const replyShape = schema<{ reply: string }>(value => ({
+    const replyShape = schema<{ reply: string }>((value) => ({
       value: value as { reply: string },
     }));
 
@@ -75,7 +79,7 @@ describe("supervisor — intent stream mode", () => {
           streamTo: "reply",
         },
       },
-      route: ctx => (ctx.iteration === 0 ? "smalltalk" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "smalltalk" : END),
       output: replyShape,
     });
 
@@ -106,7 +110,7 @@ describe("supervisor — intent stream mode", () => {
       responses: [{ content: "hi", finishReason: "stop" }],
     });
 
-    const replyShape = schema<{ reply: string }>(value => ({
+    const replyShape = schema<{ reply: string }>((value) => ({
       value: value as { reply: string },
     }));
 

@@ -159,9 +159,7 @@ class InjectionDetector implements SyncGuardrailDetector {
  * (labelled `custom`); a caller `RegExp` is carried as-is (labelled
  * `custom`). Built-ins keep their threat-category label.
  */
-function compileMarkers(
-  extra: readonly (string | RegExp)[],
-): readonly CompiledMarker[] {
+function compileMarkers(extra: readonly (string | RegExp)[]): readonly CompiledMarker[] {
   const compiled: CompiledMarker[] = BUILT_IN_MARKERS.map((entry) => ({
     label: entry.label,
     phrase: entry.phrase,
@@ -207,8 +205,6 @@ function compileMarkers(
  * // Extend the built-in set with a house rule.
  * ai.guardrail.injection({ markers: [/system\s*:\s*override/i, "sudo mode"] });
  */
-export function injection(
-  options?: InjectionDetectorOptions,
-): SyncGuardrailDetector {
+export function injection(options?: InjectionDetectorOptions): SyncGuardrailDetector {
   return new InjectionDetector(options);
 }

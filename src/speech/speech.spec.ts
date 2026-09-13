@@ -57,7 +57,14 @@ describe("ai.speech", () => {
 
   it("forwards options to the model", async () => {
     const model = new MockSpeechModel("tts-1", [{}]);
-    await speech({ model, text: "x", voice: "verse", format: "wav", speed: 1.25, instructions: "calm" });
+    await speech({
+      model,
+      text: "x",
+      voice: "verse",
+      format: "wav",
+      speed: 1.25,
+      instructions: "calm",
+    });
     expect(model.calls[0].options).toMatchObject({
       voice: "verse",
       format: "wav",

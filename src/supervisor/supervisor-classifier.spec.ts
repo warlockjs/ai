@@ -16,7 +16,10 @@ import { supervisor } from "./supervisor";
  * terminates after iter 0's branch settles.
  */
 
-function buildClassifierAgent(name: string, output: { intent: string; reasoning?: string; confidence?: number }) {
+function buildClassifierAgent(
+  name: string,
+  output: { intent: string; reasoning?: string; confidence?: number },
+) {
   // Output a JSON body the supervisor parses as ClassifierOutput.
   const sdk = MockSDK({
     responses: [
@@ -28,18 +31,21 @@ function buildClassifierAgent(name: string, output: { intent: string; reasoning?
     capabilities: { structuredOutput: true },
   });
 
-  const classifierOutputSchema: StandardSchemaV1<{ intent: string; reasoning?: string; confidence?: number }> =
-    schema<{ intent: string; reasoning?: string; confidence?: number }>(value => {
-      if (
-        !value ||
-        typeof value !== "object" ||
-        typeof (value as { intent?: unknown }).intent !== "string"
-      ) {
-        return { issues: [{ message: "expected { intent: string }" }] };
-      }
+  const classifierOutputSchema: StandardSchemaV1<{
+    intent: string;
+    reasoning?: string;
+    confidence?: number;
+  }> = schema<{ intent: string; reasoning?: string; confidence?: number }>((value) => {
+    if (
+      !value ||
+      typeof value !== "object" ||
+      typeof (value as { intent?: unknown }).intent !== "string"
+    ) {
+      return { issues: [{ message: "expected { intent: string }" }] };
+    }
 
-      return { value: value as { intent: string; reasoning?: string; confidence?: number } };
-    });
+    return { value: value as { intent: string; reasoning?: string; confidence?: number } };
+  });
 
   return agent({
     name,
@@ -93,7 +99,7 @@ describe("supervisor — classifier dispatch (Phase 7)", () => {
       name: "classifier-with-route",
       intents: { billing, shipping },
       classifier: { agent: classifyAgent },
-      route: ctx => (ctx.iteration === 0 ? "billing" : ctx.iteration === 1 ? "shipping" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "billing" : ctx.iteration === 1 ? "shipping" : END),
     });
 
     const result = await supervisorInstance.execute("input");
@@ -118,8 +124,9 @@ describe("supervisor — classifier dispatch (Phase 7)", () => {
     const supervisorInstance = supervisor({
       name: "classifier-callback",
       intents: { smalltalk },
-      classifier: ctx => ({
-        intent: typeof ctx.input === "string" && ctx.input.startsWith("hi") ? "smalltalk" : "smalltalk",
+      classifier: (ctx) => ({
+        intent:
+          typeof ctx.input === "string" && ctx.input.startsWith("hi") ? "smalltalk" : "smalltalk",
         reasoning: "starts with hi",
       }),
     });
@@ -156,7 +163,7 @@ describe("supervisor — classifier dispatch (Phase 7)", () => {
       intents: { billing, fallback },
       classifier: {
         agent: classifyAgent,
-        refine: ctx => {
+        refine: (ctx) => {
           const conf = ctx.result.data.confidence ?? 1;
 
           if (conf < 0.7) {
@@ -274,21 +281,21 @@ describe("supervisor — classifier dispatch (Phase 7)", () => {
       name: "classifier-ctx-expose",
       intents: {
         billing,
-        capture: async ctx => {
+        capture: async (ctx) => {
           captured.dispatch = ctx.classifier?.intent;
 
           return { capturedAt: "dispatch" };
         },
       },
-      classifier: ctx => ({ intent: "billing", reasoning: "test" }),
-      route: ctx => {
+      classifier: (ctx) => ({ intent: "billing", reasoning: "test" }),
+      route: (ctx) => {
         captured.route = ctx.classifier?.intent;
 
         if (ctx.iteration === 1) return "capture";
 
         return END;
       },
-      evaluate: ctx => {
+      evaluate: (ctx) => {
         captured.evaluate = ctx.classifier?.intent;
 
         return undefined;

@@ -122,8 +122,7 @@ class RedisCheckpointStore implements CheckpointStore {
   public async save(record: CheckpointRecord): Promise<void> {
     const { orchestrator_name, session_id } = record;
 
-    const document =
-      (await this.readSession(orchestrator_name, session_id)) ?? { rows: [] };
+    const document = (await this.readSession(orchestrator_name, session_id)) ?? { rows: [] };
 
     document.rows.push(record);
 
@@ -134,10 +133,7 @@ class RedisCheckpointStore implements CheckpointStore {
   /**
    * Drop a session document and de-index its session id.
    */
-  public async delete(
-    orchestratorName: string,
-    sessionId: string,
-  ): Promise<void> {
+  public async delete(orchestratorName: string, sessionId: string): Promise<void> {
     await this.client.del(this.sessionKey(orchestratorName, sessionId));
     await this.deindexSession(orchestratorName, sessionId);
   }
@@ -147,19 +143,14 @@ class RedisCheckpointStore implements CheckpointStore {
    * by a session-id prefix. Reads the self-maintained index document
    * (§9.3 boot drain).
    */
-  public async list(
-    orchestratorName: string,
-    prefix?: string,
-  ): Promise<string[]> {
+  public async list(orchestratorName: string, prefix?: string): Promise<string[]> {
     const index = await this.readIndex(orchestratorName);
 
     if (prefix === undefined) {
       return [...index.sessionIds];
     }
 
-    return index.sessionIds.filter((sessionId) =>
-      sessionId.startsWith(prefix),
-    );
+    return index.sessionIds.filter((sessionId) => sessionId.startsWith(prefix));
   }
 
   /**
@@ -226,9 +217,7 @@ class RedisCheckpointStore implements CheckpointStore {
     orchestratorName: string,
     sessionId: string,
   ): Promise<SessionDocument | undefined> {
-    const raw = await this.client.get(
-      this.sessionKey(orchestratorName, sessionId),
-    );
+    const raw = await this.client.get(this.sessionKey(orchestratorName, sessionId));
 
     if (raw === null) {
       return undefined;
@@ -246,10 +235,7 @@ class RedisCheckpointStore implements CheckpointStore {
     sessionId: string,
     document: SessionDocument,
   ): Promise<void> {
-    await this.write(
-      this.sessionKey(orchestratorName, sessionId),
-      JSON.stringify(document),
-    );
+    await this.write(this.sessionKey(orchestratorName, sessionId), JSON.stringify(document));
   }
 
   /**
@@ -270,10 +256,7 @@ class RedisCheckpointStore implements CheckpointStore {
    * Add a session id to the per-orchestrator index, no-op when already
    * present.
    */
-  private async indexSession(
-    orchestratorName: string,
-    sessionId: string,
-  ): Promise<void> {
+  private async indexSession(orchestratorName: string, sessionId: string): Promise<void> {
     const index = await this.readIndex(orchestratorName);
 
     if (index.sessionIds.includes(sessionId)) {
@@ -289,10 +272,7 @@ class RedisCheckpointStore implements CheckpointStore {
    * Remove a session id from the per-orchestrator index, no-op when
    * absent.
    */
-  private async deindexSession(
-    orchestratorName: string,
-    sessionId: string,
-  ): Promise<void> {
+  private async deindexSession(orchestratorName: string, sessionId: string): Promise<void> {
     const index = await this.readIndex(orchestratorName);
     const next = index.sessionIds.filter((id) => id !== sessionId);
 
@@ -300,10 +280,7 @@ class RedisCheckpointStore implements CheckpointStore {
       return;
     }
 
-    await this.write(
-      this.indexKey(orchestratorName),
-      JSON.stringify({ sessionIds: next }),
-    );
+    await this.write(this.indexKey(orchestratorName), JSON.stringify({ sessionIds: next }));
   }
 
   /**

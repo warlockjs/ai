@@ -29,27 +29,23 @@ export function bm25Rank(query: string, docs: ReadonlyArray<LexicalDoc>): Ranked
   const queryTerms = [...new Set(tokenize(query))];
   if (queryTerms.length === 0 || docs.length === 0) return [];
 
-  const tokenized = docs.map(doc => ({ id: doc.id, terms: tokenize(doc.text) }));
-  const avgLen =
-    tokenized.reduce((sum, d) => sum + d.terms.length, 0) / tokenized.length || 1;
+  const tokenized = docs.map((doc) => ({ id: doc.id, terms: tokenize(doc.text) }));
+  const avgLen = tokenized.reduce((sum, d) => sum + d.terms.length, 0) / tokenized.length || 1;
 
   // Document frequency per query term, across the candidate set.
   const df = new Map<string, number>();
   for (const term of queryTerms) {
-    df.set(
-      term,
-      tokenized.filter(d => d.terms.includes(term)).length,
-    );
+    df.set(term, tokenized.filter((d) => d.terms.includes(term)).length);
   }
 
   const n = tokenized.length;
 
-  const scored = tokenized.map(doc => {
+  const scored = tokenized.map((doc) => {
     const len = doc.terms.length || 1;
     let score = 0;
 
     for (const term of queryTerms) {
-      const tf = doc.terms.filter(t => t === term).length;
+      const tf = doc.terms.filter((t) => t === term).length;
       if (tf === 0) continue;
 
       const docFreq = df.get(term) ?? 0;
@@ -63,5 +59,5 @@ export function bm25Rank(query: string, docs: ReadonlyArray<LexicalDoc>): Ranked
     return { id: doc.id, score };
   });
 
-  return scored.filter(item => item.score > 0).sort((a, b) => b.score - a.score);
+  return scored.filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
 }

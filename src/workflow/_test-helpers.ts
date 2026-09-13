@@ -8,7 +8,7 @@ export function schema<T>(
 }
 
 /** Schema that accepts `{ n: number }` shapes; rejects everything else. */
-export const numberSchema = schema<{ n: number }>(v => {
+export const numberSchema = schema<{ n: number }>((v) => {
   if (typeof v === "object" && v !== null && typeof (v as any).n === "number") {
     return { value: { n: (v as any).n } };
   }
@@ -16,4 +16,4 @@ export const numberSchema = schema<{ n: number }>(v => {
 });
 
 /** Schema that wraps any value through unchanged — useful for output extracts. */
-export const passthrough = schema<any>(v => ({ value: v }));
+export const passthrough = schema<any>((v) => ({ value: v }));

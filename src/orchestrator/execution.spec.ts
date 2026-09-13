@@ -163,9 +163,9 @@ describe("orchestrator lifecycle — drift check (Phase 2)", () => {
       checkpointStore: store,
     });
 
-    await expect(
-      drifted.execute("again", { sessionId: "s1", history: [] }),
-    ).rejects.toBeInstanceOf(OrchestratorDriftError);
+    await expect(drifted.execute("again", { sessionId: "s1", history: [] })).rejects.toBeInstanceOf(
+      OrchestratorDriftError,
+    );
   });
 
   it("bypasses drift with { force: true } and persists the new signature", async () => {
@@ -245,13 +245,7 @@ describe("orchestrator lifecycle — events", () => {
 
     await orch.execute("hi", { sessionId: "s1", history: HISTORY });
 
-    expect(seen).toEqual([
-      "starting",
-      "loaded",
-      "drift",
-      "windowed",
-      "persisted",
-    ]);
+    expect(seen).toEqual(["starting", "loaded", "drift", "windowed", "persisted"]);
   });
 
   it("fires per-call (tier 3) handlers and unbinds them after the turn", async () => {

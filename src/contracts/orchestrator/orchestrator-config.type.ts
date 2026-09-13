@@ -37,10 +37,7 @@ export type SummarizeConfig = {
    * supplied the orchestrator does not surface `result.compaction` for
    * the dev to apply manually.
    */
-  onCompact?: (
-    compaction: CompactionResult,
-    ctx: { sessionId: string },
-  ) => Promise<void> | void;
+  onCompact?: (compaction: CompactionResult, ctx: { sessionId: string }) => Promise<void> | void;
   /** Compaction-lock tuning. `maxWait` caps the per-turn wait in ms. */
   lock?: { maxWait?: number };
 };
@@ -62,10 +59,7 @@ export type SummarizeCallback = (
  * this orchestrator into one common pool; a function derives a custom key
  * (a tenant id, a user id) from the executing session.
  */
-export type OrchestratorMemoryScope =
-  | "session"
-  | "shared"
-  | ((sessionId: string) => string);
+export type OrchestratorMemoryScope = "session" | "shared" | ((sessionId: string) => string);
 
 /**
  * Per-turn memory wiring for `OrchestratorConfig.memory` (memory core
@@ -171,10 +165,7 @@ export type OrchestratorMemoryConfig = {
 export type OrchestratorConfig<
   TOutput,
   TState = TOutput,
-  TIntents extends Record<string, SupervisorIntentValue> = Record<
-    string,
-    SupervisorIntentValue
-  >,
+  TIntents extends Record<string, SupervisorIntentValue> = Record<string, SupervisorIntentValue>,
 > = {
   /** Stable identifier — used in logs, events, checkpoints, signature. */
   name: string;
@@ -198,9 +189,7 @@ export type OrchestratorConfig<
   /** LLM-driven dispatch. Mutually exclusive with `route`. */
   router?: AgentContract<unknown> | RouterEntry<TState>;
   /** Retrospective per-turn verdict callback. */
-  evaluate?: (
-    ctx: EvaluateContext<TState>,
-  ) => EvaluateResult | Promise<EvaluateResult>;
+  evaluate?: (ctx: EvaluateContext<TState>) => EvaluateResult | Promise<EvaluateResult>;
   /** Initial seed for the session-state accumulator. */
   state?: TState;
   /** Final-state schema; validated before populating `result.data`. */

@@ -46,9 +46,7 @@ describe("loadHtml", () => {
   });
 
   it("preserves paragraph structure as blank-line separators", () => {
-    const [doc] = loadHtml(
-      "<p>alpha</p><p>beta</p>",
-    );
+    const [doc] = loadHtml("<p>alpha</p><p>beta</p>");
 
     // Each <p> open + close becomes a newline, so adjacent paragraphs end up
     // separated by a blank line the recursive splitter honors.

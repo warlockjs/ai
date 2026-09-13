@@ -35,8 +35,7 @@ describe("extractJsonPayload", () => {
   });
 
   it("takes the first fence when multiple are present", () => {
-    const input =
-      '```json\n{"first":true}\n```\n\n```json\n{"second":true}\n```';
+    const input = '```json\n{"first":true}\n```\n\n```json\n{"second":true}\n```';
 
     expect(extractJsonPayload(input)).toBe('{"first":true}');
   });

@@ -37,7 +37,7 @@ describe("prompt() registry — registration", () => {
     registry.add("a", { version: "2", template: "You are A2." });
 
     const versions = registry.versions("a");
-    expect(versions.map(v => v.version)).toEqual(["1", "2"]);
+    expect(versions.map((v) => v.version)).toEqual(["1", "2"]);
   });
 
   it("add() creates the name when it does not yet exist", () => {
@@ -86,8 +86,15 @@ describe("prompt() registry — resolve()", () => {
       {
         name: "support",
         versions: [
-          { version: "1", template: "You are support for {{product}}. Reply in {{language|English}}." },
-          { version: "2", template: "You are senior support for {{product}}.", required: ["product"] },
+          {
+            version: "1",
+            template: "You are support for {{product}}. Reply in {{language|English}}.",
+          },
+          {
+            version: "2",
+            template: "You are senior support for {{product}}.",
+            required: ["product"],
+          },
         ],
       },
     ],
@@ -142,9 +149,7 @@ describe("prompt() registry — resolve()", () => {
   });
 
   it("throws PromptNotFoundError when an explicit version is unknown", () => {
-    expect(() => registry.resolve("support", { version: "99" })).toThrow(
-      PromptNotFoundError,
-    );
+    expect(() => registry.resolve("support", { version: "99" })).toThrow(PromptNotFoundError);
   });
 
   it("throws PromptValidationError listing missing required keys", () => {
@@ -202,7 +207,10 @@ describe("prompt() registry — unified backing (P3 facade)", () => {
         {
           name: "support",
           versions: [
-            { version: "1", template: "You are support for {{product}}. Reply in {{language|English}}." },
+            {
+              version: "1",
+              template: "You are support for {{product}}. Reply in {{language|English}}.",
+            },
           ],
         },
       ],
@@ -227,7 +235,7 @@ describe("prompt() registry — register() merge semantics", () => {
 
     registry.register({ name: "a", versions: [{ version: "2", template: "v2" }] });
 
-    expect(registry.versions("a").map(v => v.version)).toEqual(["1", "2"]);
+    expect(registry.versions("a").map((v) => v.version)).toEqual(["1", "2"]);
   });
 
   it("throws when a merged entry repeats an existing version label", () => {

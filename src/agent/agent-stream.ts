@@ -133,10 +133,7 @@ export function createAgentStream<TResult>(): {
     on(handlerMap) {
       for (const [key, handler] of Object.entries(handlerMap)) {
         if (handler) {
-          handlers.set(
-            key as StreamEvent["type"],
-            handler as (event: StreamEvent) => void,
-          );
+          handlers.set(key as StreamEvent["type"], handler as (event: StreamEvent) => void);
         }
       }
 

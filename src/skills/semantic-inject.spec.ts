@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { EmbedderContract, EmbeddingBatchResult, EmbeddingResult } from "../contracts/embedder.contract";
+import type {
+  EmbedderContract,
+  EmbeddingBatchResult,
+  EmbeddingResult,
+} from "../contracts/embedder.contract";
 import { EmbeddingVectorCountMismatchError } from "../errors";
 import { skills } from "./skills";
 import { MockSkillsStore } from "./store/mock-skills-store";
@@ -87,7 +91,7 @@ describe("semantic pre-injection — preload", () => {
     }
   });
 
-  it("injects every body when inject is \"all\"", async () => {
+  it('injects every body when inject is "all"', async () => {
     const store = new MockSkillsStore([
       makeSkill({ name: "a", body: "A" }),
       makeSkill({ name: "b", body: "B" }),

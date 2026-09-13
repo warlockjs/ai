@@ -1,7 +1,4 @@
-import type {
-  AgentMiddleware,
-  MiddlewareTripContext,
-} from "../../contracts/middleware";
+import type { AgentMiddleware, MiddlewareTripContext } from "../../contracts/middleware";
 import type { ModelResponse } from "../../contracts/model.contract";
 import { GuardrailViolationError } from "../../errors";
 import { extractUserText } from "../utils";

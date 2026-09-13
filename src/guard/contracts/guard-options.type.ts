@@ -1,11 +1,7 @@
 import type { MiddlewareTripContext } from "../../contracts/middleware/middleware-context.type";
 import type { GuardrailDetector } from "./guardrail.contract";
 import type { OpenAiClientLike } from "./openai-client.contract";
-import type {
-  GuardrailAction,
-  GuardrailMatch,
-  GuardrailPhase,
-} from "./verdict.type";
+import type { GuardrailAction, GuardrailMatch, GuardrailPhase } from "./verdict.type";
 
 /**
  * The payload handed to {@link GuardrailEscalation.onBlock} when a detector

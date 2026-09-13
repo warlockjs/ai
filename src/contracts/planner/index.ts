@@ -13,8 +13,5 @@ export type {
   PlannerResult,
   PlannerStepSnapshot,
 } from "./planner-result.type";
-export type {
-  PlannerSnapshot,
-  PlannerSnapshotStatus,
-} from "./planner-snapshot.type";
+export type { PlannerSnapshot, PlannerSnapshotStatus } from "./planner-snapshot.type";
 export type { PlannerContract } from "./planner.contract";

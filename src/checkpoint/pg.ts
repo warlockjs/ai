@@ -102,8 +102,7 @@ function deserializeRoute(value: unknown): string | string[] | null {
  * coercions a heterogeneous `pg` client population needs.
  */
 function rowToRecord(row: Record<string, unknown>): CheckpointRecord {
-  const state =
-    typeof row.state === "string" ? JSON.parse(row.state) : row.state;
+  const state = typeof row.state === "string" ? JSON.parse(row.state) : row.state;
 
   return {
     orchestrator_name: row.orchestrator_name as string,
@@ -222,10 +221,7 @@ class PgCheckpointStore implements CheckpointStore {
   /**
    * Delete every checkpoint row for a session, ending it.
    */
-  public async delete(
-    orchestratorName: string,
-    sessionId: string,
-  ): Promise<void> {
+  public async delete(orchestratorName: string, sessionId: string): Promise<void> {
     await this.client.query(
       `DELETE FROM ${this.table}
        WHERE orchestrator_name = $1 AND session_id = $2`,
@@ -240,10 +236,7 @@ class PgCheckpointStore implements CheckpointStore {
    * wildcards so a literal `_` or `%` in the prefix is not treated as a
    * pattern.
    */
-  public async list(
-    orchestratorName: string,
-    prefix?: string,
-  ): Promise<string[]> {
+  public async list(orchestratorName: string, prefix?: string): Promise<string[]> {
     if (prefix === undefined) {
       const { rows } = await this.client.query(
         `SELECT DISTINCT session_id FROM ${this.table}
@@ -254,10 +247,7 @@ class PgCheckpointStore implements CheckpointStore {
       return rows.map((row) => (row as Record<string, unknown>).session_id as string);
     }
 
-    const escaped = prefix
-      .replace(/\\/g, "\\\\")
-      .replace(/_/g, "\\_")
-      .replace(/%/g, "\\%");
+    const escaped = prefix.replace(/\\/g, "\\\\").replace(/_/g, "\\_").replace(/%/g, "\\%");
 
     const { rows } = await this.client.query(
       `SELECT DISTINCT session_id FROM ${this.table}

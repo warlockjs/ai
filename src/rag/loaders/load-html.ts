@@ -10,14 +10,7 @@ const DEFAULT_ID = "document";
  * stripped. `script` / `style` would otherwise leak code into the chunked
  * text; `noscript` / `template` / `head` / `svg` are non-prose noise.
  */
-const STRIPPED_ELEMENTS = [
-  "script",
-  "style",
-  "noscript",
-  "template",
-  "head",
-  "svg",
-];
+const STRIPPED_ELEMENTS = ["script", "style", "noscript", "template", "head", "svg"];
 
 /**
  * Block-level tags that imply a line break in the readable text. Replacing
@@ -93,7 +86,9 @@ function extractTitle(html: string): string | undefined {
     return undefined;
   }
 
-  const title = decodeEntities(match[1] ?? "").replace(/\s+/g, " ").trim();
+  const title = decodeEntities(match[1] ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 
   return title.length > 0 ? title : undefined;
 }
@@ -159,10 +154,7 @@ function htmlToText(html: string): string {
  * @param options - Shared `id` / `metadata` / `tags` ({@link LoadHtmlOptions}).
  * @returns A {@link RagLoaderResult} (one document) ready for `rag.index()`.
  */
-export function loadHtml(
-  html: string,
-  options: LoadHtmlOptions = {},
-): RagLoaderResult {
+export function loadHtml(html: string, options: LoadHtmlOptions = {}): RagLoaderResult {
   const id = options.id ?? DEFAULT_ID;
   const title = extractTitle(html);
   const text = htmlToText(html);

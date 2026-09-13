@@ -171,9 +171,7 @@ describe("batch", () => {
 
 describe("batch failure handling", () => {
   it("isolates a thrown failure without rejecting the batch", async () => {
-    const executable = fakeExecutable((input) =>
-      input.id === 2 ? { throws: "boom" } : {},
-    );
+    const executable = fakeExecutable((input) => (input.id === 2 ? { throws: "boom" } : {}));
 
     const result = await batch(executable, items);
 
@@ -225,9 +223,7 @@ describe("batch retry", () => {
   });
 
   it("reports failed after exhausting all attempts", async () => {
-    const executable = fakeExecutable((input) =>
-      input.id === 2 ? { throws: "always" } : {},
-    );
+    const executable = fakeExecutable((input) => (input.id === 2 ? { throws: "always" } : {}));
 
     const result = await batch(executable, items, {
       retry: { attempts: 2, backoff: "none" },
@@ -239,9 +235,7 @@ describe("batch retry", () => {
 
   it("honors retryOn to stop retrying early", async () => {
     const retryOn = vi.fn().mockReturnValue(false);
-    const executable = fakeExecutable((input) =>
-      input.id === 1 ? { throws: "fatal" } : {},
-    );
+    const executable = fakeExecutable((input) => (input.id === 1 ? { throws: "fatal" } : {}));
 
     const result = await batch(executable, items, {
       retry: { attempts: 5, backoff: "none", retryOn },

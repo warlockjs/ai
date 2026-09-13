@@ -12,9 +12,7 @@ import { memory } from "./stores/memory";
  * Build a {@link PendingInterrupt} fixture, overridable per field. The
  * embedded request is the durable payload `resume(...)` rules on.
  */
-function makeInterrupt(
-  overrides: Partial<PendingInterrupt> = {},
-): PendingInterrupt {
+function makeInterrupt(overrides: Partial<PendingInterrupt> = {}): PendingInterrupt {
   const request: ApprovalRequest = {
     interruptId: "support.sess-1.0.abc",
     toolName: "refundCustomer",
@@ -68,11 +66,13 @@ function makeToolContext(
  * fired inside `execute` so a test can observe the seeded decision flowing
  * through the real `humanApproval` middleware.
  */
-function makeFakeAgent(opts: {
-  name?: string;
-  before?: (ctx: MiddlewareToolContext) => Promise<ToolInvokeResult<unknown> | void>;
-  toolContext?: MiddlewareToolContext;
-} = {}): { agent: AgentContract; execute: ReturnType<typeof vi.fn> } {
+function makeFakeAgent(
+  opts: {
+    name?: string;
+    before?: (ctx: MiddlewareToolContext) => Promise<ToolInvokeResult<unknown> | void>;
+    toolContext?: MiddlewareToolContext;
+  } = {},
+): { agent: AgentContract; execute: ReturnType<typeof vi.fn> } {
   const { name = "support", before, toolContext } = opts;
 
   const cannedResult: AgentResult = {
@@ -128,11 +128,7 @@ describe("resume", () => {
       const store = memory();
       await store.save(makeInterrupt({ status: "resolved" }));
 
-      const outcome = await resume(
-        "support.sess-1.0.abc",
-        { type: "approve" },
-        { store },
-      );
+      const outcome = await resume("support.sess-1.0.abc", { type: "approve" }, { store });
 
       expect(outcome).toEqual({
         type: "already-resolved",
@@ -144,16 +140,8 @@ describe("resume", () => {
       const store = memory();
       await store.save(makeInterrupt());
 
-      const first = await resume(
-        "support.sess-1.0.abc",
-        { type: "approve" },
-        { store },
-      );
-      const second = await resume(
-        "support.sess-1.0.abc",
-        { type: "approve" },
-        { store },
-      );
+      const first = await resume("support.sess-1.0.abc", { type: "approve" }, { store });
+      const second = await resume("support.sess-1.0.abc", { type: "approve" }, { store });
 
       expect(first.type).toBe("applied");
       expect(second.type).toBe("already-resolved");
@@ -165,11 +153,7 @@ describe("resume", () => {
       const store = memory();
       await store.save(makeInterrupt());
 
-      const outcome = await resume(
-        "support.sess-1.0.abc",
-        { type: "approve" },
-        { store },
-      );
+      const outcome = await resume("support.sess-1.0.abc", { type: "approve" }, { store });
 
       expect(outcome).toEqual({
         type: "applied",
@@ -219,11 +203,7 @@ describe("resume", () => {
       await store.save(makeInterrupt());
 
       await expect(
-        resume(
-          "support.sess-1.0.abc",
-          { type: "reject" } as never,
-          { store },
-        ),
+        resume("support.sess-1.0.abc", { type: "reject" } as never, { store }),
       ).rejects.toThrow(/requires a string 'reason'/);
     });
 
@@ -232,11 +212,7 @@ describe("resume", () => {
       await store.save(makeInterrupt());
 
       await expect(
-        resume(
-          "support.sess-1.0.abc",
-          { type: "nuke" } as never,
-          { store },
-        ),
+        resume("support.sess-1.0.abc", { type: "nuke" } as never, { store }),
       ).rejects.toThrow(/unknown decision type/);
     });
   });
@@ -248,11 +224,7 @@ describe("resume", () => {
 
       const { agent, execute } = makeFakeAgent();
 
-      const outcome = await resume(
-        "support.sess-1.0.abc",
-        { type: "approve" },
-        { store, agent },
-      );
+      const outcome = await resume("support.sess-1.0.abc", { type: "approve" }, { store, agent });
 
       expect(execute).toHaveBeenCalledTimes(1);
       // Defaults the re-run prompt to the captured original input.
@@ -278,10 +250,7 @@ describe("resume", () => {
         { store, agent, input: "Refund order #4821 (approved by ops)" },
       );
 
-      expect(execute).toHaveBeenCalledWith(
-        "Refund order #4821 (approved by ops)",
-        undefined,
-      );
+      expect(execute).toHaveBeenCalledWith("Refund order #4821 (approved by ops)", undefined);
     });
 
     it("pre-seeds the decision so the gated tool call resolves to the ruling (edit)", async () => {
@@ -304,11 +273,7 @@ describe("resume", () => {
         toolContext,
       });
 
-      await resume(
-        "support.sess-1.0.abc",
-        { type: "edit", args: { amount: 5 } },
-        { store, agent },
-      );
+      await resume("support.sess-1.0.abc", { type: "edit", args: { amount: 5 } }, { store, agent });
 
       // The author handler never ran; the seeded edit rewrote the args.
       expect(authorHandler).not.toHaveBeenCalled();
@@ -338,11 +303,7 @@ describe("resume", () => {
         toolContext,
       });
 
-      await resume(
-        "support.sess-1.0.abc",
-        { type: "approve" },
-        { store, agent },
-      );
+      await resume("support.sess-1.0.abc", { type: "approve" }, { store, agent });
 
       expect(authorHandler).not.toHaveBeenCalled();
       // approve → void (real tool runs), args untouched.
@@ -362,11 +323,7 @@ describe("resume", () => {
         toolContext: makeToolContext(),
       });
 
-      await resume(
-        "support.sess-1.0.abc",
-        { type: "approve" },
-        { store, agent },
-      );
+      await resume("support.sess-1.0.abc", { type: "approve" }, { store, agent });
     });
 
     it("does not leak a stale seed when the gated call never fires", async () => {
@@ -376,11 +333,7 @@ describe("resume", () => {
       // A re-run whose agent does NOT exercise the gated tool (no `before`).
       const { agent } = makeFakeAgent();
 
-      await resume(
-        "support.sess-1.0.abc",
-        { type: "edit", args: { amount: 5 } },
-        { store, agent },
-      );
+      await resume("support.sess-1.0.abc", { type: "edit", args: { amount: 5 } }, { store, agent });
 
       // A fresh, unrelated gated call must NOT pick up the stale seed — it
       // should reach the author handler.

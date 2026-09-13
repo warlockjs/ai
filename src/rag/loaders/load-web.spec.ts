@@ -78,9 +78,9 @@ describe("loadWeb", () => {
   it("throws an OutboundPolicyError on a non-OK response", async () => {
     const { policy } = fakeWeb("nope", { "content-type": "text/html" }, 404);
 
-    await expect(
-      loadWeb("https://example.com/missing", { policy }),
-    ).rejects.toBeInstanceOf(OutboundPolicyError);
+    await expect(loadWeb("https://example.com/missing", { policy })).rejects.toBeInstanceOf(
+      OutboundPolicyError,
+    );
   });
 
   it("honors a caller id / tags and merges metadata over derived keys", async () => {

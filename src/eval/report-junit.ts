@@ -67,20 +67,14 @@ export function toJUnit(report: EvalReport): string {
     const caseTime = (entry.duration / 1000).toFixed(3);
 
     if (entry.passed) {
-      lines.push(
-        `  <testcase name="${caseName}" classname="${suiteName}" time="${caseTime}"/>`,
-      );
+      lines.push(`  <testcase name="${caseName}" classname="${suiteName}" time="${caseTime}"/>`);
 
       continue;
     }
 
     const message = failureMessage(entry);
-    lines.push(
-      `  <testcase name="${caseName}" classname="${suiteName}" time="${caseTime}">`,
-    );
-    lines.push(
-      `    <failure message="${escapeXml(message)}">${escapeXml(message)}</failure>`,
-    );
+    lines.push(`  <testcase name="${caseName}" classname="${suiteName}" time="${caseTime}">`);
+    lines.push(`    <failure message="${escapeXml(message)}">${escapeXml(message)}</failure>`);
     lines.push("  </testcase>");
   }
 

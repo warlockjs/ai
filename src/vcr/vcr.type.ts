@@ -100,10 +100,10 @@ export type VcrOptions = {
    * `{ messages, options }` about to be stored; return a sanitized copy.
    * Overrides the default key-based `redact()`.
    */
-  redactRequest?: (request: {
+  redactRequest?: (request: { messages: Message[]; options?: ModelCallOptions }) => {
     messages: Message[];
     options?: ModelCallOptions;
-  }) => { messages: Message[]; options?: ModelCallOptions };
+  };
   /**
    * Optional redactor for the recorded RESPONSE. Off by default — redacting
    * the response changes what replay returns, so opt in only when a secret

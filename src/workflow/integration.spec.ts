@@ -6,13 +6,11 @@ import { memory as snapshotMemory } from "../snapshot/memory";
 import { step } from "./step";
 import { workflow } from "./workflow";
 
-function schema<T>(
-  validate: (value: unknown) => StandardSchemaV1.Result<T>,
-): StandardSchemaV1<T> {
+function schema<T>(validate: (value: unknown) => StandardSchemaV1.Result<T>): StandardSchemaV1<T> {
   return { "~standard": { version: 1, vendor: "test", validate } };
 }
 
-const passthrough = schema<any>(v => ({ value: v }));
+const passthrough = schema<any>((v) => ({ value: v }));
 
 // End-to-end scenario mirroring PoC Example 2 from the workflow design:
 // classify → (conditional enrich) → parallel(draft, kb-articles) → qa
@@ -84,21 +82,21 @@ describe("workflow integration — support ticket triage", () => {
         step({
           name: "classify",
           agent: classifierAgent,
-          input: ctx => ({ prompt: `classify: ${(ctx.input as any).ticket}` }),
+          input: (ctx) => ({ prompt: `classify: ${(ctx.input as any).ticket}` }),
           output: {
-            extract: ctx => JSON.parse(ctx.agentResult!.text as string),
+            extract: (ctx) => JSON.parse(ctx.agentResult!.text as string),
             schema: passthrough,
           },
         }),
         step({
           name: "enrich",
           agent: historyAgent,
-          skip: ctx => (ctx.steps.classify?.output as any)?.priority !== "high",
-          input: ctx => ({
+          skip: (ctx) => (ctx.steps.classify?.output as any)?.priority !== "high",
+          input: (ctx) => ({
             prompt: `history for ${(ctx.input as any).customerId}`,
           }),
           output: {
-            extract: ctx => JSON.parse(ctx.agentResult!.text as string),
+            extract: (ctx) => JSON.parse(ctx.agentResult!.text as string),
           },
         }),
         step({
@@ -107,11 +105,11 @@ describe("workflow integration — support ticket triage", () => {
             step({
               name: "draft",
               agent: writerAgent,
-              input: ctx => ({
+              input: (ctx) => ({
                 prompt: `reply ${ctx.state.qaFeedback ? `(feedback: ${ctx.state.qaFeedback})` : ""}`,
               }),
               output: {
-                extract: ctx => JSON.parse(ctx.agentResult!.text as string),
+                extract: (ctx) => JSON.parse(ctx.agentResult!.text as string),
               },
             }),
             step({
@@ -119,7 +117,7 @@ describe("workflow integration — support ticket triage", () => {
               agent: kbAgent,
               input: () => ({ prompt: "kb lookup" }),
               output: {
-                extract: ctx => JSON.parse(ctx.agentResult!.text as string),
+                extract: (ctx) => JSON.parse(ctx.agentResult!.text as string),
               },
             }),
           ],
@@ -127,17 +125,15 @@ describe("workflow integration — support ticket triage", () => {
         step({
           name: "qa",
           agent: qaAgent,
-          input: ctx => ({
+          input: (ctx) => ({
             prompt: `review draft: ${JSON.stringify(ctx.steps.draft?.output)}`,
           }),
           output: {
-            extract: ctx => JSON.parse(ctx.agentResult!.text as string),
+            extract: (ctx) => JSON.parse(ctx.agentResult!.text as string),
           },
-          nextStep: ctx => {
+          nextStep: (ctx) => {
             const review = ctx.steps.qa?.output as any;
-            const latest = ctx.agentResult
-              ? JSON.parse(ctx.agentResult.text as string)
-              : review;
+            const latest = ctx.agentResult ? JSON.parse(ctx.agentResult.text as string) : review;
             if (latest && !latest.approved) {
               ctx.state.qaFeedback = latest.feedback;
               return { goto: "generate" };
@@ -146,7 +142,7 @@ describe("workflow integration — support ticket triage", () => {
         }),
       ],
       output: {
-        extract: ctx => ({
+        extract: (ctx) => ({
           reply: (ctx.steps.draft?.output as any)?.response,
           kbUrls: (ctx.steps["kb-articles"]?.output as any)?.urls,
         }),
@@ -189,7 +185,7 @@ describe("workflow usage rollup", () => {
         step({
           name: "s1",
           agent: cachingAgent,
-          input: ctx => ({ prompt: String(ctx.input) }),
+          input: (ctx) => ({ prompt: String(ctx.input) }),
         }),
       ],
     });

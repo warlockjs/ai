@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Message } from "../contracts/conversation-message.type";
-import type {
-  OrchestratorContract,
-} from "../contracts/orchestrator/orchestrator.contract";
+import type { OrchestratorContract } from "../contracts/orchestrator/orchestrator.contract";
 import type { OrchestratorExecuteOptions } from "../contracts/orchestrator/orchestrator-execute-options.type";
 import type {
   OrchestratorReport,
@@ -41,11 +39,7 @@ function makeReport(): OrchestratorReport {
  * tool payload. The `execute` impl returns a successful
  * `OrchestratorResult` unless `error` is supplied.
  */
-function mockOrchestrator(options?: {
-  name?: string;
-  error?: AIError;
-  data?: unknown;
-}): {
+function mockOrchestrator(options?: { name?: string; error?: AIError; data?: unknown }): {
   orchestrator: OrchestratorContract<unknown, unknown>;
   calls: { input: SupervisorInput; options: OrchestratorExecuteOptions<unknown> }[];
 } {
@@ -136,17 +130,13 @@ describe("orchestrator.asTool()", () => {
       sessionScope: "shared",
       session: (ctx) => ({
         sessionId: String(
-          (ctx?.artifacts as { supportSession?: string } | undefined)
-            ?.supportSession,
+          (ctx?.artifacts as { supportSession?: string } | undefined)?.supportSession,
         ),
         history,
       }),
     });
 
-    await tool.invoke(
-      { message: "continue" },
-      { artifacts: { supportSession: "sess_ctx" } },
-    );
+    await tool.invoke({ message: "continue" }, { artifacts: { supportSession: "sess_ctx" } });
 
     expect(calls[0].options.sessionId).toBe("sess_ctx");
     expect(calls[0].options.history).toEqual(history);
@@ -201,9 +191,7 @@ describe("orchestrator.asTool()", () => {
       inputSchema: passthroughObject,
       sessionScope: "shared",
       // Simulates an unauthenticated request: nothing on the context.
-      session: (ctx) =>
-        (ctx?.artifacts as { supportSession?: string } | undefined)
-          ?.supportSession,
+      session: (ctx) => (ctx?.artifacts as { supportSession?: string } | undefined)?.supportSession,
     });
 
     const invocation = await tool.invoke({
@@ -212,9 +200,7 @@ describe("orchestrator.asTool()", () => {
     });
 
     expect(invocation.error?.code).toBe("TOOL_EXEC_FAILED");
-    expect((invocation.error as { cause?: unknown }).cause).toBeInstanceOf(
-      SupervisorFailedError,
-    );
+    expect((invocation.error as { cause?: unknown }).cause).toBeInstanceOf(SupervisorFailedError);
     expect(calls).toHaveLength(0);
   });
 
@@ -250,9 +236,7 @@ describe("orchestrator.asTool()", () => {
 
     expect(invocation.error).toBeDefined();
     expect(invocation.error?.code).toBe("TOOL_EXEC_FAILED");
-    expect((invocation.error as { cause?: unknown }).cause).toBeInstanceOf(
-      SupervisorFailedError,
-    );
+    expect((invocation.error as { cause?: unknown }).cause).toBeInstanceOf(SupervisorFailedError);
   });
 
   it("surfaces an orchestrator result error as ToolExecutionError with cause", async () => {

@@ -118,8 +118,7 @@ export function matchConverge(received: ReportLike): MatcherVerdict {
 
   const nonConvergent = new Set(["max-iterations", "cancelled", "error"]);
   const pass =
-    supervisorReport.status === "completed" &&
-    !nonConvergent.has(supervisorReport.terminatedBy);
+    supervisorReport.status === "completed" && !nonConvergent.has(supervisorReport.terminatedBy);
 
   return {
     pass,
@@ -145,8 +144,7 @@ export function matchPassStep(received: ReportLike, stepName: string): MatcherVe
   if (!workflowReport) {
     return {
       pass: false,
-      message: () =>
-        `toPassStep expects a workflow result, but received a "${report.type}" report`,
+      message: () => `toPassStep expects a workflow result, but received a "${report.type}" report`,
     };
   }
 
@@ -156,8 +154,7 @@ export function matchPassStep(received: ReportLike, stepName: string): MatcherVe
     const known = Object.keys(workflowReport.steps).join(", ");
     return {
       pass: false,
-      message: () =>
-        `expected workflow to have a step "${stepName}", but steps are [${known}]`,
+      message: () => `expected workflow to have a step "${stepName}", but steps are [${known}]`,
     };
   }
 
@@ -191,10 +188,7 @@ type DataResult = { data?: unknown };
  * @example
  * expect(await agent.execute(input, { output: schema })).toOutputShape(schema);
  */
-export function matchOutputShape(
-  received: DataResult,
-  schema: StandardSchemaV1,
-): MatcherVerdict {
+export function matchOutputShape(received: DataResult, schema: StandardSchemaV1): MatcherVerdict {
   const data = received.data;
 
   if (data === undefined) {

@@ -13,7 +13,7 @@ describe("composeMiddleware", () => {
 
     const out = composeMiddleware([a, b], c, [d]);
 
-    expect(out.map(entry => entry.name)).toEqual(["a", "b", "c", "d"]);
+    expect(out.map((entry) => entry.name)).toEqual(["a", "b", "c", "d"]);
   });
 
   it("preserves registration order across sources (no sorting, no dedup)", () => {
@@ -29,6 +29,6 @@ describe("composeMiddleware", () => {
   it("handles empty sources cleanly", () => {
     const out = composeMiddleware([], [mw("x")], []);
 
-    expect(out.map(entry => entry.name)).toEqual(["x"]);
+    expect(out.map((entry) => entry.name)).toEqual(["x"]);
   });
 });

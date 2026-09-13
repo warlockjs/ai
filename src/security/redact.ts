@@ -46,7 +46,7 @@ const DEFAULT_MAX_DEPTH = 8;
 
 function keyIsSensitive(key: string, fragments: string[]): boolean {
   const lower = key.toLowerCase();
-  return fragments.some(fragment => lower.includes(fragment));
+  return fragments.some((fragment) => lower.includes(fragment));
 }
 
 /**
@@ -60,7 +60,7 @@ function keyIsSensitive(key: string, fragments: string[]): boolean {
  * cause serializer (S4) so there is ONE redaction policy, not three.
  */
 export function redact<T>(value: T, options: RedactOptions = {}): T {
-  const fragments = [...DEFAULT_SENSITIVE_KEYS, ...(options.keys ?? [])].map(k =>
+  const fragments = [...DEFAULT_SENSITIVE_KEYS, ...(options.keys ?? [])].map((k) =>
     k.toLowerCase(),
   );
   const placeholder = options.placeholder ?? DEFAULT_PLACEHOLDER;
@@ -77,7 +77,7 @@ export function redact<T>(value: T, options: RedactOptions = {}): T {
     seen.add(input as object);
 
     if (Array.isArray(input)) {
-      return input.map(item => walk(item, depth + 1));
+      return input.map((item) => walk(item, depth + 1));
     }
 
     // `name` / `message` / `stack` sit on Error's prototype chain (or as
@@ -94,9 +94,7 @@ export function redact<T>(value: T, options: RedactOptions = {}): T {
 
     const out: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(source)) {
-      out[key] = keyIsSensitive(key, fragments)
-        ? placeholder
-        : walk(val, depth + 1);
+      out[key] = keyIsSensitive(key, fragments) ? placeholder : walk(val, depth + 1);
     }
     return out;
   };
@@ -116,9 +114,7 @@ export function redactHeaders(
   if (!headers) return {};
 
   const entries: Array<[string, unknown]> =
-    headers instanceof Headers
-      ? [...headers.entries()]
-      : Object.entries(headers);
+    headers instanceof Headers ? [...headers.entries()] : Object.entries(headers);
 
   const out: Record<string, unknown> = {};
   for (const [key, val] of entries) {

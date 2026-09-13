@@ -63,7 +63,13 @@ describe("ai.transcribe", () => {
 
   it("forwards options + the audio to the model", async () => {
     const model = new MockTranscriptionModel("whisper-1", [{}]);
-    await transcribe({ model, audio: AUDIO, language: "en", prompt: "names: Acme", format: "verbose_json" });
+    await transcribe({
+      model,
+      audio: AUDIO,
+      language: "en",
+      prompt: "names: Acme",
+      format: "verbose_json",
+    });
     expect(model.calls[0].audio).toEqual(AUDIO);
     expect(model.calls[0].options).toMatchObject({
       language: "en",

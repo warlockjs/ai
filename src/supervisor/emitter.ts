@@ -20,10 +20,7 @@ type AnyHandler = SupervisorEventHandler<keyof SupervisorEventMap>;
  */
 export class SupervisorEmitter {
   private readonly factoryHandlers?: SupervisorEventHandlers;
-  private readonly instanceHandlers = new Map<
-    keyof SupervisorEventMap,
-    Set<AnyHandler>
-  >();
+  private readonly instanceHandlers = new Map<keyof SupervisorEventMap, Set<AnyHandler>>();
 
   public constructor(factoryHandlers?: SupervisorEventHandlers) {
     this.factoryHandlers = factoryHandlers;

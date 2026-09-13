@@ -7,9 +7,7 @@ import { memory } from "./memory";
  * embedded {@link import("../contracts/approval.type").ApprovalRequest} is
  * the durable payload a reviewer rules on.
  */
-function makeInterrupt(
-  overrides: Partial<PendingInterrupt> = {},
-): PendingInterrupt {
+function makeInterrupt(overrides: Partial<PendingInterrupt> = {}): PendingInterrupt {
   return {
     interruptId: "support.sess-1.0.abc",
     request: {
@@ -102,10 +100,7 @@ describe("memory interrupt store", () => {
 
     const supportIds = await store.list?.("support.");
 
-    expect(supportIds?.sort()).toEqual([
-      "support.sess-1.0.x",
-      "support.sess-2.0.y",
-    ]);
+    expect(supportIds?.sort()).toEqual(["support.sess-1.0.x", "support.sess-2.0.y"]);
   });
 
   it("should return a fresh array from list (no leak of backing keys)", async () => {

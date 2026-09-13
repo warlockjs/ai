@@ -2,13 +2,7 @@ import type { StepDefinition } from "../contracts/workflow/step.contract";
 import type { WorkflowDefinition } from "../contracts/workflow/workflow.contract";
 
 function stepFingerprint(step: StepDefinition): unknown {
-  const tag = step.parallel
-    ? "parallel"
-    : step.agent
-      ? "agent"
-      : step.run
-        ? "run"
-        : "empty";
+  const tag = step.parallel ? "parallel" : step.agent ? "agent" : step.run ? "run" : "empty";
 
   const agentName = step.agent?.name;
 
@@ -16,7 +10,7 @@ function stepFingerprint(step: StepDefinition): unknown {
     n: step.name,
     t: tag,
     a: agentName,
-    c: step.parallel?.map(child => stepFingerprint(child)) ?? null,
+    c: step.parallel?.map((child) => stepFingerprint(child)) ?? null,
   };
 }
 
@@ -38,7 +32,7 @@ export function computeSignature<T>(definition: WorkflowDefinition<any, T, any, 
   const fingerprint = {
     n: definition.name,
     v: definition.version ?? null,
-    s: definition.steps.map(step => stepFingerprint(step)),
+    s: definition.steps.map((step) => stepFingerprint(step)),
   };
 
   return hash(JSON.stringify(fingerprint));

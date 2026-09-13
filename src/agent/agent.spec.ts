@@ -3,10 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Message } from "../contracts/conversation-message.type";
 import type { AgentEventMap } from "../contracts/events/event-map.type";
 import type { ToolCall } from "../contracts/result/tool-call.type";
-import type {
-  SystemPromptContract,
-  SystemPromptMeta,
-} from "../contracts/system-prompt.contract";
+import type { SystemPromptContract, SystemPromptMeta } from "../contracts/system-prompt.contract";
 import { AgentExecutionError, AIError, SchemaValidationError } from "../errors";
 import { MockModel } from "../mock/mock-model";
 import { MockSDK } from "../mock/mock-sdk";
@@ -85,10 +82,7 @@ function makeSystemPrompt(resolved: string): SystemPromptContract {
  * — which reads `prompt.meta()` to stamp `promptName` / `promptVersion` onto
  * the report — is exercised without touching the real `ai.prompts` registry.
  */
-function makeNamedSystemPrompt(
-  resolved: string,
-  identity: SystemPromptMeta,
-): SystemPromptContract {
+function makeNamedSystemPrompt(resolved: string, identity: SystemPromptMeta): SystemPromptContract {
   const prompt = makeSystemPrompt(resolved);
 
   return {
@@ -153,7 +147,9 @@ describe("agent()", () => {
     const mock = MockSDK({ responses: [{ content: "ok", finishReason: "stop" }] });
     const model = mock.model({ name: "mock-gpt" });
 
-    const result = await agent({ model, systemPrompt: "You are a helpful assistant." }).execute("hi");
+    const result = await agent({ model, systemPrompt: "You are a helpful assistant." }).execute(
+      "hi",
+    );
 
     expect(result.report.systemPrompt).toBe("You are a helpful assistant.");
   });
@@ -162,7 +158,10 @@ describe("agent()", () => {
     const mock = MockSDK({ responses: [{ content: "ok", finishReason: "stop" }] });
     const model = mock.model({ name: "mock-gpt" });
 
-    const result = await agent({ model, systemPrompt: makeSystemPrompt("Persona + rules") }).execute("hi");
+    const result = await agent({
+      model,
+      systemPrompt: makeSystemPrompt("Persona + rules"),
+    }).execute("hi");
 
     expect(result.report.systemPrompt).toBe("Persona + rules");
   });
@@ -391,7 +390,7 @@ describe("agent()", () => {
 
   // 6c. A named prompt WITHOUT an explicit version defaults to "1"
   //     (mirroring the ai.prompts registry default).
-  it("defaults promptVersion to \"1\" for a named prompt with no version", async () => {
+  it('defaults promptVersion to "1" for a named prompt with no version', async () => {
     const mock = MockSDK({
       responses: [{ content: "ok", finishReason: "stop" }],
     });
@@ -414,9 +413,7 @@ describe("agent()", () => {
 
     const anonymous = makeSystemPrompt("Resolved system prompt");
 
-    const { report } = await agent({ model, systemPrompt: anonymous }).execute(
-      "Hi",
-    );
+    const { report } = await agent({ model, systemPrompt: anonymous }).execute("Hi");
 
     expect(report.promptName).toBeUndefined();
     expect(report.promptVersion).toBeUndefined();

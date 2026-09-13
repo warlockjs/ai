@@ -20,7 +20,12 @@ describe("rag — ingestion limits (D5)", () => {
     });
 
     await expect(
-      kb.index(makeDocs([{ id: "a", text: "one" }, { id: "b", text: "two" }])),
+      kb.index(
+        makeDocs([
+          { id: "a", text: "one" },
+          { id: "b", text: "two" },
+        ]),
+      ),
     ).rejects.toThrow(/maxDocuments/);
   });
 

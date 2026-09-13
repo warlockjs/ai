@@ -1,15 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { InvalidRequestError, OutboundPolicyError } from "../errors";
 import type { AttachmentPolicy } from "../contracts/attachment-policy.type";
 import { prepareAttachmentPart } from "./prepare-attachment-part";
@@ -46,9 +38,7 @@ describe("prepareAttachmentPart", () => {
   });
 
   it("strips query strings before inferring extension", async () => {
-    const part = await prepareAttachmentPart(
-      "https://cdn.example.com/cat.jpg?v=2",
-    );
+    const part = await prepareAttachmentPart("https://cdn.example.com/cat.jpg?v=2");
 
     expect(part).toEqual({
       type: "image",
@@ -57,12 +47,12 @@ describe("prepareAttachmentPart", () => {
   });
 
   it("rejects strings without a recognized extension with InvalidRequestError", async () => {
-    await expect(
-      prepareAttachmentPart("https://example.com/data.bin"),
-    ).rejects.toBeInstanceOf(InvalidRequestError);
-    await expect(
-      prepareAttachmentPart("https://example.com/data.bin"),
-    ).rejects.toThrow(/Cannot infer attachment type/);
+    await expect(prepareAttachmentPart("https://example.com/data.bin")).rejects.toBeInstanceOf(
+      InvalidRequestError,
+    );
+    await expect(prepareAttachmentPart("https://example.com/data.bin")).rejects.toThrow(
+      /Cannot infer attachment type/,
+    );
   });
 
   it("reads local image files and base64-encodes them", async () => {
@@ -138,12 +128,12 @@ describe("prepareAttachmentPart", () => {
 
     await writeFile(filePath, Buffer.from([0]));
 
-    await expect(
-      prepareAttachmentPart({ type: "image", source: filePath }),
-    ).rejects.toBeInstanceOf(InvalidRequestError);
-    await expect(
-      prepareAttachmentPart({ type: "image", source: filePath }),
-    ).rejects.toThrow(/Cannot infer media type/);
+    await expect(prepareAttachmentPart({ type: "image", source: filePath })).rejects.toBeInstanceOf(
+      InvalidRequestError,
+    );
+    await expect(prepareAttachmentPart({ type: "image", source: filePath })).rejects.toThrow(
+      /Cannot infer media type/,
+    );
   });
 
   describe("text attachments", () => {
@@ -214,9 +204,7 @@ describe("prepareAttachmentPart", () => {
       const part = await prepareAttachmentPart(filePath, { allowedRoots: [tempDir] });
 
       expect(part.type).toBe("pdf");
-      expect((part as { source: { mediaType: string } }).source.mediaType).toBe(
-        "application/pdf",
-      );
+      expect((part as { source: { mediaType: string } }).source.mediaType).toBe("application/pdf");
     });
 
     it("passes a tagged pdf URL through without fetching", async () => {

@@ -3,9 +3,7 @@ import type { PgClientLike } from "../contracts/orchestrator/snapshot-store.cont
 import type { SupervisorSnapshot } from "../contracts/supervisor/supervisor-snapshot.type";
 import { pg } from "./pg";
 
-function makeSnapshot(
-  overrides: Partial<SupervisorSnapshot> = {},
-): SupervisorSnapshot {
+function makeSnapshot(overrides: Partial<SupervisorSnapshot> = {}): SupervisorSnapshot {
   return {
     runId: "sess-1.unversioned.0",
     supervisorName: "support",
@@ -35,10 +33,7 @@ function makeFakePg(): PgClientLike & {
   const rows = new Map<string, StoredRow>();
   const statements: string[] = [];
 
-  async function query(
-    text: string,
-    params: unknown[] = [],
-  ): Promise<{ rows: unknown[] }> {
+  async function query(text: string, params: unknown[] = []): Promise<{ rows: unknown[] }> {
     statements.push(text);
 
     if (text.startsWith("INSERT INTO")) {
@@ -66,9 +61,7 @@ function makeFakePg(): PgClientLike & {
     if (text.startsWith("SELECT run_id")) {
       if (text.includes("LIKE")) {
         const pattern = params[0] as string;
-        const literalPrefix = pattern
-          .replace(/\\([_%\\])/g, "$1")
-          .replace(/%$/, "");
+        const literalPrefix = pattern.replace(/\\([_%\\])/g, "$1").replace(/%$/, "");
         const matched: { run_id: string }[] = [];
 
         for (const row of rows.values()) {
@@ -151,9 +144,7 @@ describe("snapshot pg store", () => {
 
     await store.save(makeSnapshot());
 
-    const insert = client.statements.find((statement) =>
-      statement.startsWith("INSERT INTO"),
-    );
+    const insert = client.statements.find((statement) => statement.startsWith("INSERT INTO"));
 
     expect(insert).toContain("ON CONFLICT (run_id) DO UPDATE");
   });
@@ -222,27 +213,21 @@ describe("snapshot pg store", () => {
 
     await store.save(makeSnapshot());
 
-    expect(store.schema()).toContain(
-      "CREATE TABLE IF NOT EXISTS my_snapshots",
-    );
+    expect(store.schema()).toContain("CREATE TABLE IF NOT EXISTS my_snapshots");
     expect(
-      client.statements.some((statement) =>
-        statement.includes("INSERT INTO my_snapshots"),
-      ),
+      client.statements.some((statement) => statement.includes("INSERT INTO my_snapshots")),
     ).toBe(true);
   });
 
   it("should reject an unsafe table name", () => {
     const client = makeFakePg();
 
-    expect(() => pg({ client, table: "evil; DROP TABLE x" })).toThrow(
-      /invalid table name/,
-    );
+    expect(() => pg({ client, table: "evil; DROP TABLE x" })).toThrow(/invalid table name/);
   });
 
   it("should reject a missing client", () => {
-    expect(() =>
-      pg({ client: undefined as unknown as PgClientLike }),
-    ).toThrow(/requires a 'client'/);
+    expect(() => pg({ client: undefined as unknown as PgClientLike })).toThrow(
+      /requires a 'client'/,
+    );
   });
 });

@@ -1,18 +1,7 @@
 import type { AgentToolEntry } from "../tool/executable-as-tool";
-import {
-  buildCatalog,
-  loadRecord,
-  renderCatalogPrompt,
-  semanticPreselect,
-} from "./catalog";
-import type {
-  SkillAnalyticsEvent,
-  SkillsConfig,
-} from "./contracts/skills-config.type";
-import type {
-  SkillCatalogEntry,
-  SkillRecord,
-} from "./contracts/skill-record.type";
+import { buildCatalog, loadRecord, renderCatalogPrompt, semanticPreselect } from "./catalog";
+import type { SkillAnalyticsEvent, SkillsConfig } from "./contracts/skills-config.type";
+import type { SkillCatalogEntry, SkillRecord } from "./contracts/skill-record.type";
 import type { SkillsContract } from "./contracts/skills.contract";
 import type { SkillsStoreContract } from "./contracts/skills-store.contract";
 import { loadSkillTool } from "./load-skill-tool";

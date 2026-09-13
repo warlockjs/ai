@@ -14,11 +14,7 @@ export { judge } from "./judge-scorer";
 
 // Dataset primitive — feeds `agent.eval({ cases })`.
 export { dataset } from "./dataset";
-export type {
-  DatasetContract,
-  DatasetEntry,
-  DatasetOptions,
-} from "./dataset.type";
+export type { DatasetContract, DatasetEntry, DatasetOptions } from "./dataset.type";
 
 // Regression diff + CI reporters (pure, runner-decoupled).
 export { diff } from "./regression";

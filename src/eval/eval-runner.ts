@@ -21,9 +21,7 @@ import { diff } from "./regression";
  * (an array carried alongside `name` / `filter` / `shard`); a raw
  * `EvalCase[]` is used as-is.
  */
-function resolveCases<TOutput>(
-  cases: EvalOptions<TOutput>["cases"],
-): EvalCaseType<TOutput>[] {
+function resolveCases<TOutput>(cases: EvalOptions<TOutput>["cases"]): EvalCaseType<TOutput>[] {
   if (Array.isArray(cases)) {
     return cases;
   }
@@ -177,8 +175,7 @@ export async function runEval<TOutput>(
 
   const passedCount = cases.filter((entry) => entry.passed).length;
   const total = cases.length;
-  const meanScore =
-    total > 0 ? cases.reduce((sum, entry) => sum + entry.score, 0) / total : 0;
+  const meanScore = total > 0 ? cases.reduce((sum, entry) => sum + entry.score, 0) / total : 0;
 
   const report: EvalReport<TOutput> = {
     agentName: agent.name,

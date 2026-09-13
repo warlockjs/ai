@@ -12,8 +12,7 @@ export function encodeSSE(frame: { event?: string; data: unknown; id?: string })
   if (frame.id) out += `id: ${frame.id}\n`;
   if (frame.event) out += `event: ${frame.event}\n`;
 
-  const data =
-    typeof frame.data === "string" ? frame.data : JSON.stringify(frame.data);
+  const data = typeof frame.data === "string" ? frame.data : JSON.stringify(frame.data);
   for (const line of data.split("\n")) {
     out += `data: ${line}\n`;
   }

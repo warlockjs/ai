@@ -249,11 +249,7 @@ describe("ai.planner — durable mid-run crash-resume", () => {
     const drifted = planner({
       name: "drifter",
       model: planModel(sequentialPlan),
-      capabilities: [
-        flakyCapability("a", "out-a"),
-        flakyCapability("b", "out-b"),
-        c,
-      ],
+      capabilities: [flakyCapability("a", "out-a"), flakyCapability("b", "out-b"), c],
       durable: { store },
     });
 

@@ -52,7 +52,11 @@ describe("retrieve", () => {
       );
     }
 
-    const result = await retrieve("aaaa bbbb", { embedder, store, namespace }, { topK: 3, threshold: 0 });
+    const result = await retrieve(
+      "aaaa bbbb",
+      { embedder, store, namespace },
+      { topK: 3, threshold: 0 },
+    );
 
     expect(result.chunks).toHaveLength(3);
     expect(result.query).toBe("aaaa bbbb");
@@ -76,7 +80,11 @@ describe("retrieve", () => {
       }),
     );
 
-    const result = await retrieve("caching configuration", { embedder, store, namespace }, { topK: 1, threshold: 0 });
+    const result = await retrieve(
+      "caching configuration",
+      { embedder, store, namespace },
+      { topK: 1, threshold: 0 },
+    );
 
     const citation = result.chunks[0].citation;
     expect(citation.sourceId).toBe("guide");
@@ -93,10 +101,24 @@ describe("retrieve", () => {
     const store = cacheVectorStore(driver);
     const embedder = new FakeEmbedder();
 
-    await seed(store, embedder, "ai.rag.alpha", storedChunk({ sourceId: "a", text: "shared words here" }));
-    await seed(store, embedder, "ai.rag.beta", storedChunk({ sourceId: "b", text: "shared words here" }));
+    await seed(
+      store,
+      embedder,
+      "ai.rag.alpha",
+      storedChunk({ sourceId: "a", text: "shared words here" }),
+    );
+    await seed(
+      store,
+      embedder,
+      "ai.rag.beta",
+      storedChunk({ sourceId: "b", text: "shared words here" }),
+    );
 
-    const result = await retrieve("shared words here", { embedder, store, namespace: "ai.rag.alpha" }, { topK: 5, threshold: 0 });
+    const result = await retrieve(
+      "shared words here",
+      { embedder, store, namespace: "ai.rag.alpha" },
+      { topK: 5, threshold: 0 },
+    );
 
     expect(result.chunks).toHaveLength(1);
     expect(result.chunks[0].citation.sourceId).toBe("a");
@@ -107,10 +129,24 @@ describe("retrieve", () => {
     const embedder = new FakeEmbedder();
     const namespace = "ai.rag.docs";
 
-    await seed(store, embedder, namespace, storedChunk({ sourceId: "match", text: "alpha alpha alpha" }));
-    await seed(store, embedder, namespace, storedChunk({ sourceId: "other", text: "zzzz wwww qqqq" }));
+    await seed(
+      store,
+      embedder,
+      namespace,
+      storedChunk({ sourceId: "match", text: "alpha alpha alpha" }),
+    );
+    await seed(
+      store,
+      embedder,
+      namespace,
+      storedChunk({ sourceId: "other", text: "zzzz wwww qqqq" }),
+    );
 
-    const result = await retrieve("alpha alpha alpha", { embedder, store, namespace }, { topK: 5, threshold: 0.99 });
+    const result = await retrieve(
+      "alpha alpha alpha",
+      { embedder, store, namespace },
+      { topK: 5, threshold: 0.99 },
+    );
 
     expect(result.chunks.every((chunk) => chunk.score >= 0.99)).toBe(true);
     expect(result.chunks.some((chunk) => chunk.citation.sourceId === "other")).toBe(false);
@@ -120,7 +156,11 @@ describe("retrieve", () => {
     const store = makeStore();
     const embedder = new FakeEmbedder();
 
-    const result = await retrieve("nothing indexed", { embedder, store, namespace: "ai.rag.empty" }, { topK: 5 });
+    const result = await retrieve(
+      "nothing indexed",
+      { embedder, store, namespace: "ai.rag.empty" },
+      { topK: 5 },
+    );
 
     expect(result).toEqual({ query: "nothing indexed", chunks: [] });
   });
@@ -195,7 +235,11 @@ describe("retrieve", () => {
 
     await seed(store, embedder, namespace, storedChunk({ sourceId: "a", text: "aaaa bbbb" }));
 
-    await retrieve("aaaa bbbb", { embedder, store: spyStore, namespace }, { topK: 2, candidates: 17, threshold: 0 });
+    await retrieve(
+      "aaaa bbbb",
+      { embedder, store: spyStore, namespace },
+      { topK: 2, candidates: 17, threshold: 0 },
+    );
 
     expect(queriedTopK).toBe(17);
   });

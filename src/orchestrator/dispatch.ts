@@ -80,7 +80,10 @@ function buildSupervisorConfig<TOutput, TState>(
     initialAgent: config.initialAgent,
     maxIterations: iterate ? config.maxIterations : 1,
     historyWindow: config.historyWindow
-      ? { router: toNumber(config.historyWindow.router), agents: toNumber(config.historyWindow.agents) }
+      ? {
+          router: toNumber(config.historyWindow.router),
+          agents: toNumber(config.historyWindow.agents),
+        }
       : undefined,
     snapshotStore: iterate ? snapshotStore : undefined,
   };
@@ -177,8 +180,7 @@ function mapDecisionSource(
 export async function dispatchTurn<TOutput, TState>(
   params: DispatchParams<TOutput, TState>,
 ): Promise<DispatchOutcome<TOutput>> {
-  const { ctx, sessionId, input, seedState, turnIndex, history, context, signal } =
-    params;
+  const { ctx, sessionId, input, seedState, turnIndex, history, context, signal } = params;
 
   const iterate = ctx.config.iterate === true;
   const sup = createSupervisor<TOutput, TState>(
@@ -189,9 +191,7 @@ export async function dispatchTurn<TOutput, TState>(
 
   if (iterate) {
     const runId = deriveRunId(sessionId, ctx.config.version, turnIndex);
-    const inFlight = ctx.snapshotStore
-      ? await ctx.snapshotStore.load(runId)
-      : undefined;
+    const inFlight = ctx.snapshotStore ? await ctx.snapshotStore.load(runId) : undefined;
 
     if (inFlight && inFlight.status === "running") {
       result = await sup.resume(runId, { context, signal, history, sessionId });

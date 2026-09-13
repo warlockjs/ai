@@ -12,15 +12,15 @@ describe("ai.workflow — parallel (1.4)", () => {
           parallel: [
             step({
               name: "a",
-              run: async ctx => {
-                await new Promise(r => setTimeout(r, 5));
+              run: async (ctx) => {
+                await new Promise((r) => setTimeout(r, 5));
                 ctx.state.a = 1;
               },
             }),
             step({
               name: "b",
-              run: async ctx => {
-                await new Promise(r => setTimeout(r, 5));
+              run: async (ctx) => {
+                await new Promise((r) => setTimeout(r, 5));
                 ctx.state.b = 2;
               },
             }),
@@ -51,15 +51,15 @@ describe("ai.workflow — parallel (1.4)", () => {
           parallel: [
             step({
               name: "slow-first",
-              run: async ctx => {
-                await new Promise(r => setTimeout(r, 25));
+              run: async (ctx) => {
+                await new Promise((r) => setTimeout(r, 25));
                 ctx.state.winner = "first";
               },
             }),
             step({
               name: "fast-second",
-              run: async ctx => {
-                await new Promise(r => setTimeout(r, 1));
+              run: async (ctx) => {
+                await new Promise((r) => setTimeout(r, 1));
                 ctx.state.winner = "second";
               },
             }),
@@ -80,21 +80,20 @@ describe("ai.workflow — parallel (1.4)", () => {
         step({
           name: "group",
           mergeState: (acc, childState) => {
-            acc.total =
-              ((acc.total as number) ?? 0) + ((childState.total as number) ?? 0);
+            acc.total = ((acc.total as number) ?? 0) + ((childState.total as number) ?? 0);
           },
           parallel: [
             step({
               name: "a",
-              run: async ctx => {
-                await new Promise(r => setTimeout(r, 10));
+              run: async (ctx) => {
+                await new Promise((r) => setTimeout(r, 10));
                 ctx.state.total = 10;
               },
             }),
             step({
               name: "b",
-              run: async ctx => {
-                await new Promise(r => setTimeout(r, 1));
+              run: async (ctx) => {
+                await new Promise((r) => setTimeout(r, 1));
                 ctx.state.total = 5;
               },
             }),

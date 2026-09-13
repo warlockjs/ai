@@ -1,8 +1,5 @@
 import type { ImageModelConfig } from "../contracts/image-model.contract";
-import type {
-  ModelConfig,
-  SDKAdapterContract,
-} from "../contracts/sdk-adapter.contract";
+import type { ModelConfig, SDKAdapterContract } from "../contracts/sdk-adapter.contract";
 import type { SpeechModelConfig } from "../contracts/speech-model.contract";
 import type { TranscriptionModelConfig } from "../contracts/transcription-model.contract";
 import { approximateTokenCount } from "../utils/token-count";

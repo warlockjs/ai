@@ -6,9 +6,7 @@ import { MockModel } from "./mock-model";
 const userMessage: Message[] = [{ role: "user", content: "hi" }];
 
 /** Drain an async iterable of stream chunks into an array. */
-async function collect(
-  stream: AsyncIterable<ModelStreamChunk>,
-): Promise<ModelStreamChunk[]> {
+async function collect(stream: AsyncIterable<ModelStreamChunk>): Promise<ModelStreamChunk[]> {
   const chunks: ModelStreamChunk[] = [];
 
   for await (const chunk of stream) {
@@ -65,9 +63,7 @@ describe("MockModel.complete — scripted responses", () => {
 
   it("passes through scripted toolCalls verbatim", async () => {
     const toolCalls = [{ id: "c1", name: "echo", input: { value: "x" } }];
-    const model = new MockModel("m", [
-      { content: "", finishReason: "tool_calls", toolCalls },
-    ]);
+    const model = new MockModel("m", [{ content: "", finishReason: "tool_calls", toolCalls }]);
 
     const result = await model.complete(userMessage);
 
@@ -227,9 +223,7 @@ describe("MockModel.complete — error + delay", () => {
 
 describe("MockModel.stream", () => {
   it("emits each word as a delta chunk with a trailing space, then a done chunk", async () => {
-    const model = new MockModel("m", [
-      { content: "hello world", finishReason: "stop" },
-    ]);
+    const model = new MockModel("m", [{ content: "hello world", finishReason: "stop" }]);
 
     const chunks = await collect(model.stream(userMessage));
 
@@ -255,8 +249,8 @@ describe("MockModel.stream", () => {
 
     const chunks = await collect(model.stream(userMessage));
 
-    const toolChunk = chunks.find(c => c.type === "tool-call");
-    const doneChunk = chunks.find(c => c.type === "done");
+    const toolChunk = chunks.find((c) => c.type === "tool-call");
+    const doneChunk = chunks.find((c) => c.type === "done");
 
     expect(toolChunk).toEqual({
       type: "tool-call",
@@ -274,7 +268,7 @@ describe("MockModel.stream", () => {
     ]);
 
     const chunks = await collect(model.stream(userMessage));
-    const done = chunks.find(c => c.type === "done");
+    const done = chunks.find((c) => c.type === "done");
 
     expect(done).toMatchObject({
       finishReason: "stop",
@@ -283,10 +277,7 @@ describe("MockModel.stream", () => {
   });
 
   it("records the call and advances the queue like complete()", async () => {
-    const model = new MockModel("m", [
-      { content: "one" },
-      { content: "two" },
-    ]);
+    const model = new MockModel("m", [{ content: "one" }, { content: "two" }]);
 
     await collect(model.stream(userMessage));
     const second = await model.complete(userMessage);
@@ -304,10 +295,7 @@ describe("MockModel.stream", () => {
 
 describe("MockModel.reset", () => {
   it("clears call history and rewinds the response queue", async () => {
-    const model = new MockModel("m", [
-      { content: "first" },
-      { content: "second" },
-    ]);
+    const model = new MockModel("m", [{ content: "first" }, { content: "second" }]);
 
     await model.complete(userMessage);
     await model.complete(userMessage);

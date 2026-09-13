@@ -23,8 +23,8 @@ describe("supervisor — cancellation", () => {
       // abort signal has time to land before the next iteration
       // begins. Between-iteration cancellation is the supervisor's
       // guaranteed cancellation point.
-      route: async ctx => {
-        await new Promise(resolve => setTimeout(resolve, 10));
+      route: async (ctx) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
         if (ctx.iteration === 1) {
           controller.abort("user");
         }
@@ -72,8 +72,8 @@ describe("supervisor — cancellation", () => {
     const supervisorInstance = supervisor({
       name: "cancel-event",
       intents: { worker },
-      route: async ctx => {
-        await new Promise(resolve => setTimeout(resolve, 5));
+      route: async (ctx) => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
         if (ctx.iteration === 0) {
           controller.abort("stop");
         }
@@ -84,7 +84,7 @@ describe("supervisor — cancellation", () => {
 
     let cancelledPayload: { cancelledAt: string; reason?: string } | undefined;
 
-    supervisorInstance.on("supervisor.cancelled", payload => {
+    supervisorInstance.on("supervisor.cancelled", (payload) => {
       cancelledPayload = payload;
     });
 
@@ -100,9 +100,9 @@ describe("supervisor — cancellation", () => {
     const supervisorInstance = supervisor({
       name: "cancel-async-route",
       intents: { worker },
-      route: async ctx => {
+      route: async (ctx) => {
         // Simulate some async decision time
-        await new Promise(resolve => setTimeout(resolve, 5));
+        await new Promise((resolve) => setTimeout(resolve, 5));
         return ctx.iteration >= 10 ? END : "worker";
       },
       maxIterations: 50,

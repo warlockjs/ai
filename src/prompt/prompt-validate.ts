@@ -124,9 +124,7 @@ function collectPlaceholders(template: string): string[] {
  * Stable, most-severe-first ordering: `error` before `warn` before `info`,
  * preserving original order within a severity. Returns a fresh array.
  */
-export function sortNotesBySeverity(
-  notes: PromptValidationNote[],
-): PromptValidationNote[] {
+export function sortNotesBySeverity(notes: PromptValidationNote[]): PromptValidationNote[] {
   return notes
     .map((note, index) => ({ note, index }))
     .sort((a, b) => {
@@ -134,7 +132,7 @@ export function sortNotesBySeverity(
 
       return rankDiff !== 0 ? rankDiff : a.index - b.index;
     })
-    .map(entry => entry.note);
+    .map((entry) => entry.note);
 }
 
 /**
@@ -211,15 +209,11 @@ export function buildValidationReport(
   staticNotes: PromptValidationNote[],
   judgeResult?: { score: number; notes: PromptValidationNote[] },
 ): PromptValidationReport {
-  const allNotes = judgeResult
-    ? [...staticNotes, ...judgeResult.notes]
-    : staticNotes;
+  const allNotes = judgeResult ? [...staticNotes, ...judgeResult.notes] : staticNotes;
 
   const lintScore = staticScore(staticNotes);
 
-  const score = judgeResult
-    ? Number(((lintScore + judgeResult.score) / 2).toFixed(4))
-    : lintScore;
+  const score = judgeResult ? Number(((lintScore + judgeResult.score) / 2).toFixed(4)) : lintScore;
 
   return {
     score,

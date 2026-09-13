@@ -228,9 +228,7 @@ describe("agent() — silent-mode tools", () => {
 
 // Type-level regression: existing tools without `mode` still satisfy
 // the contract. If `mode` ever becomes required, this fails to compile.
-type _ContractStillAcceptsToolsWithoutMode = ReturnType<
-  typeof tool<string, string>
->;
+type _ContractStillAcceptsToolsWithoutMode = ReturnType<typeof tool<string, string>>;
 const _typeOnly: _ContractStillAcceptsToolsWithoutMode = tool({
   name: "no-mode",
   description: "x",

@@ -14,7 +14,7 @@ function makeAgent(
   middleware: ReturnType<typeof budget>[],
 ) {
   const sdk = MockSDK({
-    responses: responses.map(response => ({
+    responses: responses.map((response) => ({
       content: response.content,
       finishReason: response.finishReason ?? "stop",
       usage: response.usage
@@ -75,9 +75,7 @@ describe("budget — token cap", () => {
   it("concurrent executions each track their own budget", async () => {
     const guard = budget({ maxTokens: 50 });
     const sdk = MockSDK({
-      responses: [
-        { content: "ok", usage: { input: 20, output: 20, total: 40 } },
-      ],
+      responses: [{ content: "ok", usage: { input: 20, output: 20, total: 40 } }],
     });
     const ai = agent({
       model: sdk.model({ name: "gpt-test" }),
@@ -175,9 +173,7 @@ describe("budget — SLO contract (abort)", () => {
 
   it("aborts on the contract latency clause once wall-clock exceeds maxLatencyMs", async () => {
     const sdk = MockSDK({
-      responses: [
-        { content: "slow", usage: { input: 1, output: 1, total: 2 }, delay: 30 },
-      ],
+      responses: [{ content: "slow", usage: { input: 1, output: 1, total: 2 }, delay: 30 }],
     });
     const ai = agent({
       model: sdk.model({ name: "gpt-test" }),
@@ -189,9 +185,7 @@ describe("budget — SLO contract (abort)", () => {
     expect(result.error).toBeInstanceOf(BudgetExceededError);
     const budgetError = result.error as BudgetExceededError;
     expect(budgetError.context).toMatchObject({ dimension: "latency" });
-    expect((budgetError.context as { actual: number }).actual).toBeGreaterThan(
-      5,
-    );
+    expect((budgetError.context as { actual: number }).actual).toBeGreaterThan(5);
   });
 
   it("contract clauses do not fire when the run stays within the SLO", async () => {

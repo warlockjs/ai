@@ -120,8 +120,7 @@ export function readyNodes(
 ): DagNode[] {
   return dag.nodes.filter(
     (node) =>
-      !done.has(node.id) &&
-      node.dependencies.every((dependency) => completed.has(dependency)),
+      !done.has(node.id) && node.dependencies.every((dependency) => completed.has(dependency)),
   );
 }
 
@@ -140,11 +139,7 @@ export function sinkNodes(dag: PlannerDag): DagNode[] {
  * a node on the current recursion stack means a cycle — raised as a
  * typed {@link PlannerPlanInvalidError} naming the offending node.
  */
-function assertAcyclic(
-  nodes: DagNode[],
-  byId: Map<string, DagNode>,
-  plannerName: string,
-): void {
+function assertAcyclic(nodes: DagNode[], byId: Map<string, DagNode>, plannerName: string): void {
   const VISITING = 1;
   const DONE = 2;
   const state = new Map<string, number>();

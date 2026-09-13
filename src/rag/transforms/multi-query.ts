@@ -40,7 +40,7 @@ export async function multiQuery(
 
   const variants = response.content
     .split("\n")
-    .map(line => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
+    .map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
     .filter(Boolean);
 
   const seen = new Set<string>();

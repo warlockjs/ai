@@ -3,9 +3,7 @@ import { describe, expect, it } from "vitest";
 import { tool } from "../tool/tool";
 import { mockAgent } from "./mock-agent";
 
-function schema<T>(
-  validate: (value: unknown) => StandardSchemaV1.Result<T>,
-): StandardSchemaV1<T> {
+function schema<T>(validate: (value: unknown) => StandardSchemaV1.Result<T>): StandardSchemaV1<T> {
   return { "~standard": { version: 1, vendor: "test", validate } };
 }
 
@@ -46,13 +44,13 @@ describe("mockAgent()", () => {
     const t1 = tool({
       name: "alpha",
       description: "a",
-      input: schema<unknown>(v => ({ value: v })),
+      input: schema<unknown>((v) => ({ value: v })),
       execute: async () => "ok",
     });
     const t2 = tool({
       name: "beta",
       description: "b",
-      input: schema<unknown>(v => ({ value: v })),
+      input: schema<unknown>((v) => ({ value: v })),
       execute: async () => "ok",
     });
     const a = mockAgent({ tools: [t1, t2] });
@@ -70,7 +68,7 @@ describe("mockAgent()", () => {
     const echo = tool({
       name: "echo",
       description: "echoes input",
-      input: schema<{ value: string }>(raw => {
+      input: schema<{ value: string }>((raw) => {
         if (raw && typeof raw === "object" && "value" in raw) {
           return {
             value: { value: String((raw as { value: unknown }).value) },
@@ -97,7 +95,7 @@ describe("mockAgent()", () => {
 
     const result = await a.execute("go");
     expect(result.error).toBeUndefined();
-    const toolCalls = result.report.children.filter(c => c.type === "tool");
+    const toolCalls = result.report.children.filter((c) => c.type === "tool");
     expect(toolCalls).toHaveLength(1);
     expect(toolCalls[0].name).toBe("echo");
     expect((toolCalls[0] as { output?: unknown }).output).toBe("echoed:hi");

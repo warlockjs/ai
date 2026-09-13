@@ -35,10 +35,7 @@ class FakePgClient implements PgClientLike {
 
   public queries: string[] = [];
 
-  public async query(
-    text: string,
-    params: unknown[] = [],
-  ): Promise<{ rows: unknown[] }> {
+  public async query(text: string, params: unknown[] = []): Promise<{ rows: unknown[] }> {
     this.queries.push(text);
     const sql = text.replace(/\s+/g, " ").trim();
 
@@ -87,11 +84,7 @@ class FakePgClient implements PgClientLike {
     const [orchestratorName, sessionId] = params as [string, string];
 
     const matches = this.rows
-      .filter(
-        (row) =>
-          row.orchestrator_name === orchestratorName &&
-          row.session_id === sessionId,
-      )
+      .filter((row) => row.orchestrator_name === orchestratorName && row.session_id === sessionId)
       .sort((left, right) => right.turn_index - left.turn_index);
 
     return { rows: matches.length > 0 ? [matches[0]] : [] };
@@ -99,9 +92,7 @@ class FakePgClient implements PgClientLike {
 
   private handleList(sql: string, params: unknown[]): { rows: unknown[] } {
     const orchestratorName = params[0] as string;
-    const matches = this.rows.filter(
-      (row) => row.orchestrator_name === orchestratorName,
-    );
+    const matches = this.rows.filter((row) => row.orchestrator_name === orchestratorName);
 
     let sessionIds = [...new Set(matches.map((row) => row.session_id))];
 
@@ -122,36 +113,24 @@ class FakePgClient implements PgClientLike {
     const [orchestratorName, sessionId] = params as [string, string];
 
     this.rows = this.rows.filter(
-      (row) =>
-        !(
-          row.orchestrator_name === orchestratorName &&
-          row.session_id === sessionId
-        ),
+      (row) => !(row.orchestrator_name === orchestratorName && row.session_id === sessionId),
     );
 
     return { rows: [] };
   }
 
   private handlePrune(params: unknown[]): { rows: unknown[] } {
-    const [orchestratorName, sessionId, keepSnapshots] = params as [
-      string,
-      string,
-      number,
-    ];
+    const [orchestratorName, sessionId, keepSnapshots] = params as [string, string, number];
 
     const sessionRows = this.rows.filter(
-      (row) =>
-        row.orchestrator_name === orchestratorName &&
-        row.session_id === sessionId,
+      (row) => row.orchestrator_name === orchestratorName && row.session_id === sessionId,
     );
 
     if (sessionRows.length === 0) {
       return { rows: [] };
     }
 
-    const maxTurnIndex = Math.max(
-      ...sessionRows.map((row) => row.turn_index),
-    );
+    const maxTurnIndex = Math.max(...sessionRows.map((row) => row.turn_index));
     const threshold = maxTurnIndex - keepSnapshots;
 
     this.rows = this.rows.filter(
@@ -167,9 +146,7 @@ class FakePgClient implements PgClientLike {
   }
 }
 
-function makeRecord(
-  overrides: Partial<CheckpointRecord> = {},
-): CheckpointRecord {
+function makeRecord(overrides: Partial<CheckpointRecord> = {}): CheckpointRecord {
   return {
     orchestrator_name: "support",
     session_id: "sess-1",
@@ -194,9 +171,7 @@ describe("checkpoint pg store", () => {
   it("should reject an unsafe table name", () => {
     const client = new FakePgClient();
 
-    expect(() => pg({ client, table: "bad; DROP TABLE x" })).toThrow(
-      /invalid table name/,
-    );
+    expect(() => pg({ client, table: "bad; DROP TABLE x" })).toThrow(/invalid table name/);
   });
 
   it("should emit DDL matching the §8.6 reference for the configured table", () => {
@@ -205,16 +180,10 @@ describe("checkpoint pg store", () => {
 
     const ddl = store.schema();
 
-    expect(ddl).toContain(
-      "CREATE TABLE IF NOT EXISTS warlock_orchestrator_sessions",
-    );
-    expect(ddl).toContain(
-      "PRIMARY KEY (orchestrator_name, session_id, turn_index)",
-    );
+    expect(ddl).toContain("CREATE TABLE IF NOT EXISTS warlock_orchestrator_sessions");
+    expect(ddl).toContain("PRIMARY KEY (orchestrator_name, session_id, turn_index)");
     expect(ddl).toContain("state                JSONB NOT NULL");
-    expect(ddl).toContain(
-      "idx_warlock_orchestrator_sessions_lookup",
-    );
+    expect(ddl).toContain("idx_warlock_orchestrator_sessions_lookup");
   });
 
   it("should return undefined for an unknown session", async () => {
@@ -260,12 +229,8 @@ describe("checkpoint pg store", () => {
   it("should isolate sessions by orchestrator name", async () => {
     const store = pg({ client: new FakePgClient() });
 
-    await store.save(
-      makeRecord({ orchestrator_name: "support", session_id: "a" }),
-    );
-    await store.save(
-      makeRecord({ orchestrator_name: "billing", session_id: "a" }),
-    );
+    await store.save(makeRecord({ orchestrator_name: "support", session_id: "a" }));
+    await store.save(makeRecord({ orchestrator_name: "billing", session_id: "a" }));
 
     const supportSession = await store.load("support", "a");
     const billingSession = await store.load("billing", "a");
@@ -290,9 +255,7 @@ describe("checkpoint pg store", () => {
     await store.save(makeRecord({ session_id: "a", turn_index: 0 }));
     await store.save(makeRecord({ session_id: "a", turn_index: 1 }));
     await store.save(makeRecord({ session_id: "b", turn_index: 0 }));
-    await store.save(
-      makeRecord({ orchestrator_name: "billing", session_id: "c" }),
-    );
+    await store.save(makeRecord({ orchestrator_name: "billing", session_id: "c" }));
 
     const supportSessions = await store.list?.("support");
 
@@ -335,9 +298,7 @@ describe("checkpoint pg store", () => {
     };
     await pruneable.prune("support", "sess-1", 2);
 
-    const remaining = client.rows
-      .map((row) => row.turn_index)
-      .sort((left, right) => left - right);
+    const remaining = client.rows.map((row) => row.turn_index).sort((left, right) => left - right);
 
     expect(remaining).toEqual([3, 4, 5]);
   });
@@ -355,8 +316,6 @@ describe("checkpoint pg store", () => {
     await pruneable.prune("support", "sess-1", Number.POSITIVE_INFINITY);
 
     expect(client.rows).toHaveLength(2);
-    expect(
-      client.queries.some((query) => query.includes("turn_index < (")),
-    ).toBe(false);
+    expect(client.queries.some((query) => query.includes("turn_index < ("))).toBe(false);
   });
 });

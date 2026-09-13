@@ -10,7 +10,7 @@ const emptyInput: StandardSchemaV1<Record<string, unknown>> = {
   "~standard": {
     version: 1,
     vendor: "test",
-    validate: value => ({ value: (value ?? {}) as Record<string, unknown> }),
+    validate: (value) => ({ value: (value ?? {}) as Record<string, unknown> }),
   },
 };
 
@@ -193,8 +193,7 @@ describe("agent + middleware — tool-level", () => {
     const result = await ai.execute("hi");
 
     const toolCalls = result.report.children.filter(
-      (child): child is typeof child & { type: "tool" } =>
-        child.type === "tool",
+      (child): child is typeof child & { type: "tool" } => child.type === "tool",
     );
     expect(toolCalls).toHaveLength(1);
     const [firstCall] = toolCalls;

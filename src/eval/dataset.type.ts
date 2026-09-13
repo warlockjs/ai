@@ -24,9 +24,7 @@ export type DatasetContract<TOutput = unknown> = {
    * Narrow by an arbitrary predicate (typically a tag check) — returns a
    * new dataset sharing nothing mutable with this one.
    */
-  filter(
-    predicate: (entry: DatasetEntry<TOutput>) => boolean,
-  ): DatasetContract<TOutput>;
+  filter(predicate: (entry: DatasetEntry<TOutput>) => boolean): DatasetContract<TOutput>;
   /**
    * Deterministic shard `index`-of-`total` for parallel CI jobs. Every
    * entry lands in exactly one shard (round-robin by position), so the

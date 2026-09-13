@@ -11,9 +11,7 @@ import { schema } from "../supervisor/_test-helpers";
 
 /** Pass-through string schema for an `asTool` "fresh"-scope payload. */
 const stringSchema = schema<string>((value) =>
-  typeof value === "string"
-    ? { value }
-    : { issues: [{ message: "expected a string" }] },
+  typeof value === "string" ? { value } : { issues: [{ message: "expected a string" }] },
 );
 
 /** Pass-through object schema for an `asTool` "shared"-scope payload. */
@@ -189,9 +187,7 @@ describe("ai.orchestrator() — iterate:false single dispatch", () => {
 
     // iterate:false caps the internal supervisor at a single iteration —
     // the child supervisor report records exactly one iteration.
-    const childReport = result.report.turns[0]?.childReport as
-      | { iterations?: number }
-      | undefined;
+    const childReport = result.report.turns[0]?.childReport as { iterations?: number } | undefined;
     expect(childReport?.iterations).toBe(1);
     expect(result.report.children).toHaveLength(1);
   });
@@ -223,9 +219,7 @@ describe("ai.orchestrator() — iterate:false single dispatch", () => {
 
     expect(result.error).toBeUndefined();
     // The scripted reply flows through the dispatched branch's output.
-    expect(result.report.turns[0]?.result.responder?.output).toBe(
-      "scripted reply",
-    );
+    expect(result.report.turns[0]?.result.responder?.output).toBe("scripted reply");
     // The mock model was hit exactly once for the single dispatch.
     expect(sdk.models[0].callCount).toBe(1);
   });
@@ -295,9 +289,7 @@ describe("ai.orchestrator() — iterate:true delegates to the internal superviso
 
     expect(result.error).toBeUndefined();
 
-    const childReport = result.report.turns[0]?.childReport as
-      | { iterations?: number }
-      | undefined;
+    const childReport = result.report.turns[0]?.childReport as { iterations?: number } | undefined;
     expect(childReport?.iterations).toBeGreaterThan(1);
 
     // Both steps ran — the accumulator was incremented twice in-turn.
@@ -572,22 +564,16 @@ describe("ai.orchestrator() — 3-tier events fire in order (§14)", () => {
         "orchestrator.drift.checked": () => definitionOrder.push("drift"),
         "orchestrator.history.windowed": () => definitionOrder.push("windowed"),
         "orchestrator.turn.routed": () => definitionOrder.push("routed"),
-        "orchestrator.checkpoint.persisted": () =>
-          definitionOrder.push("persisted"),
+        "orchestrator.checkpoint.persisted": () => definitionOrder.push("persisted"),
         // A clean turn settles on the non-terminal `awaiting-input`
         // status (§15.6) — that, not `completed`, is the terminal it fires.
-        "orchestrator.turn.awaiting-input": () =>
-          definitionOrder.push("awaiting-input"),
+        "orchestrator.turn.awaiting-input": () => definitionOrder.push("awaiting-input"),
       },
     });
 
     // tier 2 — instance subscription.
-    orchestrator.on("orchestrator.turn.starting", () =>
-      instanceOrder.push("starting"),
-    );
-    orchestrator.on("orchestrator.checkpoint.persisted", () =>
-      instanceOrder.push("persisted"),
-    );
+    orchestrator.on("orchestrator.turn.starting", () => instanceOrder.push("starting"));
+    orchestrator.on("orchestrator.checkpoint.persisted", () => instanceOrder.push("persisted"));
 
     await orchestrator.execute("hi", {
       sessionId: "s1",
@@ -595,8 +581,7 @@ describe("ai.orchestrator() — 3-tier events fire in order (§14)", () => {
       // tier 3 — per-call subscription.
       on: {
         "orchestrator.turn.starting": () => perCallOrder.push("starting"),
-        "orchestrator.turn.awaiting-input": () =>
-          perCallOrder.push("awaiting-input"),
+        "orchestrator.turn.awaiting-input": () => perCallOrder.push("awaiting-input"),
       },
     });
 
@@ -633,9 +618,7 @@ describe("ai.orchestrator() — 3-tier events fire in order (§14)", () => {
       },
     });
 
-    orchestrator.on("orchestrator.turn.starting", () =>
-      tierOrder.push("instance"),
-    );
+    orchestrator.on("orchestrator.turn.starting", () => tierOrder.push("instance"));
 
     await orchestrator.execute("hi", {
       sessionId: "s1",
@@ -705,9 +688,7 @@ describe("ai.orchestrator() — exactly one terminal event per turn (§14.1)", (
    * through that double-fired `awaiting-input` + `completed` on a clean
    * turn must not regress.
    */
-  function tallyTerminals(
-    on: (terminals: string[]) => void,
-  ): {
+  function tallyTerminals(on: (terminals: string[]) => void): {
     "orchestrator.turn.completed": () => void;
     "orchestrator.turn.failed": () => void;
     "orchestrator.turn.cancelled": () => void;
@@ -720,8 +701,7 @@ describe("ai.orchestrator() — exactly one terminal event per turn (§14.1)", (
       "orchestrator.turn.completed": () => terminals.push("completed"),
       "orchestrator.turn.failed": () => terminals.push("failed"),
       "orchestrator.turn.cancelled": () => terminals.push("cancelled"),
-      "orchestrator.turn.awaiting-input": () =>
-        terminals.push("awaiting-input"),
+      "orchestrator.turn.awaiting-input": () => terminals.push("awaiting-input"),
     };
   }
 

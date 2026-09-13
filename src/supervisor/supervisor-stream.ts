@@ -103,11 +103,9 @@ export function createSupervisorStream<TResult>(): {
         return Promise.resolve({ value: undefined, done: true });
       }
 
-      return new Promise<IteratorResult<SupervisorStreamEvent>>(
-        (resolve, reject) => {
-          pending.push({ resolve, reject });
-        },
-      );
+      return new Promise<IteratorResult<SupervisorStreamEvent>>((resolve, reject) => {
+        pending.push({ resolve, reject });
+      });
     },
   };
 

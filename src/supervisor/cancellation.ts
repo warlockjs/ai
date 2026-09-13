@@ -6,9 +6,7 @@ import { SupervisorCancelledError } from "../errors";
  * an `Error`, or some other value. Used at between-iteration boundaries
  * and on any mid-iteration cancellation path.
  */
-export function createCancelledError(
-  signal: AbortSignal | undefined,
-): SupervisorCancelledError {
+export function createCancelledError(signal: AbortSignal | undefined): SupervisorCancelledError {
   const reason = signal?.reason;
   const reasonText =
     typeof reason === "string"

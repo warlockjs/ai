@@ -64,13 +64,13 @@ export function buildRouterContextMessage(params: {
   } = params;
 
   const intentLines = [...entries.values()].map(
-    entry => `- ${entry.intent}: ${entry.description}`,
+    (entry) => `- ${entry.intent}: ${entry.description}`,
   );
 
   const historyLines =
     iterations.length === 0
       ? ["(none yet)"]
-      : iterations.map(snapshot => formatHistoryLine(snapshot));
+      : iterations.map((snapshot) => formatHistoryLine(snapshot));
 
   const sections: string[] = [];
 
@@ -103,8 +103,7 @@ export function buildRouterContextMessage(params: {
     sections.push("", `Reviewer feedback from last iteration: ${feedback}`);
   }
 
-  const renderedInput =
-    typeof input === "string" ? input : safeStringify(input);
+  const renderedInput = typeof input === "string" ? input : safeStringify(input);
 
   sections.push("", `Original input: ${renderedInput}`);
 

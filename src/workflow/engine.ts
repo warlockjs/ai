@@ -2,10 +2,7 @@ import { log } from "@warlock.js/logger";
 import type { BaseReport } from "../contracts/result/base-report.type";
 import type { StepSnapshot } from "../contracts/result/step-result.type";
 import type { Usage } from "../contracts/result/usage.type";
-import type {
-  WorkflowReport,
-  WorkflowResult,
-} from "../contracts/result/workflow-result.type";
+import type { WorkflowReport, WorkflowResult } from "../contracts/result/workflow-result.type";
 import type { StepDefinition } from "../contracts/workflow/step.contract";
 import type { WorkflowContext } from "../contracts/workflow/workflow-context.type";
 import type { WorkflowSnapshot } from "../contracts/workflow/workflow-snapshot.type";
@@ -92,9 +89,7 @@ export async function runWorkflow<TOutput>(
   const stepByName = new Map<string, StepDefinition>();
   for (const s of definition.steps) stepByName.set(s.name, s);
 
-  const state: Record<string, unknown> = params.resumeFrom
-    ? { ...params.resumeFrom.state }
-    : {};
+  const state: Record<string, unknown> = params.resumeFrom ? { ...params.resumeFrom.state } : {};
   const steps: Record<string, StepSnapshot> = params.resumeFrom
     ? { ...params.resumeFrom.steps }
     : {};
@@ -135,10 +130,7 @@ export async function runWorkflow<TOutput>(
   );
   logger.info(logModule, "starting", "workflow starting", { runId });
 
-  let currentName: string | null = resolveInitialStep(
-    definition,
-    params.resumeFrom,
-  );
+  let currentName: string | null = resolveInitialStep(definition, params.resumeFrom);
   let stepCount = 0;
 
   try {
@@ -169,10 +161,9 @@ export async function runWorkflow<TOutput>(
 
       const step = stepByName.get(currentName);
       if (!step) {
-        throw new RoutingError(
-          `workflow "${definition.name}": unknown step "${currentName}"`,
-          { stepName: currentName },
-        );
+        throw new RoutingError(`workflow "${definition.name}": unknown step "${currentName}"`, {
+          stepName: currentName,
+        });
       }
 
       const snapshot = await executeStep({
@@ -226,21 +217,12 @@ export async function runWorkflow<TOutput>(
           });
           if (!persistOutcome.ok) {
             const persistErr = toAIError(persistOutcome.error);
-            emitter.emit(
-              "workflow.error",
-              { error: persistErr },
-              params.executionHandlers,
-            );
-            logger.error(
-              logModule,
-              "persist.failed",
-              "snapshot persist failed",
-              {
-                step: step.name,
-                code: persistErr.code,
-                message: persistErr.message,
-              },
-            );
+            emitter.emit("workflow.error", { error: persistErr }, params.executionHandlers);
+            logger.error(logModule, "persist.failed", "snapshot persist failed", {
+              step: step.name,
+              code: persistErr.code,
+              message: persistErr.message,
+            });
           }
           failedStepName = step.name;
           throw snapshot.error;
@@ -269,21 +251,12 @@ export async function runWorkflow<TOutput>(
         });
         if (!failurePersist.ok) {
           const persistErr = toAIError(failurePersist.error);
-          emitter.emit(
-            "workflow.error",
-            { error: persistErr },
-            params.executionHandlers,
-          );
-          logger.error(
-            logModule,
-            "persist.failed",
-            "snapshot persist failed",
-            {
-              step: step.name,
-              code: persistErr.code,
-              message: persistErr.message,
-            },
-          );
+          emitter.emit("workflow.error", { error: persistErr }, params.executionHandlers);
+          logger.error(logModule, "persist.failed", "snapshot persist failed", {
+            step: step.name,
+            code: persistErr.code,
+            message: persistErr.message,
+          });
         }
 
         if (signal?.aborted) throw createCancelledError(signal);
@@ -327,11 +300,7 @@ export async function runWorkflow<TOutput>(
       });
       if (!outcome.ok) {
         const persistErr = toAIError(outcome.error);
-        emitter.emit(
-          "workflow.error",
-          { error: persistErr },
-          params.executionHandlers,
-        );
+        emitter.emit("workflow.error", { error: persistErr }, params.executionHandlers);
         logger.error(logModule, "persist.failed", "snapshot persist failed", {
           step: step.name,
           code: persistErr.code,
@@ -371,10 +340,7 @@ export async function runWorkflow<TOutput>(
       error = err;
     } else {
       status = "failed";
-      error = new WorkflowError(
-        err instanceof Error ? err.message : String(err),
-        { cause: err },
-      );
+      error = new WorkflowError(err instanceof Error ? err.message : String(err), { cause: err });
     }
   }
 
@@ -389,22 +355,14 @@ export async function runWorkflow<TOutput>(
   let data: TOutput | undefined;
   if (status === "completed" && definition.output) {
     try {
-      const extracted = await definition.output.extract(
-        buildContext({ state }),
-      );
-      data = (await validateWorkflowOutput(
-        definition.output.schema,
-        extracted,
-      )) as TOutput;
+      const extracted = await definition.output.extract(buildContext({ state }));
+      data = (await validateWorkflowOutput(definition.output.schema, extracted)) as TOutput;
     } catch (err) {
       status = "failed";
       error =
         err instanceof AIError
           ? err
-          : new WorkflowError(
-              err instanceof Error ? err.message : String(err),
-              { cause: err },
-            );
+          : new WorkflowError(err instanceof Error ? err.message : String(err), { cause: err });
     }
   }
 
@@ -467,7 +425,7 @@ export async function runWorkflow<TOutput>(
   // overwrite it with `null` and force resume to fall back to the
   // first non-completed step (which is the same step in practice, but
   // less informative for tooling reading the snapshot).
-  const finalNext = status === "failed" ? failedStepName ?? null : null;
+  const finalNext = status === "failed" ? (failedStepName ?? null) : null;
 
   const finalOutcome = await persistSnapshot({
     definition,
@@ -482,11 +440,7 @@ export async function runWorkflow<TOutput>(
   });
   if (!finalOutcome.ok) {
     const persistErr = toAIError(finalOutcome.error);
-    emitter.emit(
-      "workflow.error",
-      { error: persistErr },
-      params.executionHandlers,
-    );
+    emitter.emit("workflow.error", { error: persistErr }, params.executionHandlers);
     logger.error(logModule, "persist.failed", "final snapshot persist failed", {
       code: persistErr.code,
       message: persistErr.message,
@@ -556,10 +510,10 @@ async function resolveFailureRoute<T>(params: {
   try {
     outcome = await step.onFailure(ctx, error);
   } catch (err) {
-    throw new RoutingError(
-      `workflow "${definition.name}": step "${step.name}" onFailure threw`,
-      { stepName: step.name, cause: err },
-    );
+    throw new RoutingError(`workflow "${definition.name}": step "${step.name}" onFailure threw`, {
+      stepName: step.name,
+      cause: err,
+    });
   }
   return mapNextStep(outcome);
 }
@@ -574,10 +528,7 @@ function resolveInitialStep<T>(
   // checkpoint). Falls back to first step whose snapshot is missing
   // or not in a terminal-success state — covers older snapshots
   // written before `next` was wired.
-  if (
-    resumeFrom.next &&
-    definition.steps.some(s => s.name === resumeFrom.next)
-  ) {
+  if (resumeFrom.next && definition.steps.some((s) => s.name === resumeFrom.next)) {
     return resumeFrom.next;
   }
 
@@ -591,10 +542,7 @@ function resolveInitialStep<T>(
   return null;
 }
 
-async function validateWorkflowOutput(
-  schema: unknown,
-  value: unknown,
-): Promise<unknown> {
+async function validateWorkflowOutput(schema: unknown, value: unknown): Promise<unknown> {
   if (!schema) return value;
 
   const result = await (
@@ -609,12 +557,9 @@ async function validateWorkflowOutput(
     "issues" in result &&
     (result as { issues: unknown }).issues
   ) {
-    throw new SchemaValidationError(
-      "workflow output failed schema validation",
-      {
-        issues: (result as { issues: any }).issues,
-      },
-    );
+    throw new SchemaValidationError("workflow output failed schema validation", {
+      issues: (result as { issues: any }).issues,
+    });
   }
 
   return (result as { value: unknown }).value;

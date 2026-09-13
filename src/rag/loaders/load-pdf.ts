@@ -173,9 +173,7 @@ export async function loadPdf(
 
 /** One page of a parsed PDF — the text-layer item list `pagerender` sees. */
 type PdfPage = {
-  getTextContent: (
-    options?: unknown,
-  ) => Promise<{ items: { str: string }[] }>;
+  getTextContent: (options?: unknown) => Promise<{ items: { str: string }[] }>;
 };
 
 /**

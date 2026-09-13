@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { prompt } from "./prompt";
 import { syncLangfusePrompts } from "./prompt-langfuse-sync";
-import type {
-  LangfuseClientLike,
-  LangfusePromptLike,
-} from "./prompt-langfuse-sync.type";
+import type { LangfuseClientLike, LangfusePromptLike } from "./prompt-langfuse-sync.type";
 
 /** A fake Langfuse-prompts client recording its calls for assertions. */
 function makeFakeClient(
@@ -44,15 +41,10 @@ describe("syncLangfusePrompts — pull", () => {
 
     const upserted: string[] = [];
 
-    await syncLangfusePrompts(
-      { client, direction: "pull" },
-      ["support-agent"],
-      [],
-      entry => {
-        upserted.push(`${entry.name}@${entry.versions[0].version}`);
-        expect(entry.versions[0].template).toBe("You are support.");
-      },
-    );
+    await syncLangfusePrompts({ client, direction: "pull" }, ["support-agent"], [], (entry) => {
+      upserted.push(`${entry.name}@${entry.versions[0].version}`);
+      expect(entry.versions[0].template).toBe("You are support.");
+    });
 
     expect(upserted).toEqual(["support-agent@3"]);
   });
@@ -63,7 +55,7 @@ describe("syncLangfusePrompts — pull", () => {
     });
 
     const upserted: string[] = [];
-    await syncLangfusePrompts({ client }, ["a"], [], entry => upserted.push(entry.name));
+    await syncLangfusePrompts({ client }, ["a"], [], (entry) => upserted.push(entry.name));
 
     expect(upserted).toEqual(["a"]);
   });
@@ -105,7 +97,7 @@ describe("syncLangfusePrompts — push", () => {
       { client, direction: "both" },
       ["remote"],
       [{ name: "local", versions: [{ version: "1", template: "local body" }] }],
-      entry => upserted.push(entry.name),
+      (entry) => upserted.push(entry.name),
     );
 
     expect(upserted).toEqual(["remote"]);
@@ -154,6 +146,6 @@ describe("prompt().sync — no langfuse option", () => {
     await registry.sync();
 
     expect(registry.has("remote-prompt")).toBe(true);
-    expect(registry.versions("remote-prompt").some(v => v.version === "5")).toBe(true);
+    expect(registry.versions("remote-prompt").some((v) => v.version === "5")).toBe(true);
   });
 });

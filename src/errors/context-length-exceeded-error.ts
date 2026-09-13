@@ -33,10 +33,7 @@ export class ContextLengthExceededError extends ProviderError {
   public readonly actual?: number;
   public readonly modelName?: string;
 
-  public constructor(
-    message: string,
-    options?: ContextLengthExceededErrorOptions,
-  ) {
+  public constructor(message: string, options?: ContextLengthExceededErrorOptions) {
     super(message, options, "CONTEXT_LENGTH_EXCEEDED");
     this.name = "ContextLengthExceededError";
     this.limit = options?.limit;

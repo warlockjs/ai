@@ -270,9 +270,7 @@ class Vcr implements VcrModel {
       out.chunks = entry.chunks;
     }
     if (entry.error) {
-      out.error = this.redactErrorHook
-        ? this.redactErrorHook(entry.error)
-        : entry.error;
+      out.error = this.redactErrorHook ? this.redactErrorHook(entry.error) : entry.error;
     }
 
     return out;

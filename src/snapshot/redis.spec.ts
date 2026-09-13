@@ -3,9 +3,7 @@ import type { RedisClientLike } from "../contracts/orchestrator/snapshot-store.c
 import type { SupervisorSnapshot } from "../contracts/supervisor/supervisor-snapshot.type";
 import { redis } from "./redis";
 
-function makeSnapshot(
-  overrides: Partial<SupervisorSnapshot> = {},
-): SupervisorSnapshot {
+function makeSnapshot(overrides: Partial<SupervisorSnapshot> = {}): SupervisorSnapshot {
   return {
     runId: "sess-1.unversioned.0",
     supervisorName: "support",
@@ -98,9 +96,7 @@ describe("snapshot redis store", () => {
 
     await store.save(makeSnapshot({ runId: "sess-1.unversioned.0" }));
 
-    expect(
-      client.store.has("warlock:supervisor:snapshot:sess-1.unversioned.0"),
-    ).toBe(true);
+    expect(client.store.has("warlock:supervisor:snapshot:sess-1.unversioned.0")).toBe(true);
   });
 
   it("should honor a custom key prefix", async () => {
@@ -128,9 +124,9 @@ describe("snapshot redis store", () => {
   });
 
   it("should reject a missing client", () => {
-    expect(() =>
-      redis({ client: undefined as unknown as RedisClientLike }),
-    ).toThrow(/requires a 'client'/);
+    expect(() => redis({ client: undefined as unknown as RedisClientLike })).toThrow(
+      /requires a 'client'/,
+    );
   });
 
   it("should reject a client missing required methods", () => {

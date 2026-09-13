@@ -6,9 +6,7 @@ import { WorkflowCancelledError } from "../errors";
  * Used both at between-step boundaries and inside the retry backoff
  * sleep.
  */
-export function createCancelledError(
-  signal: AbortSignal | undefined,
-): WorkflowCancelledError {
+export function createCancelledError(signal: AbortSignal | undefined): WorkflowCancelledError {
   const reason = signal?.reason;
   const reasonText =
     typeof reason === "string"
@@ -19,10 +17,10 @@ export function createCancelledError(
           ? ""
           : String(reason);
 
-  return new WorkflowCancelledError(
-    `workflow cancelled${reasonText ? `: ${reasonText}` : ""}`,
-    { cancelledAt: new Date().toISOString(), reason: reasonText },
-  );
+  return new WorkflowCancelledError(`workflow cancelled${reasonText ? `: ${reasonText}` : ""}`, {
+    cancelledAt: new Date().toISOString(),
+    reason: reasonText,
+  });
 }
 
 /**

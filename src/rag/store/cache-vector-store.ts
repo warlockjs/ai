@@ -22,12 +22,7 @@ import type { VectorStore } from "./vector-store.contract";
  */
 export function cacheVectorStore(driver: CacheDriver<any, any>): VectorStore {
   return {
-    async upsert(
-      key: string,
-      value: unknown,
-      vector: number[],
-      tags?: string[],
-    ): Promise<void> {
+    async upsert(key: string, value: unknown, vector: number[], tags?: string[]): Promise<void> {
       await driver.set(key, value, tags && tags.length > 0 ? { vector, tags } : { vector });
     },
 

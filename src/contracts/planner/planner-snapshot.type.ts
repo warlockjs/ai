@@ -14,11 +14,7 @@ import type { PlannerStepSnapshot } from "./planner-result.type";
  * - `"cancelled"` — aborted via `AbortSignal`; resume is allowed.
  * - `"failed"` — terminated with an error; resume after the fix.
  */
-export type PlannerSnapshotStatus =
-  | "running"
-  | "completed"
-  | "cancelled"
-  | "failed";
+export type PlannerSnapshotStatus = "running" | "completed" | "cancelled" | "failed";
 
 /**
  * Persisted shape written to the configured {@link

@@ -39,10 +39,7 @@ function sumUsage(nodes: ReadonlyArray<BaseReport>): Usage {
 }
 
 /** Depth-first search for the first node satisfying `predicate`. */
-function find(
-  node: BaseReport,
-  predicate: (node: BaseReport) => boolean,
-): BaseReport | undefined {
+function find(node: BaseReport, predicate: (node: BaseReport) => boolean): BaseReport | undefined {
   if (predicate(node)) {
     return node;
   }

@@ -36,9 +36,9 @@ describe("createCommandDispatcher", () => {
       {} as unknown as Parameters<typeof createCommandDispatcher>[0],
     );
 
-    expect(() =>
-      command("compact", { sessionId: "s1", history: [] }),
-    ).toThrow(SupervisorFailedError);
+    expect(() => command("compact", { sessionId: "s1", history: [] })).toThrow(
+      SupervisorFailedError,
+    );
   });
 
   it("propagates the handler's rejection unchanged", async () => {
@@ -49,8 +49,6 @@ describe("createCommandDispatcher", () => {
       },
     });
 
-    await expect(
-      command("compact", { sessionId: "s1", history: [] }),
-    ).rejects.toBe(boom);
+    await expect(command("compact", { sessionId: "s1", history: [] })).rejects.toBe(boom);
   });
 });

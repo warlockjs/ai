@@ -29,15 +29,13 @@ type ScoreLine = {
  * candidate. Kept terse and JSON-light so any chat model can answer.
  */
 function buildPrompt(query: string, candidates: RetrievedChunk[]): Message[] {
-  const lines = candidates
-    .map((candidate, index) => `[${index}] ${candidate.text}`)
-    .join("\n\n");
+  const lines = candidates.map((candidate, index) => `[${index}] ${candidate.text}`).join("\n\n");
 
   return [
     {
       role: "system",
       content:
-        "You are a relevance grader. For each numbered passage, rate how well it answers the query on a scale from 0 (irrelevant) to 1 (fully relevant). Reply with ONLY a JSON array of objects like [{\"index\":0,\"score\":0.9}], one entry per passage, no prose.",
+        'You are a relevance grader. For each numbered passage, rate how well it answers the query on a scale from 0 (irrelevant) to 1 (fully relevant). Reply with ONLY a JSON array of objects like [{"index":0,"score":0.9}], one entry per passage, no prose.',
     },
     {
       role: "user",

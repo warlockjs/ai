@@ -103,7 +103,9 @@ export class MockModel implements ModelContract {
         input: mock.usage?.input ?? estimatedInput,
         output: mock.usage?.output ?? estimatedOutput,
         total: (mock.usage?.input ?? estimatedInput) + (mock.usage?.output ?? estimatedOutput),
-        ...(mock.usage?.cachedTokens !== undefined ? { cachedTokens: mock.usage.cachedTokens } : {}),
+        ...(mock.usage?.cachedTokens !== undefined
+          ? { cachedTokens: mock.usage.cachedTokens }
+          : {}),
       },
       toolCalls: mock.toolCalls,
     };

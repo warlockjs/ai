@@ -95,15 +95,14 @@ export function topic(options: TopicFilterOptions): SyncGuardrailDetector {
 
       // Allow list: matching NONE of the terms is a miss → trigger onMatch.
       if (allow.length > 0) {
-        const matchedAny = allow.some(term => locate(text, term) !== undefined);
+        const matchedAny = allow.some((term) => locate(text, term) !== undefined);
 
         if (!matchedAny) {
           const match: GuardrailMatch = {
             rule: `${DETECTOR_NAME}.allow.miss`,
             label: "allow-miss",
           };
-          const reason =
-            options.reason ?? "Text matched none of the allowed topics.";
+          const reason = options.reason ?? "Text matched none of the allowed topics.";
 
           return verdict(onMatch, reason, [match]);
         }

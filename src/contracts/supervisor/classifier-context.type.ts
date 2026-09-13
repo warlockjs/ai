@@ -71,9 +71,7 @@ export type ClassifierOutput = {
  *   shallow-merge slice into state.
  */
 export type ClassifierRefineResult =
-  | undefined
-  | EndSentinel
-  | (Record<string, unknown> & { intent?: string | EndSentinel });
+  undefined | EndSentinel | (Record<string, unknown> & { intent?: string | EndSentinel });
 
 /**
  * Read-only context passed to a classifier callback or to a
@@ -162,9 +160,7 @@ export type ClassifierAgentEntry<TState = Record<string, unknown>> = {
  * prior-state inspection) and an LLM call would be wasteful.
  */
 export type ClassifierRunEntry<TState = Record<string, unknown>> = {
-  run: (
-    ctx: ClassifierContext<TState>,
-  ) => Promise<ClassifierOutput> | ClassifierOutput;
+  run: (ctx: ClassifierContext<TState>) => Promise<ClassifierOutput> | ClassifierOutput;
   refine?: (
     ctx: ClassifierRefineContext<TState>,
   ) => Promise<ClassifierRefineResult> | ClassifierRefineResult;

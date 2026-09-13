@@ -116,9 +116,7 @@ describe("ai.planner — DAG execution", () => {
         version: 1,
         vendor: "test",
         validate: (value: unknown) =>
-          typeof value === "string"
-            ? { value }
-            : { issues: [{ message: "string required" }] },
+          typeof value === "string" ? { value } : { issues: [{ message: "string required" }] },
       },
     };
 
@@ -152,9 +150,7 @@ describe("ai.planner — DAG execution", () => {
         version: 1,
         vendor: "test",
         validate: (value: unknown) =>
-          typeof value === "string"
-            ? { value }
-            : { issues: [{ message: "string required" }] },
+          typeof value === "string" ? { value } : { issues: [{ message: "string required" }] },
       },
     };
 

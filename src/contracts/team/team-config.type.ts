@@ -3,7 +3,10 @@ import type { AgentContract } from "../agent/agent.contract";
 import type { EvaluateContext, EvaluateResult } from "../supervisor/evaluate-context.type";
 import type { IntentCallback } from "../supervisor/intent-entry.type";
 import type { RouterEntry } from "../supervisor/router-entry.type";
-import type { SupervisorConfig, SupervisorEventHandlers } from "../supervisor/supervisor-config.type";
+import type {
+  SupervisorConfig,
+  SupervisorEventHandlers,
+} from "../supervisor/supervisor-config.type";
 import type { FlowObserveOption } from "../../observe/resolve-observers";
 import type { SnapshotStore } from "../orchestrator/snapshot-store.contract";
 import type { SystemPromptContract } from "../system-prompt.contract";
@@ -19,9 +22,7 @@ import type { WorkflowInstance } from "../workflow/workflow.contract";
  * per-entry overrides belong to `supervisor()`.
  */
 export type TeamMemberValue =
-  | AgentContract<unknown>
-  | WorkflowInstance<unknown, unknown>
-  | IntentCallback;
+  AgentContract<unknown> | WorkflowInstance<unknown, unknown> | IntentCallback;
 
 /**
  * The built-in quality-gate strategies. Each desugars to a concrete

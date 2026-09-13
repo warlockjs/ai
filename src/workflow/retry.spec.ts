@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RetryConfig } from "../contracts/workflow/retry-config.type";
-import {
-  DEFAULT_BACKOFF_CAP_MS,
-  isAbortError,
-  resolveBackoff,
-  resolveRetryConfig,
-} from "./retry";
+import { DEFAULT_BACKOFF_CAP_MS, isAbortError, resolveBackoff, resolveRetryConfig } from "./retry";
 
 describe("resolveBackoff", () => {
   it('"none" is always zero regardless of attempt', () => {
@@ -75,9 +70,7 @@ describe("resolveRetryConfig", () => {
     const stepRetry: RetryConfig = { attempts: 3, backoff: "exponential" };
     const workflowDefault: RetryConfig = { attempts: 10 };
 
-    expect(resolveRetryConfig({ retry: stepRetry }, workflowDefault)).toBe(
-      stepRetry,
-    );
+    expect(resolveRetryConfig({ retry: stepRetry }, workflowDefault)).toBe(stepRetry);
   });
 
   it("falls back to the workflow default when the step has no retry", () => {

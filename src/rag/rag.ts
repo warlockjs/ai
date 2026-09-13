@@ -3,11 +3,7 @@ import { EmbeddingVectorCountMismatchError } from "../errors";
 import { chunk as chunkText } from "./chunk/chunk";
 import type { ChunkOptions } from "./contracts/chunk-options.type";
 import type { RetrieveOptions, RetrieveResult } from "./contracts/citation.type";
-import type {
-  Rag,
-  RagAsToolOptions,
-  RagConfig,
-} from "./contracts/rag-config.type";
+import type { Rag, RagAsToolOptions, RagConfig } from "./contracts/rag-config.type";
 import type { RagDocument } from "./contracts/rag-document.type";
 import { ragAsTool } from "./as-tool";
 import { retrieve as runRetrieve, type StoredChunk } from "./retrieve";
@@ -83,10 +79,7 @@ export function rag(config: RagConfig): Rag {
   const instance: Rag = {
     name,
 
-    async index(
-      docs: RagDocument[],
-      chunkOverride?: ChunkOptions,
-    ): Promise<{ chunks: number }> {
+    async index(docs: RagDocument[], chunkOverride?: ChunkOptions): Promise<{ chunks: number }> {
       const chunkOptions = chunkOverride ?? config.chunk;
 
       // Ingestion guardrails (D5) — fail BEFORE any embedding spend.
@@ -97,10 +90,7 @@ export function rag(config: RagConfig): Rag {
         );
       }
       if (limits?.maxBytes !== undefined) {
-        const totalBytes = docs.reduce(
-          (sum, doc) => sum + Buffer.byteLength(doc.text ?? ""),
-          0,
-        );
+        const totalBytes = docs.reduce((sum, doc) => sum + Buffer.byteLength(doc.text ?? ""), 0);
         if (totalBytes > limits.maxBytes) {
           throw new Error(
             `rag("${name}"): index() received ${totalBytes} bytes of document text, exceeding the configured maxBytes of ${limits.maxBytes}`,
@@ -210,7 +200,11 @@ export function rag(config: RagConfig): Rag {
     },
 
     asTool(options?: RagAsToolOptions) {
-      return ragAsTool(name, (query, retrieveOptions) => instance.retrieve(query, retrieveOptions), options);
+      return ragAsTool(
+        name,
+        (query, retrieveOptions) => instance.retrieve(query, retrieveOptions),
+        options,
+      );
     },
   };
 

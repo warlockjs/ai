@@ -34,10 +34,7 @@ import { stampReportLineage } from "../utils/stamp-report-lineage";
 import type { DagNode, PlannerDag } from "./dag-scheduler";
 import { buildDag, readyNodes, sinkNodes } from "./dag-scheduler";
 import { planSchema } from "./plan-schema";
-import {
-  deletePlannerSnapshot,
-  persistPlannerSnapshot,
-} from "./snapshot";
+import { deletePlannerSnapshot, persistPlannerSnapshot } from "./snapshot";
 
 /**
  * Construction args for one {@link PlannerRun}. Carries everything the
@@ -505,11 +502,7 @@ export class PlannerRun<TOutput> {
           const previousOutputs = node.dependencies.map(
             (dependency) => outputs.get(dependency) as string,
           );
-          const stepCompleted = await this.executeStep(
-            node.index,
-            node.step,
-            previousOutputs,
-          );
+          const stepCompleted = await this.executeStep(node.index, node.step, previousOutputs);
 
           if (stepCompleted) {
             // Read the raw output off the snapshot (NOT shared `this.data`,
@@ -940,12 +933,9 @@ export class PlannerRun<TOutput> {
       return step.input;
     }
 
-    return [
-      "Context from earlier steps:",
-      ...previousOutputs,
-      "",
-      `Task: ${step.input}`,
-    ].join("\n");
+    return ["Context from earlier steps:", ...previousOutputs, "", `Task: ${step.input}`].join(
+      "\n",
+    );
   }
 
   /**
@@ -1044,10 +1034,7 @@ export class PlannerRun<TOutput> {
    * (the failed node + any skipped tail) at-or-after that cursor so the
    * re-run repopulates them without duplicating.
    */
-  private rehydrateSequentialState(
-    steps: PlannerStep[],
-    previousOutputs: string[],
-  ): number {
+  private rehydrateSequentialState(steps: PlannerStep[], previousOutputs: string[]): number {
     let cursor = 0;
 
     for (let index = 0; index < steps.length; index++) {
@@ -1104,9 +1091,7 @@ export class PlannerRun<TOutput> {
 
     // Prune every non-completed ledger entry so the re-run's pushes don't
     // duplicate the failed / skipped frontier from the crashed run.
-    const retained = this.executedSteps.filter((snapshot) =>
-      completedIndices.has(snapshot.index),
-    );
+    const retained = this.executedSteps.filter((snapshot) => completedIndices.has(snapshot.index));
     this.executedSteps.length = 0;
     this.executedSteps.push(...retained);
 

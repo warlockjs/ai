@@ -1,7 +1,4 @@
-import type {
-  SkillCatalogEntry,
-  SkillRecord,
-} from "../contracts/skill-record.type";
+import type { SkillCatalogEntry, SkillRecord } from "../contracts/skill-record.type";
 import type { SkillsStoreContract } from "../contracts/skills-store.contract";
 import { parseFrontmatter, parseTags } from "./parse-frontmatter";
 

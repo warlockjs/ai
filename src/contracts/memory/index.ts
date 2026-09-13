@@ -9,14 +9,6 @@
  * non-breaking.
  */
 export type { MemoryContract } from "./memory.contract";
-export type {
-  MemoryConfig,
-  SemanticMemoryConfig,
-  WorkingMemoryConfig,
-} from "./memory-config.type";
-export type {
-  MemoryItem,
-  MemoryTier,
-  RecalledMemory,
-} from "./memory-item.type";
+export type { MemoryConfig, SemanticMemoryConfig, WorkingMemoryConfig } from "./memory-config.type";
+export type { MemoryItem, MemoryTier, RecalledMemory } from "./memory-item.type";
 export type { RecallOptions } from "./recall-options.type";

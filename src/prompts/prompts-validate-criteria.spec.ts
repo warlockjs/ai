@@ -17,7 +17,12 @@ describe("formatCriteria", () => {
   });
 
   it("joins a list into a numbered rule set and drops blanks", () => {
-    const out = formatCriteria(["Addresses the user by name", "", "  ", "Never gives medical advice"]);
+    const out = formatCriteria([
+      "Addresses the user by name",
+      "",
+      "  ",
+      "Never gives medical advice",
+    ]);
     expect(out).toContain("ALL of the following criteria");
     expect(out).toContain("1. Addresses the user by name");
     expect(out).toContain("2. Never gives medical advice");
@@ -44,8 +49,8 @@ describe("ai.prompts.validate — custom criteria", () => {
 
     // Our criteria text actually reached the judge model.
     const sent = judge.callHistory
-      .flatMap(call => call.messages)
-      .map(message => JSON.stringify(message.content))
+      .flatMap((call) => call.messages)
+      .map((message) => JSON.stringify(message.content))
       .join("\n");
     expect(sent).toContain("Never gives medical advice");
     expect(sent).toContain("Addresses the user by their");
@@ -67,7 +72,9 @@ describe("ai.prompts.validate — custom criteria", () => {
 
   it("a criteria judge never flips ok for a placeholder-clean prompt", async () => {
     const registry = prompts();
-    const judge = new MockModel("judge", [{ content: JSON.stringify({ score: 0.1, passed: false, reason: "violates rule 2" }) }]);
+    const judge = new MockModel("judge", [
+      { content: JSON.stringify({ score: 0.1, passed: false, reason: "violates rule 2" }) },
+    ]);
 
     const result = await registry.validate("A clean, placeholder-free prompt.", {
       judge,

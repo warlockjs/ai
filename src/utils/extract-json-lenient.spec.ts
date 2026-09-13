@@ -77,9 +77,7 @@ describe("extractJsonLenient", () => {
   });
 
   it("returns the trimmed text for pure prose with no JSON", () => {
-    expect(extractJsonLenient("I think it deserves a pass.")).toBe(
-      "I think it deserves a pass.",
-    );
+    expect(extractJsonLenient("I think it deserves a pass.")).toBe("I think it deserves a pass.");
   });
 
   it("returns empty string for empty input", () => {

@@ -1,15 +1,8 @@
 // Storage contracts (orchestrator.md §8.2 / §8.4) — the durable
 // foundation the orchestrator factory builds on. Public surface so devs
 // can type their own stores and clients.
-export type {
-  CheckpointRecord,
-  CheckpointStore,
-} from "./checkpoint-store.contract";
-export type {
-  PgClientLike,
-  RedisClientLike,
-  SnapshotStore,
-} from "./snapshot-store.contract";
+export type { CheckpointRecord, CheckpointStore } from "./checkpoint-store.contract";
+export type { PgClientLike, RedisClientLike, SnapshotStore } from "./snapshot-store.contract";
 export type { SessionLock } from "./session-lock.contract";
 
 // Orchestrator contract + factory surface (orchestrator.md §15). The

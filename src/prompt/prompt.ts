@@ -1,22 +1,12 @@
 import type { SystemPromptContract } from "../contracts/system-prompt.contract";
-import {
-  defaultPromptsManager,
-  prompts as createPromptsManager,
-} from "../prompts/prompts-manager";
+import { defaultPromptsManager, prompts as createPromptsManager } from "../prompts/prompts-manager";
 import type { PromptsManagerContract } from "../prompts/prompts-manager.contract";
 import { Instruction } from "../system-prompt/instruction";
 import { renderPlaceholders } from "../system-prompt/render-placeholders";
 import { SystemPrompt } from "../system-prompt/system-prompt";
 import { PromptNotFoundError, PromptValidationError } from "./errors";
-import {
-  syncLangfusePrompts,
-  warmLangfuse,
-} from "./prompt-langfuse-sync";
-import {
-  buildValidationReport,
-  judgePrompt,
-  staticLint,
-} from "./prompt-validate";
+import { syncLangfusePrompts, warmLangfuse } from "./prompt-langfuse-sync";
+import { buildValidationReport, judgePrompt, staticLint } from "./prompt-validate";
 import { agent } from "../agent/agent";
 import type { AgentContract } from "../contracts/agent/agent.contract";
 import type { ModelContract } from "../contracts/model.contract";
@@ -138,7 +128,7 @@ class PromptRegistry implements PromptRegistryContract {
   public add(name: string, version: PromptVersion): PromptRegistryContract {
     const mirror = this.versionMeta.get(name) ?? [];
 
-    if (mirror.some(existing => existing.version === version.version)) {
+    if (mirror.some((existing) => existing.version === version.version)) {
       throw new PromptValidationError(
         `Prompt "${name}" already has a version labeled "${version.version}".`,
         { context: { name, version: version.version } },
@@ -240,11 +230,8 @@ class PromptRegistry implements PromptRegistryContract {
       return;
     }
 
-    await syncLangfusePrompts(
-      this.options.langfuse,
-      this.list(),
-      this.snapshotEntries(),
-      entry => this.register(entry),
+    await syncLangfusePrompts(this.options.langfuse, this.list(), this.snapshotEntries(), (entry) =>
+      this.register(entry),
     );
   }
 
@@ -260,7 +247,7 @@ class PromptRegistry implements PromptRegistryContract {
     }
 
     const picked = version
-      ? mirror.find(candidate => candidate.version === version)
+      ? mirror.find((candidate) => candidate.version === version)
       : mirror[mirror.length - 1];
 
     if (!picked) {
@@ -284,7 +271,7 @@ class PromptRegistry implements PromptRegistryContract {
     }
 
     const picked = version
-      ? mirror.find(candidate => candidate.version === version)
+      ? mirror.find((candidate) => candidate.version === version)
       : mirror[mirror.length - 1];
 
     return picked ? picked.template : textOrName;
@@ -304,7 +291,8 @@ class PromptRegistry implements PromptRegistryContract {
     }
 
     const missing = version.required.filter(
-      key => placeholders[key] === undefined || placeholders[key] === null || placeholders[key] === "",
+      (key) =>
+        placeholders[key] === undefined || placeholders[key] === null || placeholders[key] === "",
     );
 
     if (missing.length > 0) {
@@ -361,10 +349,7 @@ class PromptRegistry implements PromptRegistryContract {
  * ai.systemPrompt("You are support.", { name: "support" });
  * const sp = ai.prompt("support"); // → the registered SystemPromptContract
  */
-function promptFactory(
-  name: string,
-  versionOrTag?: string,
-): SystemPromptContract;
+function promptFactory(name: string, versionOrTag?: string): SystemPromptContract;
 function promptFactory(options?: PromptRegistryOptions): PromptRegistryContract;
 function promptFactory(
   first?: string | PromptRegistryOptions,

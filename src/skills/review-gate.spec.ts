@@ -7,12 +7,21 @@ import { makeSkill, recordingAnalytics } from "./test-support/make-skill";
 
 /** A candidate fixture to feed the gate. */
 function candidate() {
-  return makeSkill({ name: "draft", description: "A draft", body: "body", type: "candidate", version: 0 });
+  return makeSkill({
+    name: "draft",
+    description: "A draft",
+    body: "body",
+    type: "candidate",
+    version: 0,
+  });
 }
 
 describe("review gate — default DENY (Phase 2)", () => {
   it("does not expose saveSkill when no review gate is configured", () => {
-    const lib = skills({ name: "no-gate", sources: [{ type: "store", store: new MockSkillsStore([]) }] });
+    const lib = skills({
+      name: "no-gate",
+      sources: [{ type: "store", store: new MockSkillsStore([]) }],
+    });
 
     const toolNames = lib.tools().map((tool) => tool.name);
     expect(toolNames).toContain("loadSkill");
@@ -89,6 +98,8 @@ describe("review gate — default DENY (Phase 2)", () => {
 
     await runReviewGate(candidate(), gate, analytics.record);
 
-    expect(analytics.events.find((event) => event.type === "denied")).toMatchObject({ skill: "draft" });
+    expect(analytics.events.find((event) => event.type === "denied")).toMatchObject({
+      skill: "draft",
+    });
   });
 });

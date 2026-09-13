@@ -60,12 +60,11 @@ export type WorkflowExecuteOptions<
   input: TInput;
 };
 
-export type WorkflowResumeOptions<TContext = unknown> =
-  WorkflowRunOptions<TContext> & {
-    /** Bypass signature drift check. Use when you know the workflow
-     *  definition change is safe for in-flight snapshots. */
-    force?: boolean;
-  };
+export type WorkflowResumeOptions<TContext = unknown> = WorkflowRunOptions<TContext> & {
+  /** Bypass signature drift check. Use when you know the workflow
+   *  definition change is safe for in-flight snapshots. */
+  force?: boolean;
+};
 
 export type WorkflowDefinition<
   TInput = unknown,
@@ -151,11 +150,7 @@ export interface WorkflowInstance<
   TOutput = unknown,
   TState = Record<string, unknown>,
   TContext = unknown,
-> extends ExecutableContract<
-  TInput,
-  WorkflowRunOptions<TContext>,
-  WorkflowResult<TOutput>
-> {
+> extends ExecutableContract<TInput, WorkflowRunOptions<TContext>, WorkflowResult<TOutput>> {
   readonly name: string;
   readonly description?: string;
   /**
@@ -182,13 +177,8 @@ export interface WorkflowInstance<
    * your real `input` has a top-level `input` key, prefer the
    * two-arg form to avoid ambiguity.
    */
-  execute(
-    input: TInput,
-    options?: WorkflowRunOptions<TContext>,
-  ): Promise<WorkflowResult<TOutput>>;
-  execute(
-    options: WorkflowExecuteOptions<TInput, TContext>,
-  ): Promise<WorkflowResult<TOutput>>;
+  execute(input: TInput, options?: WorkflowRunOptions<TContext>): Promise<WorkflowResult<TOutput>>;
+  execute(options: WorkflowExecuteOptions<TInput, TContext>): Promise<WorkflowResult<TOutput>>;
 
   resume(
     runId: string,

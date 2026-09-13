@@ -51,11 +51,7 @@ export interface FlagRecord {
  * Append a `flag` record onto the namespaced `ctx.state` array, creating it
  * on first write. Never throws — recording is best-effort annotation.
  */
-function recordFlag(
-  ctx: MiddlewareTripContext,
-  name: string,
-  record: FlagRecord,
-): void {
+function recordFlag(ctx: MiddlewareTripContext, name: string, record: FlagRecord): void {
   const key = flagsKey(name);
   const existing = ctx.state.get(key);
   const flags = Array.isArray(existing) ? (existing as FlagRecord[]) : [];
@@ -162,10 +158,7 @@ async function runDetectors(
 
       // Input / tool phases have no safe rewrite-and-continue seam — downgrade
       // to a block so the un-redacted text is never threaded through.
-      const reason =
-        phase === "tool"
-          ? "tool-arg-redaction-unsupported"
-          : verdict.reason;
+      const reason = phase === "tool" ? "tool-arg-redaction-unsupported" : verdict.reason;
 
       return {
         type: "block",
@@ -213,15 +206,12 @@ async function block(
     });
   }
 
-  throw new GuardrailViolationError(
-    `guardrail "${name}" rejected ${phase} — ${outcome.reason}`,
-    {
-      // `phase` is widened to include "tool"; the error carries it verbatim.
-      phase: phase as "input" | "output",
-      reason: outcome.reason,
-      guardrail: name,
-    },
-  );
+  throw new GuardrailViolationError(`guardrail "${name}" rejected ${phase} — ${outcome.reason}`, {
+    // `phase` is widened to include "tool"; the error carries it verbatim.
+    phase: phase as "input" | "output",
+    reason: outcome.reason,
+    guardrail: name,
+  });
 }
 
 /**
@@ -306,13 +296,7 @@ export function guard(options: GuardOptions): AgentMiddleware {
           return;
         }
 
-        const outcome = await runDetectors(
-          output,
-          response.content,
-          "output",
-          ctx,
-          name,
-        );
+        const outcome = await runDetectors(output, response.content, "output", ctx, name);
 
         if (outcome.type === "block") {
           await block(outcome, "output", ctx, name, escalation);

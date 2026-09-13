@@ -98,9 +98,7 @@ function hashString(input: string): string {
  * not import that file (it would close an import cycle: `system-prompt.ts`
  * imports this module to implement `.refined()`).
  */
-function isSystemPromptContract(
-  value: unknown,
-): value is SystemPromptContract {
+function isSystemPromptContract(value: unknown): value is SystemPromptContract {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -117,7 +115,7 @@ function isSystemPromptContract(
  */
 function rawTemplate(prompt: SystemPromptContract): string {
   return prompt.blocks
-    .map(block => block.text)
+    .map((block) => block.text)
     .join("\n\n")
     .trim();
 }
@@ -144,8 +142,7 @@ function collectPlaceholderTokens(template: string): Map<string, string> {
 
     const defaultText = rawDefault?.trim();
     const key = `${path}\u0000${defaultText ?? "\u0001"}`;
-    const display =
-      defaultText === undefined ? `{{${path}}}` : `{{${path}|${defaultText}}}`;
+    const display = defaultText === undefined ? `{{${path}}}` : `{{${path}|${defaultText}}}`;
 
     tokens.set(key, display);
   }
@@ -215,7 +212,7 @@ function formatRefineCriteria(
     return trimmed.length > 0 ? trimmed : undefined;
   }
 
-  const rules = criteria.map(rule => rule.trim()).filter(rule => rule.length > 0);
+  const rules = criteria.map((rule) => rule.trim()).filter((rule) => rule.length > 0);
 
   if (rules.length === 0) {
     return undefined;
@@ -248,7 +245,7 @@ function buildRepairInput(
 ): string {
   return [
     "Your previous rewrite broke placeholder parity:",
-    ...issues.map(issue => `- ${issue}`),
+    ...issues.map((issue) => `- ${issue}`),
     "",
     "Every {{placeholder}} token of the original must appear verbatim in the",
     "rewrite (same name, same |default), and no new ones may be introduced.",
@@ -265,16 +262,11 @@ function buildRepairInput(
 }
 
 /** Read a pinned refinement — any store fault or non-string value is a miss. */
-async function readStore(
-  store: RefinedPromptStoreLike,
-  key: string,
-): Promise<string | undefined> {
+async function readStore(store: RefinedPromptStoreLike, key: string): Promise<string | undefined> {
   try {
     const value = await store.get<unknown>(key);
 
-    return typeof value === "string" && value.trim().length > 0
-      ? value
-      : undefined;
+    return typeof value === "string" && value.trim().length > 0 ? value : undefined;
   } catch {
     return undefined;
   }
@@ -405,9 +397,7 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
    */
   public meta(): SystemPromptMeta | undefined;
   public meta(meta: SystemPromptMeta): RefinedSystemPromptContract;
-  public meta(
-    meta?: SystemPromptMeta,
-  ): SystemPromptMeta | undefined | RefinedSystemPromptContract {
+  public meta(meta?: SystemPromptMeta): SystemPromptMeta | undefined | RefinedSystemPromptContract {
     if (meta === undefined) {
       return this.sourcePrompt.meta();
     }
@@ -416,16 +406,12 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
   }
 
   /** Derive a new source with the persona set, re-wrapped (pin invalidates). */
-  public persona(
-    value: PersonaContract | string,
-  ): RefinedSystemPromptContract {
+  public persona(value: PersonaContract | string): RefinedSystemPromptContract {
     return this.rewrap(this.sourcePrompt.persona(value));
   }
 
   /** Derive a new source with the instruction appended, re-wrapped (pin invalidates). */
-  public instruction(
-    value: InstructionContract | string,
-  ): RefinedSystemPromptContract {
+  public instruction(value: InstructionContract | string): RefinedSystemPromptContract {
     return this.rewrap(this.sourcePrompt.instruction(value));
   }
 
@@ -433,28 +419,16 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
    * Fold blocks / a contract / a registered name into the SOURCE and re-wrap
    * — same three forms as the base builder's `merge`.
    */
-  public merge(
-    ...blocks: readonly SystemPromptBlockContract[]
-  ): RefinedSystemPromptContract;
+  public merge(...blocks: readonly SystemPromptBlockContract[]): RefinedSystemPromptContract;
   public merge(source: SystemPromptContract): RefinedSystemPromptContract;
-  public merge(
-    name: string,
-    options?: SystemPromptMergeOptions,
-  ): RefinedSystemPromptContract;
+  public merge(name: string, options?: SystemPromptMergeOptions): RefinedSystemPromptContract;
   public merge(
     first?: SystemPromptBlockContract | SystemPromptContract | string,
-    ...rest: readonly (
-      | SystemPromptBlockContract
-      | SystemPromptMergeOptions
-      | undefined
-    )[]
+    ...rest: readonly (SystemPromptBlockContract | SystemPromptMergeOptions | undefined)[]
   ): RefinedSystemPromptContract {
     if (typeof first === "string") {
       return this.rewrap(
-        this.sourcePrompt.merge(
-          first,
-          rest[0] as SystemPromptMergeOptions | undefined,
-        ),
+        this.sourcePrompt.merge(first, rest[0] as SystemPromptMergeOptions | undefined),
       );
     }
 
@@ -462,10 +436,7 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
       return this.rewrap(this.sourcePrompt.merge(first));
     }
 
-    const blocks = [
-      ...(first ? [first] : []),
-      ...rest,
-    ] as readonly SystemPromptBlockContract[];
+    const blocks = [...(first ? [first] : []), ...rest] as readonly SystemPromptBlockContract[];
 
     return this.rewrap(this.sourcePrompt.merge(...blocks));
   }
@@ -477,7 +448,7 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
    */
   public resolve(placeholders?: Placeholders): string {
     return this.blocks
-      .map(block => block.resolve(placeholders))
+      .map((block) => block.resolve(placeholders))
       .join("\n\n")
       .trim();
   }
@@ -487,16 +458,12 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
    * — sugar over `ai.prompts.validate(this, options)`, same as the base
    * builder.
    */
-  public validate(
-    options?: PromptsValidateOptions,
-  ): Promise<PromptValidationResult> {
+  public validate(options?: PromptsValidateOptions): Promise<PromptValidationResult> {
     return this.deps.validatePrompt(this, options);
   }
 
   /** Re-configure refinement for the same source (new options, fresh pin state). */
-  public refined(
-    options: RefinedSystemPromptOptions,
-  ): RefinedSystemPromptContract {
+  public refined(options: RefinedSystemPromptOptions): RefinedSystemPromptContract {
     return new RefinedSystemPrompt(this.sourcePrompt, options, this.deps);
   }
 
@@ -512,10 +479,7 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
    * pin for everyone).
    */
   public async materialize(): Promise<void> {
-    if (
-      this.refinedTemplate !== undefined ||
-      this.compileFailures >= MAX_LAZY_COMPILE_ATTEMPTS
-    ) {
+    if (this.refinedTemplate !== undefined || this.compileFailures >= MAX_LAZY_COMPILE_ATTEMPTS) {
       return;
     }
 
@@ -541,9 +505,7 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
    * source's `required` keys carried over, and NO name (never
    * auto-registers).
    */
-  public async refinePrompt(
-    options?: PromptRefineOptions,
-  ): Promise<SystemPromptContract> {
+  public async refinePrompt(options?: PromptRefineOptions): Promise<SystemPromptContract> {
     const template = await this.compile(options);
     const sourceMeta = this.sourcePrompt.meta();
     const refinedFrom = sourceMeta?.name
@@ -553,12 +515,8 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
     return this.deps.buildPrompt([new Instruction(template)], {
       refinedFrom,
       refinerModel: `${this.options.model.provider}:${this.options.model.name}`,
-      ...(sourceMeta?.description !== undefined
-        ? { description: sourceMeta.description }
-        : {}),
-      ...(sourceMeta?.required !== undefined
-        ? { required: sourceMeta.required }
-        : {}),
+      ...(sourceMeta?.description !== undefined ? { description: sourceMeta.description } : {}),
+      ...(sourceMeta?.required !== undefined ? { required: sourceMeta.required } : {}),
     });
   }
 
@@ -614,10 +572,7 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
    * run still being the latest-started generation — a superseded run
    * returns its text but never overwrites the newer pin.
    */
-  private async compileUncached(
-    skipStoreRead: boolean,
-    generation: number,
-  ): Promise<string> {
+  private async compileUncached(skipStoreRead: boolean, generation: number): Promise<string> {
     const template = rawTemplate(this.sourcePrompt);
 
     // An empty source resolves to "" (no system message) — nothing to compile.
@@ -667,9 +622,7 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
     const refiner = this.buildRefinerAgent();
     const criteriaBlock = formatRefineCriteria(this.options.criteria);
 
-    const first = await refiner.execute(
-      buildRefineInput(template, criteriaBlock),
-    );
+    const first = await refiner.execute(buildRefineInput(template, criteriaBlock));
 
     if (first.error) {
       throw new PromptRefinementError(
@@ -736,9 +689,7 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
    */
   private storeKey(template: string): string {
     const criteria = formatRefineCriteria(this.options.criteria) ?? "";
-    const hash = hashString(
-      [REFINE_RECIPE_VERSION, criteria, template].join("\u0000"),
-    );
+    const hash = hashString([REFINE_RECIPE_VERSION, criteria, template].join("\u0000"));
 
     return `prompts.refined.${this.options.model.provider}:${this.options.model.name}.${hash}`;
   }
@@ -746,8 +697,7 @@ export class RefinedSystemPrompt implements RefinedSystemPromptContract {
   /** Pin the compiled template on the instance. */
   private adopt(template: string): void {
     this.refinedTemplate = template;
-    this.refinedBlocks =
-      template.length > 0 ? [new Instruction(template)] : [];
+    this.refinedBlocks = template.length > 0 ? [new Instruction(template)] : [];
   }
 
   /**

@@ -22,10 +22,7 @@ import type { ResolvedOrchestratorMemory } from "./memory";
 export type OrchestratorEngineContext<
   TOutput = unknown,
   TState = TOutput,
-  TIntents extends Record<string, SupervisorIntentValue> = Record<
-    string,
-    SupervisorIntentValue
-  >,
+  TIntents extends Record<string, SupervisorIntentValue> = Record<string, SupervisorIntentValue>,
 > = {
   /** The validated factory config (C1 has already run author-time checks). */
   config: OrchestratorConfig<TOutput, TState, TIntents>;

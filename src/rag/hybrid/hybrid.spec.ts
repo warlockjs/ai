@@ -12,9 +12,14 @@ describe("reciprocalRankFusion (A4)", () => {
       ["b", "a", "d"],
     ]);
     // `b` is rank 1 + rank 0; `a` is rank 0 + rank 1 — `a` and `b` lead.
-    expect(fused.slice(0, 2).map(r => r.id).sort()).toEqual(["a", "b"]);
-    expect(fused.map(r => r.id)).toContain("c");
-    expect(fused.map(r => r.id)).toContain("d");
+    expect(
+      fused
+        .slice(0, 2)
+        .map((r) => r.id)
+        .sort(),
+    ).toEqual(["a", "b"]);
+    expect(fused.map((r) => r.id)).toContain("c");
+    expect(fused.map((r) => r.id)).toContain("d");
   });
 
   it("returns [] for no lists", () => {

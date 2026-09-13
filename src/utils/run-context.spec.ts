@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BaseReport } from "../contracts/result/base-report.type";
-import {
-  captureChildReport,
-  currentRunFrame,
-  withoutRunFrame,
-  withRunFrame,
-} from "./run-context";
+import { captureChildReport, currentRunFrame, withoutRunFrame, withRunFrame } from "./run-context";
 
 /**
  * Unit coverage for the ambient run-frame primitive that powers
@@ -91,14 +86,11 @@ describe("run-context ambient frame", () => {
   it("survives async boundaries — a capture several awaits deep still finds the frame", async () => {
     const sink: BaseReport[] = [];
 
-    await withRunFrame(
-      { sink, rootRunId: "root", parentRunId: "parent" },
-      async () => {
-        await Promise.resolve();
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        captureChildReport(makeReport("deep"));
-      },
-    );
+    await withRunFrame({ sink, rootRunId: "root", parentRunId: "parent" }, async () => {
+      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      captureChildReport(makeReport("deep"));
+    });
 
     expect(sink).toHaveLength(1);
     expect(sink[0].name).toBe("deep");

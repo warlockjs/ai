@@ -1,14 +1,8 @@
-import type {
-  RetryBackoff,
-  RetryConfig,
-} from "../contracts/workflow/retry-config.type";
+import type { RetryBackoff, RetryConfig } from "../contracts/workflow/retry-config.type";
 
 export const DEFAULT_BACKOFF_CAP_MS = 30_000;
 
-export function resolveBackoff(
-  attempt: number,
-  backoff: RetryBackoff | undefined,
-): number {
+export function resolveBackoff(attempt: number, backoff: RetryBackoff | undefined): number {
   const value = (() => {
     switch (backoff) {
       case "none":

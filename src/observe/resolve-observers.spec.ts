@@ -67,9 +67,7 @@ describe("notifyObservers — isolate-but-surface (C5)", () => {
       throw new Error("handler also broke");
     };
 
-    await expect(
-      notifyObservers(observer, fakeReport, onError),
-    ).resolves.toBeUndefined();
+    await expect(notifyObservers(observer, fakeReport, onError)).resolves.toBeUndefined();
   });
 
   it("routes the report to a healthy observer and resolves cleanly", async () => {

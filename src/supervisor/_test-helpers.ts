@@ -18,7 +18,7 @@ export function schema<T>(
   return { "~standard": { version: 1, vendor: "test", validate } };
 }
 
-export const passthrough = schema<unknown>(value => ({ value }));
+export const passthrough = schema<unknown>((value) => ({ value }));
 
 /**
  * Build an agent whose responses are scripted by `MockModel`. Shortcut
@@ -61,34 +61,26 @@ export const END_VALUE = END;
  * Schema describing a router agent's output shape. Accepts `next`
  * (string | string[] | END) and optional `reasoning`.
  */
-export const routerOutputSchema = schema<{ next: Next; reasoning?: string }>(
-  value => {
-    if (!value || typeof value !== "object") {
-      return { issues: [{ message: "router output must be an object" }] };
-    }
+export const routerOutputSchema = schema<{ next: Next; reasoning?: string }>((value) => {
+  if (!value || typeof value !== "object") {
+    return { issues: [{ message: "router output must be an object" }] };
+  }
 
-    const record = value as { next?: unknown; reasoning?: unknown };
+  const record = value as { next?: unknown; reasoning?: unknown };
 
-    if (
-      typeof record.next !== "string" &&
-      !(
-        Array.isArray(record.next) &&
-        record.next.every(element => typeof element === "string")
-      )
-    ) {
-      return {
-        issues: [
-          { message: "router output `next` must be string or string[]" },
-        ],
-      };
-    }
-
+  if (
+    typeof record.next !== "string" &&
+    !(Array.isArray(record.next) && record.next.every((element) => typeof element === "string"))
+  ) {
     return {
-      value: {
-        next: record.next as Next,
-        reasoning:
-          typeof record.reasoning === "string" ? record.reasoning : undefined,
-      },
+      issues: [{ message: "router output `next` must be string or string[]" }],
     };
-  },
-);
+  }
+
+  return {
+    value: {
+      next: record.next as Next,
+      reasoning: typeof record.reasoning === "string" ? record.reasoning : undefined,
+    },
+  };
+});

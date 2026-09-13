@@ -1,12 +1,7 @@
 import type { AIError } from "../../errors/ai-error";
 import { type Usage } from "../result";
 import type { SupervisorResult } from "../result/supervisor-result.type";
-import type {
-  EvaluateResult,
-  IterationSnapshot,
-  Next,
-  SupervisorInput,
-} from "../supervisor";
+import type { EvaluateResult, IterationSnapshot, Next, SupervisorInput } from "../supervisor";
 
 /** Fires once at the start of every `supervisor.execute()` call. */
 export type SupervisorStartingPayload = {

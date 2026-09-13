@@ -50,9 +50,7 @@ export type IntentRunner = {
  * `agent.tools[]`, not via supervised inline dispatch.
  */
 export type SupervisableExecutable =
-  | AgentContract<unknown>
-  | WorkflowInstance<unknown, unknown>
-  | SupervisorContract<unknown>;
+  AgentContract<unknown> | WorkflowInstance<unknown, unknown> | SupervisorContract<unknown>;
 
 /**
  * Subset of `SupervisableExecutable` that exposes a native
@@ -63,9 +61,7 @@ export type SupervisableExecutable =
  * events bubble through the supervisor's existing top-level forward
  * chain.
  */
-export type StreamableExecutable =
-  | AgentContract<unknown>
-  | SupervisorContract<unknown>;
+export type StreamableExecutable = AgentContract<unknown> | SupervisorContract<unknown>;
 
 /**
  * Result envelope returned by `ctx.run(executable, ...)` — discriminated
@@ -73,9 +69,7 @@ export type StreamableExecutable =
  * passed and TS narrows accordingly.
  */
 export type SupervisableResult =
-  | AgentResult<unknown>
-  | WorkflowResult<unknown>
-  | SupervisorResult<unknown>;
+  AgentResult<unknown> | WorkflowResult<unknown> | SupervisorResult<unknown>;
 
 /**
  * Per-call options to `ctx.run` / `ctx.stream`. Each kind's native
@@ -85,9 +79,7 @@ export type SupervisableResult =
  * Warlock convention.
  */
 export type SupervisableExecuteOptions =
-  | AgentExecuteOptions<unknown>
-  | WorkflowRunOptions
-  | SupervisorExecuteOptions;
+  AgentExecuteOptions<unknown> | WorkflowRunOptions | SupervisorExecuteOptions;
 
 /**
  * Map of registered intents keyed by their name in the supervisor's

@@ -77,9 +77,7 @@ describe("agent — cost rollup and lineage stamping end-to-end", () => {
 
   it("leaves Usage.cost undefined when the model has no pricing", async () => {
     const mock = MockSDK({
-      responses: [
-        { content: "answer", finishReason: "stop", usage: { input: 100, output: 50 } },
-      ],
+      responses: [{ content: "answer", finishReason: "stop", usage: { input: 100, output: 50 } }],
     });
     const model = mock.model({ name: "mock" });
     // intentionally no pricing — honest absence over false zero

@@ -34,9 +34,7 @@ describe("agent judge-safe preset", () => {
   // 1. Lenient parse: recovers a verdict wrapped in a ```json fence.
   it("parses a fenced ```json verdict on the first trip (no repair needed)", async () => {
     const mock = MockSDK({
-      responses: [
-        { content: '```json\n{"score":0.9,"passed":true}\n```', finishReason: "stop" },
-      ],
+      responses: [{ content: '```json\n{"score":0.9,"passed":true}\n```', finishReason: "stop" }],
     });
     const model: MockModel = mock.model({ name: "nova" }) as MockModel;
 
@@ -202,9 +200,7 @@ describe("agent judge-safe preset", () => {
     });
     const model: MockModel = mock.model({ name: "nova" }) as MockModel;
 
-    const result = await agent
-      .judge({ model, output: verdictSchema })
-      .execute("grade it");
+    const result = await agent.judge({ model, output: verdictSchema }).execute("grade it");
 
     expect(result.error).toBeUndefined();
     expect(result.data).toEqual({ score: 0.8, passed: true });

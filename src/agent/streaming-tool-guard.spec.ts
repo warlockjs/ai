@@ -25,10 +25,7 @@ const querySchema = makeSchema<{ query: string }>((value) => {
   return { value: { query: v.query } };
 });
 
-function buildLeakyAgent(opts: {
-  leakedContent: string;
-  withGuardOnConfig?: boolean;
-}) {
+function buildLeakyAgent(opts: { leakedContent: string; withGuardOnConfig?: boolean }) {
   const executeSpy = vi.fn(async (input: { query: string }) => ({
     found: 1,
     echo: input.query,

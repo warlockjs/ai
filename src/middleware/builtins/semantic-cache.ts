@@ -25,9 +25,7 @@ import { extractUserText } from "../utils";
  *   throw) if you need the call to fail closed instead.
  */
 export type SemanticCacheScope =
-  | "session"
-  | "shared"
-  | ((context: MiddlewareTripContext) => string | undefined);
+  "session" | "shared" | ((context: MiddlewareTripContext) => string | undefined);
 
 /**
  * Configuration for `semanticCache()`.
@@ -172,9 +170,7 @@ function resolveScope(
   }
 
   const key =
-    typeof scope === "function"
-      ? scope(context)
-      : sessionScope(context.options?.sessionId);
+    typeof scope === "function" ? scope(context) : sessionScope(context.options?.sessionId);
 
   return key ? key : undefined;
 }
@@ -294,9 +290,7 @@ export function semanticCache(options: SemanticCacheOptions): AgentMiddleware {
   // `entry.scope` equality check below, so even a hash collision cannot
   // widen what a session can read.
   const keyFor = (hash: string, scope: string | undefined): string =>
-    scope === undefined
-      ? `${namespace}.${hash}`
-      : `${namespace}.${fnv1a(scope)}.${hash}`;
+    scope === undefined ? `${namespace}.${hash}` : `${namespace}.${fnv1a(scope)}.${hash}`;
 
   return {
     name,

@@ -21,8 +21,4 @@ export type {
 export type { SkillsStoreContract } from "./skills-store.contract";
 
 // Records
-export type {
-  SkillRecord,
-  SkillCatalogEntry,
-  LoadSkillInput,
-} from "./skill-record.type";
+export type { SkillRecord, SkillCatalogEntry, LoadSkillInput } from "./skill-record.type";

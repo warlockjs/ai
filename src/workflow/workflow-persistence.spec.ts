@@ -16,8 +16,8 @@ describe("ai.workflow — persistence + resume (1.6)", () => {
       name: "persist",
       snapshotStore: store,
       steps: [
-        step({ name: "a", run: ctx => (ctx.state.a = 1) }),
-        step({ name: "b", run: ctx => (ctx.state.b = 2) }),
+        step({ name: "a", run: (ctx) => (ctx.state.a = 1) }),
+        step({ name: "b", run: (ctx) => (ctx.state.b = 2) }),
       ],
     });
 
@@ -43,15 +43,10 @@ describe("ai.workflow — persistence + resume (1.6)", () => {
     const wf2 = workflow({
       name: "drift",
       snapshotStore: store,
-      steps: [
-        step({ name: "a", run: () => {} }),
-        step({ name: "b", run: () => {} }),
-      ],
+      steps: [step({ name: "a", run: () => {} }), step({ name: "b", run: () => {} })],
     });
 
-    await expect(wf2.resume("r-drift")).rejects.toBeInstanceOf(
-      WorkflowDriftError,
-    );
+    await expect(wf2.resume("r-drift")).rejects.toBeInstanceOf(WorkflowDriftError);
   });
 
   it("resume with force bypasses drift check", async () => {
@@ -67,10 +62,7 @@ describe("ai.workflow — persistence + resume (1.6)", () => {
     const wf2 = workflow({
       name: "force",
       snapshotStore: store,
-      steps: [
-        step({ name: "a", run: () => {} }),
-        step({ name: "b", run: () => {} }),
-      ],
+      steps: [step({ name: "a", run: () => {} }), step({ name: "b", run: () => {} })],
     });
 
     const result = await wf2.resume("r-force", { force: true });
@@ -88,13 +80,13 @@ describe("ai.workflow — persistence + resume (1.6)", () => {
         steps: [
           step({
             name: "a",
-            run: ctx => {
+            run: (ctx) => {
               ctx.state.a = "done";
             },
           }),
           step({
             name: "b",
-            run: ctx => {
+            run: (ctx) => {
               if (crash) throw new Error("boom");
               ctx.state.b = "done";
             },

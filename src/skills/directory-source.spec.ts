@@ -25,9 +25,14 @@ describe("directory source", () => {
   it("parses SKILL.md front-matter (same shape as generate-llms)", async () => {
     writeSkill(
       "scaffold-form",
-      ["---", "description: Scaffold a React form", "tags: frontend, react", "---", "# Body", "Step one."].join(
-        "\n",
-      ),
+      [
+        "---",
+        "description: Scaffold a React form",
+        "tags: frontend, react",
+        "---",
+        "# Body",
+        "Step one.",
+      ].join("\n"),
     );
 
     const source = directorySource(root);

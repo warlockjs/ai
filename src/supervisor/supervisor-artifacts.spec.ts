@@ -24,30 +24,31 @@ import { supervisor } from "./supervisor";
  *    callable elsewhere.
  */
 
-const stringInputSchema: StandardSchemaV1<{ query: string }> = schema<{ query: string }>(value => {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    typeof (value as { query?: unknown }).query !== "string"
-  ) {
-    return { issues: [{ message: "query must be a string" }] };
-  }
+const stringInputSchema: StandardSchemaV1<{ query: string }> = schema<{ query: string }>(
+  (value) => {
+    if (
+      !value ||
+      typeof value !== "object" ||
+      typeof (value as { query?: unknown }).query !== "string"
+    ) {
+      return { issues: [{ message: "query must be a string" }] };
+    }
 
-  return { value: value as { query: string } };
-});
+    return { value: value as { query: string } };
+  },
+);
 
 type Block = { type: "items"; itemIds: string[] };
 
-function lastSnapshotState(result: { report: { snapshots: { state: Record<string, unknown> }[] } }): Record<string, unknown> {
+function lastSnapshotState(result: {
+  report: { snapshots: { state: Record<string, unknown> }[] };
+}): Record<string, unknown> {
   const snapshots = result.report.snapshots;
 
   return snapshots[snapshots.length - 1].state;
 }
 
-function makeSearchTool(opts: {
-  blocks?: Block[];
-  recordedCtxKeys?: () => unknown;
-}) {
+function makeSearchTool(opts: { blocks?: Block[]; recordedCtxKeys?: () => unknown }) {
   return tool({
     name: "search_catalog",
     description: "Search items",
@@ -56,9 +57,7 @@ function makeSearchTool(opts: {
       // Record what the tool sees in ctx for the standalone case.
       opts.recordedCtxKeys?.();
 
-      const list = opts.blocks ?? [
-        { type: "items", itemIds: ["a", "b"] } satisfies Block,
-      ];
+      const list = opts.blocks ?? [{ type: "items", itemIds: ["a", "b"] } satisfies Block];
 
       // Side-channel write — the agent never sees this.
       const bag = ctx?.artifacts as { blocks?: Block[] } | undefined;
@@ -129,7 +128,7 @@ describe("supervisor — tool ctx artifacts", () => {
     const supervisorInstance = supervisor({
       name: "artifacts-auto-spread",
       intents: { searcher },
-      route: ctx => (ctx.iteration === 0 ? "searcher" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "searcher" : END),
     });
 
     const result = await supervisorInstance.execute("find AC");
@@ -160,7 +159,7 @@ describe("supervisor — tool ctx artifacts", () => {
     >({
       name: "artifacts-concat",
       intents: { searcher },
-      route: ctx => {
+      route: (ctx) => {
         if (ctx.iteration < 2) {
           calls++;
 
@@ -171,10 +170,7 @@ describe("supervisor — tool ctx artifacts", () => {
       },
       finalizeArtifacts: (state, artifacts) => ({
         ...state,
-        blocks: [
-          ...(((state as { blocks?: Block[] }).blocks) ?? []),
-          ...(artifacts.blocks ?? []),
-        ],
+        blocks: [...((state as { blocks?: Block[] }).blocks ?? []), ...(artifacts.blocks ?? [])],
       }),
     });
 
@@ -201,7 +197,7 @@ describe("supervisor — tool ctx artifacts", () => {
     const supervisorInstance = supervisor({
       name: "artifacts-replace",
       intents: { searcher },
-      route: ctx => (ctx.iteration < 2 ? "searcher" : END),
+      route: (ctx) => (ctx.iteration < 2 ? "searcher" : END),
     });
 
     const result = await supervisorInstance.execute("find");
@@ -240,15 +236,11 @@ describe("supervisor — tool ctx artifacts", () => {
       iterations: 1,
     });
 
-    const blocksSchema = schema<{ blocks?: Block[] }>(value => {
+    const blocksSchema = schema<{ blocks?: Block[] }>((value) => {
       const blocks = (value as { blocks?: unknown[] }).blocks ?? [];
 
       for (const block of blocks) {
-        if (
-          !block ||
-          typeof block !== "object" ||
-          !Array.isArray((block as Block).itemIds)
-        ) {
+        if (!block || typeof block !== "object" || !Array.isArray((block as Block).itemIds)) {
           return { issues: [{ message: "block.itemIds is required" }] };
         }
       }
@@ -259,7 +251,7 @@ describe("supervisor — tool ctx artifacts", () => {
     const supervisorInstance = supervisor({
       name: "artifacts-schema-validation",
       intents: { searcher },
-      route: ctx => (ctx.iteration === 0 ? "searcher" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "searcher" : END),
       artifactsSchema: blocksSchema,
     });
 
@@ -287,10 +279,10 @@ describe("supervisor — tool ctx artifacts", () => {
     >({
       name: "artifacts-snapshot",
       intents: { searcher },
-      route: ctx => (ctx.iteration < 2 ? "searcher" : END),
+      route: (ctx) => (ctx.iteration < 2 ? "searcher" : END),
       // Use finalize that strips blocks entirely — proves snapshot
       // captures pre-merge data even when the merger discards it.
-      finalizeArtifacts: state => state,
+      finalizeArtifacts: (state) => state,
     });
 
     const result = await supervisorInstance.execute("find");
@@ -302,7 +294,9 @@ describe("supervisor — tool ctx artifacts", () => {
     // finalizeArtifacts dropping them from state. Iteration 2 was the
     // terminal END-decision snapshot — no dispatch, no tool writes,
     // empty bag.
-    const dispatchSnapshots = result.report.snapshots.filter(s => Object.keys(s.result).length > 0);
+    const dispatchSnapshots = result.report.snapshots.filter(
+      (s) => Object.keys(s.result).length > 0,
+    );
     expect(dispatchSnapshots.length).toBeGreaterThanOrEqual(2);
 
     for (const snapshot of dispatchSnapshots) {
@@ -334,7 +328,7 @@ describe("supervisor — tool ctx artifacts", () => {
     const supervisorInstance = supervisor({
       name: "artifacts-empty-snapshot",
       intents: { noopAgent },
-      route: ctx => (ctx.iteration === 0 ? "noopAgent" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "noopAgent" : END),
     });
 
     const result = await supervisorInstance.execute("hi");
@@ -377,9 +371,7 @@ describe("supervisor — tool ctx artifacts", () => {
         {
           content: "",
           finishReason: "tool_calls",
-          toolCalls: [
-            { id: "c0", name: "search_catalog", input: { query: "ac" } },
-          ],
+          toolCalls: [{ id: "c0", name: "search_catalog", input: { query: "ac" } }],
         },
         {
           content: "done",
@@ -399,7 +391,7 @@ describe("supervisor — tool ctx artifacts", () => {
     const supervisorInstance = supervisor({
       name: "artifacts-leak-check",
       intents: { searcher },
-      route: ctx => (ctx.iteration === 0 ? "searcher" : END),
+      route: (ctx) => (ctx.iteration === 0 ? "searcher" : END),
     });
 
     const result = await supervisorInstance.execute("find AC");
@@ -411,14 +403,10 @@ describe("supervisor — tool ctx artifacts", () => {
     // artifact key never leaked into the LLM-visible channel.
     const history = model.callHistory;
     const lastCall = history[history.length - 1];
-    const toolMessages = lastCall.messages.filter(
-      message => message.role === "tool",
-    );
+    const toolMessages = lastCall.messages.filter((message) => message.role === "tool");
     const toolResultBodies = toolMessages
-      .map(message =>
-        typeof message.content === "string"
-          ? message.content
-          : JSON.stringify(message.content),
+      .map((message) =>
+        typeof message.content === "string" ? message.content : JSON.stringify(message.content),
       )
       .join("|");
 

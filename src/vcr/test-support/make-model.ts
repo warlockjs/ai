@@ -55,10 +55,7 @@ export class FakeModel implements ModelContract {
     return entry ?? { response: defaultResponse() };
   }
 
-  public async complete(
-    _messages: Message[],
-    _options?: ModelCallOptions,
-  ): Promise<ModelResponse> {
+  public async complete(_messages: Message[], _options?: ModelCallOptions): Promise<ModelResponse> {
     this.completeCalls++;
 
     const entry = this.next();

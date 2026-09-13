@@ -61,10 +61,7 @@ function workflowEntry(
 }
 
 /** A resolved callback intent — fingerprinted by the "callback" marker only. */
-function callbackEntry(
-  intent: string,
-  description = "dev code",
-): ResolvedCallbackEntry {
+function callbackEntry(intent: string, description = "dev code"): ResolvedCallbackEntry {
   return {
     intent,
     type: "callback",
@@ -74,9 +71,7 @@ function callbackEntry(
 }
 
 /** Assemble an entries map preserving insertion order of the arguments. */
-function entriesOf(
-  ...list: ResolvedIntentEntry[]
-): Map<string, ResolvedIntentEntry> {
+function entriesOf(...list: ResolvedIntentEntry[]): Map<string, ResolvedIntentEntry> {
   const map = new Map<string, ResolvedIntentEntry>();
   for (const entry of list) {
     map.set(entry.intent, entry);

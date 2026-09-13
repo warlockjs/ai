@@ -13,10 +13,5 @@ export type { AiMatchers } from "./matchers";
 // Pure, library-agnostic matcher logic — no vitest coupling. Safe for
 // non-test consumers that want the verdicts without the global
 // `expect` augmentation.
-export {
-  matchConverge,
-  matchOutputShape,
-  matchPassStep,
-  matchRouteTo,
-} from "./matcher-logic";
+export { matchConverge, matchOutputShape, matchPassStep, matchRouteTo } from "./matcher-logic";
 export type { MatcherVerdict } from "./matcher-logic";

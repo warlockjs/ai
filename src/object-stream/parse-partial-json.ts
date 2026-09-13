@@ -63,7 +63,7 @@ function completePartialJson(text: string): string | undefined {
 
   const closers = () =>
     stack
-      .map(c => (c === "{" ? "}" : "]"))
+      .map((c) => (c === "{" ? "}" : "]"))
       .reverse()
       .join("");
 
@@ -84,7 +84,7 @@ function completePartialJson(text: string): string | undefined {
   }
 
   // Fallback 2: drop a partial trailing literal / number (e.g. `tr`, `12.`).
-  const droppedLiteral = core.replace(/[:,]?\s*[A-Za-z0-9.+\-eE]+$/, match =>
+  const droppedLiteral = core.replace(/[:,]?\s*[A-Za-z0-9.+\-eE]+$/, (match) =>
     match.trimStart().startsWith(":") ? ":null" : "",
   );
   attempts.push(droppedLiteral.replace(/,\s*$/, "") + closers());

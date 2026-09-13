@@ -139,8 +139,7 @@ async function prepareBinaryPart(
     return { type: kind, source: { base64: resolved.value, mediaType: resolved.mediaType } };
   }
 
-  const mediaType =
-    kind === "pdf" ? "application/pdf" : inferAudioMediaType(resolved.value);
+  const mediaType = kind === "pdf" ? "application/pdf" : inferAudioMediaType(resolved.value);
 
   if (!mediaType) {
     throw new InvalidRequestError(
@@ -296,7 +295,7 @@ function enforceLocalPathPolicy(
   const roots = policy?.allowedRoots;
   if (roots && roots.length > 0) {
     const target = resolvePath(path);
-    const inside = roots.some(root => {
+    const inside = roots.some((root) => {
       const rel = relative(resolvePath(root), target);
       return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
     });
@@ -313,11 +312,7 @@ function enforceLocalPathPolicy(
 function isTaggedAttachment(
   attachment: Attachment,
 ): attachment is Extract<Attachment, { type: string }> {
-  return (
-    typeof attachment === "object" &&
-    attachment !== null &&
-    "type" in attachment
-  );
+  return typeof attachment === "object" && attachment !== null && "type" in attachment;
 }
 
 function inferImageMediaType(input: unknown): string | undefined {

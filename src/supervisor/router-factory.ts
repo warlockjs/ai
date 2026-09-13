@@ -130,7 +130,10 @@ export function router(config: RouterConfig): AgentContract<RouterOutput> {
     throw new TypeError("ai.router: `intents` must contain at least one entry");
   }
 
-  const routingPrompt = buildRoutingSystemPrompt(config.intents, resolvePrefix(config.systemPrompt));
+  const routingPrompt = buildRoutingSystemPrompt(
+    config.intents,
+    resolvePrefix(config.systemPrompt),
+  );
 
   return agent<RouterOutput>({
     name: config.name ?? "router",

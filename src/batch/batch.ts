@@ -7,12 +7,7 @@ import type { Usage } from "../contracts/result/usage.type";
 import { accumulateCost } from "../utils/compute-cost";
 import { generateRunId } from "../utils/generate-run-id";
 import { stampReportLineage } from "../utils/stamp-report-lineage";
-import type {
-  BatchItemResult,
-  BatchOptions,
-  BatchReport,
-  BatchResult,
-} from "./batch.type";
+import type { BatchItemResult, BatchOptions, BatchReport, BatchResult } from "./batch.type";
 import { runBatchItem } from "./run-batch-item";
 import { runWithConcurrency } from "./run-with-concurrency";
 
@@ -91,9 +86,7 @@ class BatchRun<TInput, TOptions, TResult extends BaseResult> {
   public async run(): Promise<BatchResult<TResult>> {
     const concurrency = this.resolveConcurrency();
 
-    await runWithConcurrency(this.items.length, concurrency, (index) =>
-      this.processItem(index),
-    );
+    await runWithConcurrency(this.items.length, concurrency, (index) => this.processItem(index));
 
     return this.buildResult();
   }

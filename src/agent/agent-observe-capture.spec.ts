@@ -3,11 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { AgentReport } from "../contracts/result/execution-report.type";
 import type { ExecutionReport } from "../contracts/result/execution-report.type";
 import { MockSDK } from "../mock/mock-sdk";
-import {
-  clearObservers,
-  registerObserver,
-  setObserveAll,
-} from "../observe/observer-registry";
+import { clearObservers, registerObserver, setObserveAll } from "../observe/observer-registry";
 import type { Observer } from "../observe/observer.contract";
 import { tool } from "../tool/tool";
 import { agent } from "./agent";

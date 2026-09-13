@@ -28,10 +28,7 @@ export type StorageFileShape = {
  * - `{ base64, mediaType }` — raw inline bytes with an explicit IANA
  *   media type, useful for in-memory data that never touched disk.
  */
-export type AttachmentSource =
-  | string
-  | StorageFileShape
-  | { base64: string; mediaType: string };
+export type AttachmentSource = string | StorageFileShape | { base64: string; mediaType: string };
 
 /**
  * An attachment that can be passed to an agent execution.

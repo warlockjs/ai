@@ -18,11 +18,7 @@ class FakeRedisClient implements RedisClientLike {
     return this.store.has(key) ? (this.store.get(key) as string) : null;
   }
 
-  public async set(
-    key: string,
-    value: string,
-    ...args: unknown[]
-  ): Promise<unknown> {
+  public async set(key: string, value: string, ...args: unknown[]): Promise<unknown> {
     this.store.set(key, value);
     this.lastSetArgs = args;
 
@@ -36,9 +32,7 @@ class FakeRedisClient implements RedisClientLike {
   }
 }
 
-function makeRecord(
-  overrides: Partial<CheckpointRecord> = {},
-): CheckpointRecord {
+function makeRecord(overrides: Partial<CheckpointRecord> = {}): CheckpointRecord {
   return {
     orchestrator_name: "support",
     session_id: "sess-1",
@@ -118,12 +112,8 @@ describe("checkpoint redis store", () => {
   it("should isolate sessions by orchestrator name and session id", async () => {
     const store = redis({ client: new FakeRedisClient() });
 
-    await store.save(
-      makeRecord({ orchestrator_name: "support", session_id: "a" }),
-    );
-    await store.save(
-      makeRecord({ orchestrator_name: "billing", session_id: "a" }),
-    );
+    await store.save(makeRecord({ orchestrator_name: "support", session_id: "a" }));
+    await store.save(makeRecord({ orchestrator_name: "billing", session_id: "a" }));
 
     const supportSession = await store.load("support", "a");
     const billingSession = await store.load("billing", "a");
@@ -146,15 +136,9 @@ describe("checkpoint redis store", () => {
   it("should list session ids scoped to an orchestrator", async () => {
     const store = redis({ client: new FakeRedisClient() });
 
-    await store.save(
-      makeRecord({ orchestrator_name: "support", session_id: "a" }),
-    );
-    await store.save(
-      makeRecord({ orchestrator_name: "support", session_id: "b" }),
-    );
-    await store.save(
-      makeRecord({ orchestrator_name: "billing", session_id: "c" }),
-    );
+    await store.save(makeRecord({ orchestrator_name: "support", session_id: "a" }));
+    await store.save(makeRecord({ orchestrator_name: "support", session_id: "b" }));
+    await store.save(makeRecord({ orchestrator_name: "billing", session_id: "c" }));
 
     const supportSessions = await store.list?.("support");
 
@@ -218,9 +202,7 @@ describe("checkpoint redis store", () => {
     };
     await pruneable.prune("support", "sess-1", 2);
 
-    const raw = await client.get(
-      "warlock:orchestrator:session:support:sess-1",
-    );
+    const raw = await client.get("warlock:orchestrator:session:support:sess-1");
     const document = JSON.parse(raw as string) as {
       rows: CheckpointRecord[];
     };
@@ -243,8 +225,6 @@ describe("checkpoint redis store", () => {
 
     await store.save(makeRecord());
 
-    expect([...client.store.keys()]).toContain(
-      "myapp:session:support:sess-1",
-    );
+    expect([...client.store.keys()]).toContain("myapp:session:support:sess-1");
   });
 });

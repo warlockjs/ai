@@ -10,14 +10,11 @@ const emptyInputSchema: StandardSchemaV1<Record<string, unknown>> = {
   "~standard": {
     version: 1,
     vendor: "test",
-    validate: value => ({ value: (value ?? {}) as Record<string, unknown> }),
+    validate: (value) => ({ value: (value ?? {}) as Record<string, unknown> }),
   },
 };
 
-function makeObservingMiddleware(
-  name: string,
-  observer: { names: string[] },
-): AgentMiddleware {
+function makeObservingMiddleware(name: string, observer: { names: string[] }): AgentMiddleware {
   return {
     name,
     tool: {
@@ -93,10 +90,7 @@ describe("forTool", () => {
     });
 
     const observer = { names: [] as string[] };
-    const scoped = forTool(
-      ["t1", "t3"],
-      makeObservingMiddleware("obs", observer),
-    );
+    const scoped = forTool(["t1", "t3"], makeObservingMiddleware("obs", observer));
 
     const sdk = MockSDK({
       responses: [

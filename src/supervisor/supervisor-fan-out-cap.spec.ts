@@ -59,18 +59,14 @@ describe("supervisor fan-out cap — dedup", () => {
         },
         other: { run: () => ({ other: true }), description: "other" },
       },
-      route: ctx =>
-        ctx.iteration === 0 ? ["worker", "worker", "other", "worker"] : END,
+      route: (ctx) => (ctx.iteration === 0 ? ["worker", "worker", "other", "worker"] : END),
     });
 
     const result = await supervisorInstance.execute("x");
 
     expect(result.error).toBeUndefined();
     expect(workerCalls).toBe(1);
-    expect(Object.keys(result.report.snapshots[0].result)).toEqual([
-      "worker",
-      "other",
-    ]);
+    expect(Object.keys(result.report.snapshots[0].result)).toEqual(["worker", "other"]);
     // The raw decision is still recorded verbatim for forensics.
     expect(result.report.snapshots[0].decision.next).toEqual([
       "worker",
@@ -97,7 +93,7 @@ describe("supervisor fan-out cap — dedup", () => {
           description: "worker",
         },
       },
-      route: ctx => (ctx.iteration === 0 ? flood : END),
+      route: (ctx) => (ctx.iteration === 0 ? flood : END),
     });
 
     const result = await supervisorInstance.execute("x");
@@ -122,15 +118,12 @@ describe("supervisor fan-out cap — width limit", () => {
     expect(result.error?.code).toBe("SUPERVISOR_INVALID_ROUTE");
     expect(result.error?.message).toMatch(/exceeds maxFanOut=10/);
     expect((result.error as SupervisorRoutingError).returned).toHaveLength(12);
-    expect((result.error as SupervisorRoutingError).availableKeys).toHaveLength(
-      12,
-    );
+    expect((result.error as SupervisorRoutingError).availableKeys).toHaveLength(12);
   });
 
   it("allows a fan-out exactly at the cap", async () => {
     let dispatched = 0;
-    const intents: Record<string, { run: () => unknown; description: string }> =
-      {};
+    const intents: Record<string, { run: () => unknown; description: string }> = {};
 
     for (let index = 0; index < 10; index++) {
       intents[`w${index}`] = {
@@ -145,7 +138,7 @@ describe("supervisor fan-out cap — width limit", () => {
     const supervisorInstance = supervisor({
       name: "at-cap",
       intents,
-      route: ctx => (ctx.iteration === 0 ? Object.keys(intents) : END),
+      route: (ctx) => (ctx.iteration === 0 ? Object.keys(intents) : END),
     });
 
     const result = await supervisorInstance.execute("x");
@@ -172,8 +165,7 @@ describe("supervisor fan-out cap — width limit", () => {
 
   it("honours a raised maxFanOut for supervisors that legitimately fan wide", async () => {
     let dispatched = 0;
-    const intents: Record<string, { run: () => unknown; description: string }> =
-      {};
+    const intents: Record<string, { run: () => unknown; description: string }> = {};
 
     for (let index = 0; index < 12; index++) {
       intents[`w${index}`] = {
@@ -189,7 +181,7 @@ describe("supervisor fan-out cap — width limit", () => {
       name: "raised-cap",
       intents,
       maxFanOut: 20,
-      route: ctx => (ctx.iteration === 0 ? Object.keys(intents) : END),
+      route: (ctx) => (ctx.iteration === 0 ? Object.keys(intents) : END),
     });
 
     const result = await supervisorInstance.execute("x");
@@ -237,7 +229,7 @@ describe("supervisor fan-out cap — width limit", () => {
       },
       maxFanOut: 3,
       route: () => "seed",
-      evaluate: ctx =>
+      evaluate: (ctx) =>
         ctx.iteration === 0
           ? { satisfied: false, reassignTo: Object.keys(intents) }
           : { satisfied: true },

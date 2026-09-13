@@ -4,11 +4,7 @@ import type { BaseReport } from "../contracts/result/base-report.type";
 import type { PlannerPlan } from "../contracts/planner/planner-plan.type";
 import { mockAgent } from "../mock/mock-agent";
 import { MockSDK } from "../mock/mock-sdk";
-import {
-  clearObservers,
-  registerObserver,
-  setObserveAll,
-} from "../observe/observer-registry";
+import { clearObservers, registerObserver, setObserveAll } from "../observe/observer-registry";
 import { planner } from "./planner";
 
 /** A planning agent (model mode) whose single trip returns `plan` as JSON. */
@@ -85,9 +81,7 @@ describe("ai.planner — observe-all routing + nesting", () => {
     const failing = planner({
       name: "err-planner",
       model: planModel({ steps: [] }),
-      capabilities: [
-        { name: "a", description: "d", executable: mockAgent({ name: "a" }) },
-      ],
+      capabilities: [{ name: "a", description: "d", executable: mockAgent({ name: "a" }) }],
     });
 
     const collected: BaseReport[] = [];

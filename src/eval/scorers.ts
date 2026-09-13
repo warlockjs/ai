@@ -1,8 +1,4 @@
-import type {
-  EvalScore,
-  EvalScorer,
-  EvalScorerContext,
-} from "../contracts/agent/eval.type";
+import type { EvalScore, EvalScorer, EvalScorerContext } from "../contracts/agent/eval.type";
 
 /**
  * Predicate signature for {@link predicate}. Receives the same context
@@ -114,9 +110,7 @@ export function contains<TOutput = unknown>(): EvalScorer<TOutput> {
  * @example
  * scorers: [predicate((ctx) => ctx.result.report.children.every(c => c.status === "completed"))]
  */
-export function predicate<TOutput = unknown>(
-  fn: EvalPredicate<TOutput>,
-): EvalScorer<TOutput> {
+export function predicate<TOutput = unknown>(fn: EvalPredicate<TOutput>): EvalScorer<TOutput> {
   return async (context: EvalScorerContext<TOutput>): Promise<EvalScore> => {
     const result = await fn(context);
 

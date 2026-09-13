@@ -112,11 +112,9 @@ export function createOrchestratorStream<TResult>(): {
         return Promise.resolve({ value: undefined, done: true });
       }
 
-      return new Promise<IteratorResult<OrchestratorEvent>>(
-        (resolve, reject) => {
-          pending.push({ resolve, reject });
-        },
-      );
+      return new Promise<IteratorResult<OrchestratorEvent>>((resolve, reject) => {
+        pending.push({ resolve, reject });
+      });
     },
   };
 

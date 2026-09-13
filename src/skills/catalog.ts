@@ -1,9 +1,6 @@
 import type { EmbedderContract } from "../contracts/embedder.contract";
 import { EmbeddingVectorCountMismatchError } from "../errors";
-import type {
-  SkillCatalogEntry,
-  SkillRecord,
-} from "./contracts/skill-record.type";
+import type { SkillCatalogEntry, SkillRecord } from "./contracts/skill-record.type";
 import type { SkillsStoreContract } from "./contracts/skills-store.contract";
 
 // ============================================================
@@ -123,9 +120,7 @@ export function renderCatalogPrompt(name: string, entries: SkillCatalogEntry[]):
     return "";
   }
 
-  const lines = entries.map(
-    (entry) => `- ${entry.name} (v${entry.version}): ${entry.description}`,
-  );
+  const lines = entries.map((entry) => `- ${entry.name} (v${entry.version}): ${entry.description}`);
 
   return [
     `# Available skills — "${name}"`,
@@ -188,9 +183,8 @@ export async function semanticPreselect(
   ]);
 
   if (vectors.length !== catalog.length + 1) {
-    const missingRecord = vectors.length === 0
-      ? "input"
-      : catalog[vectors.length - 1]?.name ?? "none";
+    const missingRecord =
+      vectors.length === 0 ? "input" : (catalog[vectors.length - 1]?.name ?? "none");
 
     throw new EmbeddingVectorCountMismatchError({
       provider: embedder.provider,
