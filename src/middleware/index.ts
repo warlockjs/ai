@@ -8,6 +8,14 @@ export {
   type BudgetFallbackSignal,
   type BudgetOptions,
   type BudgetPricing,
+  type ScopedBudgetOptions,
+  type ScopedBudgetReserveInput,
+  type ScopedBudgetReserveResult,
+  type ScopedBudgetStore,
+  type ScopedBudgetWindow,
+  type CacheScopedBudgetStoreOptions,
+  cacheScopedBudgetStore,
+  memoryScopedBudgetStore,
   readBudgetFallbackSignal,
 } from "./builtins/budget";
 export {

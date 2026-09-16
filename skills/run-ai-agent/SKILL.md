@@ -94,6 +94,30 @@ await agent.execute("cancel it", { sessionId });   // 30 seconds later, same ses
 
 The framework stamps it onto every report node this run produces. Cost dashboards can group by `sessionId` without joining the report tree.
 
+## Scoped budgets — cap a user or tenant across executions
+
+`budget()`'s existing caps apply to one execution. Add `scoped` to share a UTC
+day or month ledger across runs. The application owns the key: use a stable
+user/tenant id or resolve one from the middleware context.
+
+```ts
+import { budget, memoryScopedBudgetStore } from "@warlock.js/ai";
+
+const ledger = memoryScopedBudgetStore(); // tests or one process
+const guard = budget({
+  scoped: { key: (ctx) => ctx.options?.sessionId ?? "anonymous", window: "day", maxTokens: 50_000, store: ledger },
+});
+```
+
+Use `await cacheScopedBudgetStore()` for an optional `@warlock.js/cache`
+backed ledger; choose a cache driver whose `update` operation is atomic across
+your deployment. A scope rejection produces `ScopedBudgetExceededError` with
+`key`, `window`, `limit`, and `used`. Current providers expose no portable
+preflight usage estimate, so the middleware atomically books measured usage at
+each completed trip; stores also expose `commit` / `refund` for future
+estimate-aware integrations. Cascade storage awaits Cascade's atomic upsert
+API.
+
 ## Result shape — `AgentResult<T>`
 
 ```ts

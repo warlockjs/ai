@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.13.0
 
+### Added
+
+- Scoped UTC day/month budget ledgers through `budget({ scoped })`, with an
+  in-memory store and a lazy optional-peer cache store. Shared limits atomically
+  reject overages with `ScopedBudgetExceededError` carrying the ledger key,
+  window, limit, and attempted usage. Cache-backed deployment-wide enforcement
+  requires a cache driver whose `update` primitive is cross-node atomic; a
+  Cascade store awaits its atomic upsert API.
+
 ### Fixed
 
 - `@warlock.js/cache` marked `optional` in `peerDependenciesMeta` — every runtime import of it in `src` is `import type` (structural typing only, e.g. `config.ts`, `memory/*.ts`, `rag/**`); `@warlock.js/cache` is never required to resolve at runtime for a consumer that doesn't opt into cache-backed features. `@warlock.js/logger` stays a required (non-optional) peer: several modules (`config.ts`, `agent/agent.ts`, `eval/eval-runner.ts`, `workflow/engine.ts`, `planner/planner.ts`, `planner/planner-run.ts`, `supervisor/execution.ts`) import its `log` value statically at the top level, so the package must be resolvable at load time.

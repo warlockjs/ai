@@ -12,6 +12,10 @@ export {
   type BudgetExceededErrorOptions,
   type BudgetUnit,
 } from "./budget-exceeded-error";
+export {
+  ScopedBudgetExceededError,
+  type ScopedBudgetExceededErrorOptions,
+} from "./scoped-budget-exceeded-error";
 export { ContentFilterError, type ContentFilterErrorOptions } from "./content-filter-error";
 export {
   ContextLengthExceededError,

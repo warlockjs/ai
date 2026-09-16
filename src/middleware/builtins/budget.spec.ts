@@ -2,8 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { agent } from "../../agent/agent";
 import { BudgetExceededError } from "../../errors";
 import { MockSDK } from "../../mock/mock-sdk";
+import { MemoryCacheDriver, cache } from "@warlock.js/cache";
 import type { BudgetContractViolation } from "./budget";
-import { budget, readBudgetFallbackSignal } from "./budget";
+import {
+  budget,
+  cacheScopedBudgetStore,
+  memoryScopedBudgetStore,
+  readBudgetFallbackSignal,
+} from "./budget";
 
 function makeAgent(
   responses: Array<{
@@ -317,5 +323,93 @@ describe("budget — SLO contract (fallback)", () => {
     await ai.execute("hi");
 
     expect(recorded).toBeUndefined();
+  });
+});
+
+describe("budget — scoped ledgers", () => {
+  it("rejects a second execution when its scoped token window is exhausted", async () => {
+    const store = memoryScopedBudgetStore();
+    const ai = makeAgent(
+      [
+        { content: "first", usage: { input: 5, output: 5 } },
+        { content: "second", usage: { input: 5, output: 5 } },
+      ],
+      [budget({ scoped: { key: "user.42", window: "day", maxTokens: 10, store } })],
+    );
+
+    const first = await ai.execute("first");
+    const second = await ai.execute("second");
+
+    expect(first.error).toBeUndefined();
+    expect(second.error).toMatchObject({
+      name: "ScopedBudgetExceededError",
+      key: "user.42",
+      window: "day",
+      limit: 10,
+      used: 20,
+    });
+  });
+
+  it("starts a fresh ledger at the next UTC day", async () => {
+    const store = memoryScopedBudgetStore();
+    const first = await store.reserve({
+      key: "tenant.7",
+      windowStart: Date.UTC(2026, 8, 17),
+      unit: "tokens",
+      amount: 10,
+      limit: 10,
+    });
+    const nextDay = await store.reserve({
+      key: "tenant.7",
+      windowStart: Date.UTC(2026, 8, 18),
+      unit: "tokens",
+      amount: 10,
+      limit: 10,
+    });
+
+    expect(first).toEqual({ allowed: true, used: 10 });
+    expect(nextDay).toEqual({ allowed: true, used: 10 });
+  });
+
+  it("never allows more than ten concurrent memory reservations", async () => {
+    const store = memoryScopedBudgetStore();
+    const results = await Promise.all(
+      Array.from({ length: 50 }, () =>
+        store.reserve({
+          key: "user.concurrent",
+          windowStart: Date.UTC(2026, 8, 17),
+          unit: "tokens",
+          amount: 1,
+          limit: 10,
+        }),
+      ),
+    );
+
+    expect(results.filter((result) => result.allowed)).toHaveLength(10);
+  });
+
+  it("never allows more than ten concurrent cache-memory reservations", async () => {
+    cache.setCacheConfigurations({
+      default: "memory",
+      drivers: { memory: MemoryCacheDriver },
+      options: { memory: {} },
+    });
+    await cache.init();
+    const store = await cacheScopedBudgetStore();
+    const results = await Promise.all(
+      Array.from({ length: 50 }, () =>
+        store.reserve({
+          key: "user.cached",
+          windowStart: Date.UTC(2026, 8, 17),
+          unit: "tokens",
+          amount: 1,
+          limit: 10,
+        }),
+      ),
+    );
+
+    expect(results.filter((result) => result.allowed)).toHaveLength(10);
+    await cache.flush();
+    await cache.disconnect();
   });
 });

@@ -1,11 +1,29 @@
 import type { AgentMiddleware, MiddlewareExecuteContext } from "../../contracts/middleware";
-import { BudgetExceededError, type BudgetUnit } from "../../errors";
+import {
+  BudgetExceededError,
+  ScopedBudgetExceededError,
+  type BudgetUnit,
+} from "../../errors";
 import { namespacedState } from "../utils";
 import type {
   BudgetContract,
   BudgetContractDimension,
   BudgetContractViolation,
 } from "./budget-contract.type";
+import type {
+  ScopedBudgetStore,
+  ScopedBudgetWindow,
+} from "./scoped-budget-store.type";
+
+export { cacheScopedBudgetStore } from "./cache-scoped-budget-store";
+export type { CacheScopedBudgetStoreOptions } from "./cache-scoped-budget-store";
+export { memoryScopedBudgetStore } from "./memory-scoped-budget-store";
+export type {
+  ScopedBudgetReserveInput,
+  ScopedBudgetReserveResult,
+  ScopedBudgetStore,
+  ScopedBudgetWindow,
+} from "./scoped-budget-store.type";
 
 export type {
   BudgetContract,
@@ -31,6 +49,20 @@ export type BudgetPricing = Record<
     outputPer1K: number;
   }
 >;
+
+/** A cross-execution token and/or cost limit for one UTC window. */
+export type ScopedBudgetOptions = {
+  /** Application-owned identity, commonly a user or tenant id. */
+  key: string | ((context: MiddlewareExecuteContext) => string);
+  /** UTC ledger boundary. */
+  window: ScopedBudgetWindow;
+  /** Maximum aggregate tokens for this key and window. */
+  maxTokens?: number;
+  /** Maximum aggregate USD cost for this key and window. Requires pricing. */
+  maxCostUSD?: number;
+  /** Atomic ledger implementation shared by all executions in the scope. */
+  store: ScopedBudgetStore;
+};
 
 /**
  * Configuration for `budget()`. At least one of `maxTokens` or
@@ -81,6 +113,12 @@ export type BudgetOptions = {
    * {@link readBudgetFallbackSignal}.
    */
   contract?: BudgetContract;
+  /**
+   * Cross-execution UTC ledger. Measured per-trip usage is atomically reserved
+   * after each response because models do not expose a portable preflight
+   * estimate. Supply one or both scoped caps.
+   */
+  scoped?: ScopedBudgetOptions;
 };
 
 type BudgetCounters = {
@@ -98,6 +136,8 @@ type BudgetCounters = {
    * breaching.
    */
   fallbackFired: boolean;
+  scopedKey?: string;
+  scopedWindowStart?: number;
 };
 
 /**
@@ -142,6 +182,43 @@ function breachContract(
       context: { dimension, limit, actual, source: "contract" },
     },
   );
+}
+
+function scopedWindowStart(window: ScopedBudgetWindow, now = new Date()): number {
+  if (window === "day") {
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  }
+
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+}
+
+async function reserveScopedBudget(
+  options: ScopedBudgetOptions,
+  key: string,
+  windowStart: number,
+  unit: BudgetUnit,
+  amount: number,
+): Promise<void> {
+  const limit = unit === "tokens" ? options.maxTokens : options.maxCostUSD;
+
+  if (limit === undefined || amount === 0) {
+    return;
+  }
+
+  const reservation = await options.store.reserve({
+    key,
+    windowStart,
+    unit,
+    amount,
+    limit,
+  });
+
+  if (!reservation.allowed) {
+    throw new ScopedBudgetExceededError(
+      `scoped budget "${key}" exceeded for ${options.window} — ${reservation.used} ${unit} (cap: ${limit})`,
+      { key, window: options.window, limit, used: reservation.used, unit },
+    );
+  }
 }
 
 /**
@@ -275,6 +352,11 @@ export function budget(options: BudgetOptions): AgentMiddleware {
           warned: false,
           startedAt: Date.now(),
           fallbackFired: false,
+          scopedKey:
+            typeof options.scoped?.key === "function"
+              ? options.scoped.key(context)
+              : options.scoped?.key,
+          scopedWindowStart: options.scoped ? scopedWindowStart(options.scoped.window) : undefined,
         });
       },
     },
@@ -307,6 +389,30 @@ export function budget(options: BudgetOptions): AgentMiddleware {
                 `for it. Add a pricing entry for "${context.model.name}" to options.pricing.`,
             );
           }
+        }
+
+        if (options.scoped && counters.scopedKey && counters.scopedWindowStart !== undefined) {
+          await reserveScopedBudget(
+            options.scoped,
+            counters.scopedKey,
+            counters.scopedWindowStart,
+            "tokens",
+            response.usage.total,
+          );
+
+          const pricing = options.pricing?.[context.model.name];
+          const tripCost = pricing
+            ?
+                (response.usage.input / 1000) * pricing.inputPer1K +
+                (response.usage.output / 1000) * pricing.outputPer1K
+            : 0;
+          await reserveScopedBudget(
+            options.scoped,
+            counters.scopedKey,
+            counters.scopedWindowStart,
+            "usd",
+            tripCost,
+          );
         }
 
         if (hasTokenCap && counters.tokens > options.maxTokens!) {
