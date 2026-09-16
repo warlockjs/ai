@@ -76,7 +76,7 @@ Cheap and fast models occasionally emit a registered tool's structured input as 
 ai.agent({
   model: someFastModel,
   tools: [suggestFollowupsTool, searchCatalogTool],
-  streamingToolGuard: {},  // empty object = on with defaults
+  streamingToolGuard: {}, // empty object = on with defaults
 });
 ```
 
@@ -89,7 +89,7 @@ Recovery conditions: the buffered JSON must (a) parse cleanly, (b) carry a `name
 ```ts
 const sessionId = "sess_user_42_2026-05-12";
 await agent.execute("what's my order?", { sessionId });
-await agent.execute("cancel it", { sessionId });   // 30 seconds later, same session
+await agent.execute("cancel it", { sessionId }); // 30 seconds later, same session
 ```
 
 The framework stamps it onto every report node this run produces. Cost dashboards can group by `sessionId` without joining the report tree.
@@ -105,13 +105,21 @@ import { budget, memoryScopedBudgetStore } from "@warlock.js/ai";
 
 const ledger = memoryScopedBudgetStore(); // tests or one process
 const guard = budget({
-  scoped: { key: (ctx) => ctx.options?.sessionId ?? "anonymous", window: "day", maxTokens: 50_000, store: ledger },
+  scoped: {
+    key: (ctx) => ctx.options?.sessionId ?? "anonymous",
+    window: "day",
+    maxTokens: 50_000,
+    store: ledger,
+  },
 });
 ```
 
 Use `await cacheScopedBudgetStore()` for an optional `@warlock.js/cache`
 backed ledger; choose a cache driver whose `update` operation is atomic across
-your deployment. A scope rejection produces `ScopedBudgetExceededError` with
+your deployment. Use `await cascadeScopedBudgetStore({ model })` or
+`await cascadeScopedBudgetStore({ table })` for a Cascade ledger; its table
+needs a unique `(key, windowStart, unit)` index. Cascade is optional and lazy
+loaded, so applications that do not use this store do not need the package. A scope rejection produces `ScopedBudgetExceededError` with
 `key`, `window`, `limit`, and `used`. Current providers expose no portable
 preflight usage estimate, so the middleware atomically books measured usage at
 each completed trip; stores also expose `commit` / `refund` for future
@@ -123,10 +131,10 @@ API.
 ```ts
 type AgentResult<T> = {
   type: "agent";
-  data?: T;             // structured output when `output` schema was supplied
-  text?: string;        // raw final LLM text
-  report: AgentReport;  // trips, toolCalls, status, timing
-  usage: Usage;         // aggregated token usage + cost breakdown
+  data?: T; // structured output when `output` schema was supplied
+  text?: string; // raw final LLM text
+  report: AgentReport; // trips, toolCalls, status, timing
+  usage: Usage; // aggregated token usage + cost breakdown
   error?: AIError;
 };
 
@@ -140,7 +148,7 @@ type AgentReport = {
   duration: number;
   model: { name: string; provider: string };
   trips: LLMTrip[];
-  children: ToolCall[];   // tool dispatches — filter by `c.type === "tool"`
+  children: ToolCall[]; // tool dispatches — filter by `c.type === "tool"`
 };
 ```
 
@@ -251,7 +259,7 @@ attachments: [
 
 Model must declare `capabilities.vision`. OpenAI adapter auto-infers from name; override with `openai.model({ name, vision: true })`.
 
-A URL *image* attachment is passed to the provider as a URL — the provider fetches it, not the framework, so there's no server-side SSRF surface. A **remote `{ type: "text", source: <url> }` attachment IS fetched server-side** (the adapter needs the raw text inline) and is default-DENY: it throws unless `attachmentPolicy.allowRemoteFetch: true`, and when enabled runs through the shared `guardedFetch` / `OutboundPolicy` guard — see [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md).
+A URL _image_ attachment is passed to the provider as a URL — the provider fetches it, not the framework, so there's no server-side SSRF surface. A **remote `{ type: "text", source: <url> }` attachment IS fetched server-side** (the adapter needs the raw text inline) and is default-DENY: it throws unless `attachmentPolicy.allowRemoteFetch: true`, and when enabled runs through the shared `guardedFetch` / `OutboundPolicy` guard — see [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md).
 
 ## Pattern — streaming
 
@@ -313,7 +321,7 @@ Each `tools` entry is either a built `ToolContract` (from `ai.tool(...)` or an e
 ```ts
 const concierge = ai.agent({
   model,
-  tools: [billingWorkflow, supportSupervisor, lookupTool],  // no .asTool() needed
+  tools: [billingWorkflow, supportSupervisor, lookupTool], // no .asTool() needed
 });
 ```
 
@@ -325,14 +333,14 @@ const concierge = ai.agent({
 const report = await myAgent.eval({
   cases: [
     { name: "capital", input: "Capital of Egypt?", expected: "Cairo" },
-    { name: "tone", input: "Comfort an upset user." },          // judge-scored
+    { name: "tone", input: "Comfort an upset user." }, // judge-scored
   ],
-  scorers: [ai.eval.contains()],                                 // default for cases w/o their own
-  judge: { agent: judgeAgent, rubric: "Score 1.0 only if empathetic." },  // LLM-as-judge fallback
-  passThreshold: 0.5,                                            // default
+  scorers: [ai.eval.contains()], // default for cases w/o their own
+  judge: { agent: judgeAgent, rubric: "Score 1.0 only if empathetic." }, // LLM-as-judge fallback
+  passThreshold: 0.5, // default
 });
 
-expect(report.passed).toBe(true);   // true only when EVERY case passed
+expect(report.passed).toBe(true); // true only when EVERY case passed
 ```
 
 Each case runs through `execute(input)`; scorer precedence is per-case `scorers` → suite `scorers` → synthesized `judge` (throws at author time if a case resolves none). Built-in scorers on `ai.eval.*`: `exact()`, `contains()`, `predicate(fn)`, `judge(config)`. Full coverage — plus the Vitest matchers (`registerAiMatchers` / `toRouteTo` / `toConverge` / `toPassStep` / `toOutputShape`) — in [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md).
@@ -348,7 +356,7 @@ const result = await ai.spawnSubAgent({
   name: "extract-entities",
   model,
   task: "Pull every company name from this article: ...",
-  budget: { maxCostUSD: 0.05 },   // per-task spend cap — aborts when crossed
+  budget: { maxCostUSD: 0.05 }, // per-task spend cap — aborts when crossed
   output: companiesSchema,
 });
 ```

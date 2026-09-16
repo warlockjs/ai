@@ -15,6 +15,10 @@ export {
   type ScopedBudgetWindow,
   type CacheScopedBudgetStoreOptions,
   cacheScopedBudgetStore,
+  type CascadeScopedBudgetModel,
+  type CascadeScopedBudgetStoreOptions,
+  cascadeScopedBudgetStore,
+  CascadeScopedBudgetStoreUnavailableError,
   memoryScopedBudgetStore,
   readBudgetFallbackSignal,
 } from "./builtins/budget";

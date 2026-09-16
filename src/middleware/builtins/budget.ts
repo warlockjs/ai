@@ -1,22 +1,23 @@
 import type { AgentMiddleware, MiddlewareExecuteContext } from "../../contracts/middleware";
-import {
-  BudgetExceededError,
-  ScopedBudgetExceededError,
-  type BudgetUnit,
-} from "../../errors";
+import { BudgetExceededError, ScopedBudgetExceededError, type BudgetUnit } from "../../errors";
 import { namespacedState } from "../utils";
 import type {
   BudgetContract,
   BudgetContractDimension,
   BudgetContractViolation,
 } from "./budget-contract.type";
-import type {
-  ScopedBudgetStore,
-  ScopedBudgetWindow,
-} from "./scoped-budget-store.type";
+import type { ScopedBudgetStore, ScopedBudgetWindow } from "./scoped-budget-store.type";
 
 export { cacheScopedBudgetStore } from "./cache-scoped-budget-store";
 export type { CacheScopedBudgetStoreOptions } from "./cache-scoped-budget-store";
+export {
+  cascadeScopedBudgetStore,
+  CascadeScopedBudgetStoreUnavailableError,
+} from "./cascade-scoped-budget-store";
+export type {
+  CascadeScopedBudgetModel,
+  CascadeScopedBudgetStoreOptions,
+} from "./cascade-scoped-budget-store";
 export { memoryScopedBudgetStore } from "./memory-scoped-budget-store";
 export type {
   ScopedBudgetReserveInput,
@@ -402,9 +403,8 @@ export function budget(options: BudgetOptions): AgentMiddleware {
 
           const pricing = options.pricing?.[context.model.name];
           const tripCost = pricing
-            ?
-                (response.usage.input / 1000) * pricing.inputPer1K +
-                (response.usage.output / 1000) * pricing.outputPer1K
+            ? (response.usage.input / 1000) * pricing.inputPer1K +
+              (response.usage.output / 1000) * pricing.outputPer1K
             : 0;
           await reserveScopedBudget(
             options.scoped,
