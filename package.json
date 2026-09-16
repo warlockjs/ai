@@ -52,6 +52,9 @@
     "@warlock.js/ai-openai": {
       "optional": true
     },
+    "@warlock.js/cache": {
+      "optional": true
+    },
     "langfuse": {
       "optional": true
     },

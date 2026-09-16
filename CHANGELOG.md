@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.13.0
+
+### Fixed
+
+- `@warlock.js/cache` marked `optional` in `peerDependenciesMeta` — every runtime import of it in `src` is `import type` (structural typing only, e.g. `config.ts`, `memory/*.ts`, `rag/**`); `@warlock.js/cache` is never required to resolve at runtime for a consumer that doesn't opt into cache-backed features. `@warlock.js/logger` stays a required (non-optional) peer: several modules (`config.ts`, `agent/agent.ts`, `eval/eval-runner.ts`, `workflow/engine.ts`, `planner/planner.ts`, `planner/planner-run.ts`, `supervisor/execution.ts`) import its `log` value statically at the top level, so the package must be resolvable at load time.
+
 ## 5.11.0 - 2026-09-14
 
 _Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.11.0._
