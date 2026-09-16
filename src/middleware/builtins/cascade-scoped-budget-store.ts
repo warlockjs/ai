@@ -1,4 +1,4 @@
-import type { Model as CascadeModel } from "@warlock.js/cascade";
+import type { ChildModel, Model as CascadeModel } from "@warlock.js/cascade";
 import type {
   ScopedBudgetReserveInput,
   ScopedBudgetReserveResult,
@@ -6,7 +6,7 @@ import type {
 } from "./scoped-budget-store.type";
 
 /** Cascade model static surface required by the scoped-budget ledger. */
-export type CascadeScopedBudgetModel = typeof CascadeModel;
+export type CascadeScopedBudgetModel = ChildModel<CascadeModel>;
 
 /** Configuration for a Cascade-backed scoped-budget ledger. */
 export type CascadeScopedBudgetStoreOptions = {

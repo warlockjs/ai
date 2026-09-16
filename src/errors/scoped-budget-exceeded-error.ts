@@ -1,8 +1,12 @@
 import { BudgetExceededError, type BudgetExceededErrorOptions } from "./budget-exceeded-error";
 import type { ScopedBudgetWindow } from "../middleware/builtins/scoped-budget-store.type";
 
-/** Payload for a scoped-budget rejection. */
-export type ScopedBudgetExceededErrorOptions = BudgetExceededErrorOptions & {
+/**
+ * Payload for a scoped-budget rejection. `actual` is intentionally omitted —
+ * the constructor derives it from `used` so callers never pass a redundant
+ * (and potentially inconsistent) value.
+ */
+export type ScopedBudgetExceededErrorOptions = Omit<BudgetExceededErrorOptions, "actual"> & {
   key: string;
   window: ScopedBudgetWindow;
   used: number;

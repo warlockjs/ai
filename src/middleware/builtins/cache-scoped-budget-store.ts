@@ -5,7 +5,7 @@ import type {
   ScopedBudgetStore,
 } from "./scoped-budget-store.type";
 
-type ScopedBudgetCache = Pick<CacheDriver, "update">;
+type ScopedBudgetCache = Pick<CacheDriver<unknown, unknown>, "update">;
 
 /** Options for the optional cache-backed scoped-budget store. */
 export type CacheScopedBudgetStoreOptions = {
