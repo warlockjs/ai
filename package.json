@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai",
-  "version": "5.12.0",
+  "version": "5.13.0",
   "type": "module",
   "description": "Core @warlock.js AI framework — contracts, agent, workflow, supervisor",
   "main": "./src/index.ts",
