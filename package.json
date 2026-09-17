@@ -34,6 +34,7 @@
   "devDependencies": {
     "@warlock.js/ai-openai": "workspace:^",
     "@warlock.js/cache": "workspace:^",
+    "@warlock.js/cascade": "workspace:^",
     "@warlock.js/logger": "workspace:^",
     "typescript": "^5.9.3",
     "vitest": "4.1.10"
@@ -41,6 +42,7 @@
   "peerDependencies": {
     "@warlock.js/ai-openai": "*",
     "@warlock.js/cache": "*",
+    "@warlock.js/cascade": "*",
     "@warlock.js/logger": "*",
     "langfuse": "*",
     "openai": "*",
@@ -53,6 +55,9 @@
       "optional": true
     },
     "@warlock.js/cache": {
+      "optional": true
+    },
+    "@warlock.js/cascade": {
       "optional": true
     },
     "langfuse": {
