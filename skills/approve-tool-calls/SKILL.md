@@ -1,6 +1,6 @@
 ---
 name: approve-tool-calls
-description: 'Gate an agent''s tool calls behind a human with `ai.human.approval(options)` (the `tool.before` approval-gate middleware) — ships in @warlock.js/ai core. Triggers: `ai.human.approval`, `humanApproval`, `HumanApprovalOptions`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalHandler`, `InterruptPolicy`, `evaluatePolicy`, `ApprovalRejectedError`, `policy: { type: "allowlist" | "denylist" | "predicate" }`, decision `{ type: "approve" | "reject" | "edit" }`; ''human in the loop'', ''approve a tool call before it runs'', ''ask a human before the agent sends/charges/deletes'', ''pause before a dangerous tool'', ''let an operator edit the tool args'', ''reject a tool call with a reason the model can self-correct from''. Typical import `import { ai } from "@warlock.js/ai"`. Skip: persisting the request and resuming hours later out-of-process — `@warlock.js/ai/durable-resume/SKILL.md`; the agent/middleware/tool primitives themselves — `@warlock.js/ai`.'
+description: "Approve tool calls — the human-in-the-loop gate in @warlock.js/ai; use when you need to approve tool calls."
 ---
 
 # Approve tool calls — the human-in-the-loop gate

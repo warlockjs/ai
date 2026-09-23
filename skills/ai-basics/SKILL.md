@@ -1,6 +1,6 @@
 ---
 name: ai-basics
-description: 'Start with @warlock.js/ai — provider-agnostic core for agents / tools / workflows / supervisors / orchestrators. 4-primitive ladder (agent → workflow → supervisor → orchestrator, all shipped) plus planner, memory, stores, DX helpers, and the optional @warlock.js/ai-panoptic observability sidecar. Every primitive returns {data, error, usage, report}. Triggers: `ai.agent`, `ai.tool`, `ai.workflow`, `ai.supervisor`, `ai.orchestrator`, `ai.planner`, `ai.memory`, `ai.systemPrompt`, `ExecuteResult`, `BaseReport`, `AIError`, `panoptic`; ''which AI primitive do I use'', ''what is warlock ai'', ''pick an AI skill'', ''how do I observe / trace AI runs''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent details — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langchain`, `llamaindex`, `ai` (Vercel SDK); raw `openai` / `@anthropic-ai/sdk`.'
+description: "Start here for @warlock.js/ai application setup, provider configuration, and its core agent primitives."
 ---
 
 # AI foundations

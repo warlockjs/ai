@@ -1,6 +1,6 @@
 ---
 name: run-orchestrator
-description: 'Durable stateful sessions with ai.orchestrator({...}) — the capstone of the 4-primitive ladder. Wraps a supervisor with cross-turn session state (checkpointStore), per-turn windowing, drift detection, post-turn compaction, mid-turn resume (iterate: true + snapshotStore), per-turn memory, typed commands, asTool, and a 3-tier event model. Triggers: `ai.orchestrator`, `orchestrator.execute`, `orchestrator.resume`, `orchestrator.command`, `orchestrator.stream`, `OrchestratorConfig`, `OrchestratorResult`, `OrchestratorReport`, `OrchestratorContract`, `CheckpointStore`, `OrchestratorDriftError`, `sessionId`, `iterate`, `historyWindow`, `summarize`, `keepSnapshots`, `awaiting-input`, `turns[]`, `TurnSnapshot`, `CompactionResult`, `initialAgent`, `checkpointStore`; ''multi-turn conversation that persists'', ''durable session across calls'', ''resume an interrupted turn'', ''compact session history'', ''per-session memory''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a single routing turn with no session — `@warlock.js/ai/run-supervisor/SKILL.md`; a fixed pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; the store factories themselves — `@warlock.js/ai/manage-ai-stores/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: "ai.orchestrator() — durable stateful sessions in @warlock.js/ai; use when you need to run orchestrator."
 ---
 
 # `ai.orchestrator()` — durable stateful sessions

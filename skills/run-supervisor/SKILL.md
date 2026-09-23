@@ -1,6 +1,6 @@
 ---
 name: run-supervisor
-description: 'Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback, intents as agents / workflows / callbacks, fan-out, evaluate quality loop, ack receptionist, supervisor-level middleware. A callback that calls agent.execute() directly auto-nests agent → tool under the callback span (ambient RunFrame) with usage / cost rolled up — same for team members and orchestrator turns. Triggers: `ai.supervisor`, `ai.router`, `ai.fanOut`, `supervisor.execute`, `supervisor.resume`, `intents`, `router`, `route`, `classifier`, `evaluate`, `ack`, `artifactsSchema`, `middleware`, `END`, `ctx.intents.X.execute`, `ctx.run`, `RunFrame`, `callback span`, `children`, `parentRunId`, `rootRunId`, `trace nesting`, `sub-agent`; ''route one input across specialists'', ''multi-intent dispatch'', ''fan-out then evaluate'', ''classifier then router'', ''supervisor middleware'', ''self-consistency / voting'', ''why is my callback agent not nested / cost is $0'', ''nest a sub-agent under a callback''; typical import `import { ai } from "@warlock.js/ai"`. Skip: durable multi-turn sessions — `@warlock.js/ai/run-orchestrator/SKILL.md`; fixed pipelines — `@warlock.js/ai/run-ai-workflow/SKILL.md`; single agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: "ai.supervisor() — multi-intent routing in @warlock.js/ai; use when you need to run supervisor."
 ---
 
 # `ai.supervisor()` — multi-intent routing

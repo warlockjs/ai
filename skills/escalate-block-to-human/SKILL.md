@@ -1,6 +1,6 @@
 ---
 name: escalate-block-to-human
-description: 'Route a hard guardrail block to a human-review surface with @warlock.js/ai-guard — the `escalation.onBlock` seam and an `escalate: true` verdict. Triggers: `escalation`, `onBlock`, `GuardrailEscalation`, `GuardrailBlockEvent`, `escalate: true`, `{ type: "block", escalate: true }`, ''escalate a block to a human'', ''human review queue for guardrail'', ''page an operator on a guardrail block'', ''human-in-the-loop guardrail'', ''compose a block with a review surface'', ''custom detector that escalates''; typical import `import "@warlock.js/ai-guard"` then `ai.guardrail({ escalation: { onBlock } })`. Skip: composing the guard / phases / verdict model — `@warlock.js/ai-guard/guard-input-output/SKILL.md`; PII/moderation detectors — `@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md`; durable suspend/resume human-step machinery (deferred) — not in this package.'
+description: "Escalate a block to a human in @warlock.js/ai; use when you need to escalate block to human."
 ---
 
 # Escalate a block to a human

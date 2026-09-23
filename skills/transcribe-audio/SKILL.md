@@ -1,6 +1,6 @@
 ---
 name: transcribe-audio
-description: 'Speech-to-text via ai.transcribe({ model: sdk.transcribe({ name }), audio }) — the audio-INPUT verb (Theme I), returning the uniform never-throws { data, error, usage, report } envelope with cost-truth + panoptic observation. Feed it an AudioInput = { base64; mediaType; filename? } — build one with ai.audioFromFile(path) (reads disk, infers media type incl. WhatsApp .ogg/.opus) or ai.audioFromBuffer(bytes, mediaType). Models: OpenAI whisper-1 (verbose_json, per-minute, segments + durationSeconds) or gpt-4o-transcribe (json, per-token). Triggers: `ai.transcribe`, `ai.audioFromFile`, `ai.audioFromBuffer`, `sdk.transcribe`, `openai.transcribe`, `TranscriptionModelContract`, `AudioInput`, `TranscriptionSegment`, `MockTranscriptionModel`; ''speech to text'', ''transcribe audio'', ''voice note to text'', ''WhatsApp voice message'', ''whisper'', ''gpt-4o-transcribe'', ''subtitle segments'', ''audio input''; typical import `import { ai } from "@warlock.js/ai"` + `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: text-to-speech / synthesizing a voice — [[generate-speech]]; competing libs raw `openai.audio.transcriptions.create`, `whisper.cpp`.'
+description: "Transcribe audio — the speech-to-text verb (ai.transcribe) in @warlock.js/ai; use when you need to transcribe audio."
 ---
 
 # Transcribe audio — the speech-to-text verb (`ai.transcribe`)

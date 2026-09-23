@@ -1,6 +1,6 @@
 ---
 name: durable-resume
-description: 'Persist a gated tool call and resume it from another process hours later — ships in @warlock.js/ai core: `ai.human.resume(interruptId, decision, options)`, the `InterruptStore` (`ai.human.interrupt.{memory,pg,redis}()`), `PendingInterrupt`, and the `InterruptSuspendedError` suspend sentinel. Triggers: `ai.human.resume`, `resume(interruptId, decision)`, `InterruptStore`, `ai.human.interrupt.memory`, `ai.human.interrupt.pg`, `ai.human.interrupt.redis`, `interruptMemory`, `interruptPg`, `interruptRedis`, `PendingInterrupt`, `InterruptSuspendedError`, `ResumeOptions`, `ResumeResult`, `PgClientLike`, `RedisClientLike`; ''approve hours later from a webhook'', ''persist the approval request and resume in another process'', ''durable human-in-the-loop'', ''store the interrupt in Postgres/Redis'', ''re-run the agent turn once the human approves''. Typical import `import { ai, InterruptSuspendedError } from "@warlock.js/ai"`. Skip: the in-process await gate and the policy/decision shapes — `@warlock.js/ai/approve-tool-calls/SKILL.md`.'
+description: "Durable resume — persist the interrupt, approve from another process in @warlock.js/ai; use when you need to durable resume."
 ---
 
 # Durable resume — persist the interrupt, approve from another process

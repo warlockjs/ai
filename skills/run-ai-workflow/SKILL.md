@@ -1,6 +1,6 @@
 ---
 name: run-ai-workflow
-description: 'Build durable resumable pipelines with ai.workflow({...}) + ai.step({...}) — lifecycle (skip / before / run|agent|parallel / output / after / nextStep), retry, parallel groups, snapshot resume. Triggers: `ai.workflow`, `ai.step`, `wf.execute`, `wf.resume`, `WorkflowContext`, `WorkflowResult`, `StepSnapshot`, `nextStep`, `onFailure`, `WorkflowDriftError`; ''build a workflow'', ''define a step'', ''resume after crash'', ''parallel steps'', ''retry with backoff''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; supervisor — `@warlock.js/ai/run-supervisor/SKILL.md`; competing libs `temporal`, `inngest`, `bullmq`.'
+description: "ai.workflow() — static, deterministic pipelines in @warlock.js/ai; use when you need to run ai workflow."
 ---
 
 # `ai.workflow()` — static, deterministic pipelines
