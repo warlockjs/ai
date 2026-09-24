@@ -1,6 +1,6 @@
 ---
 name: define-ai-tool
-description: "ai.tool() — typed tool factory in @warlock.js/ai; use when you need to define ai tool."
+description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`; ''define a tool'', ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — `@warlock.js/ai/run-ai-agent/SKILL.md`; supervisor artifacts — `@warlock.js/ai/run-supervisor/SKILL.md`; competing libs `langchain` tools, raw `openai` function-calling.'
 ---
 
 # `ai.tool()` — typed tool factory

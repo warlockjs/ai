@@ -1,6 +1,6 @@
 ---
 name: attach-ai-middleware
-description: "Middleware — agent-level pipeline in @warlock.js/ai; use when you need to attach ai middleware."
+description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — `@warlock.js/ai/run-ai-agent/SKILL.md`; cache drivers — `@warlock.js/ai/persist-ai-data/SKILL.md`; competing libs `langchain` callbacks.'
 ---
 
 # Middleware — agent-level pipeline

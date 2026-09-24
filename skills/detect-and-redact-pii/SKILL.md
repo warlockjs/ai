@@ -1,6 +1,6 @@
 ---
 name: detect-and-redact-pii
-description: "Detect and redact PII (and moderate) in @warlock.js/ai; use when you need to detect and redact pii."
+description: 'Detect and redact PII (and run model-graded moderation) with @warlock.js/ai-guard detectors — `ai.guardrail.pii(...)` and the optional `ai.guardrail.moderation(...)` peer. Triggers: `ai.guardrail.pii`, `piiDetector`, `PiiDetectorOptions`, `PiiCategory`, `mask`, `{label}`, `dictionary`, `onMatch`, `ai.guardrail.moderation`, `openAiModeration`, `OpenAiModerationOptions`, `blockOn`, `omni-moderation-latest`; ''redact PII from model output'', ''mask SSN / credit card / email / phone / IP'', ''stop PII leaking into a tool call'', ''scrub sensitive data'', ''add OpenAI moderation'', ''block violent / self-harm content''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail.pii` / `.moderation`) or `import { pii, moderation } from "@warlock.js/ai-guard"`. Skip: composing the guard / wiring it into an agent — `@warlock.js/ai-guard/guard-input-output/SKILL.md`; routing a block to a human — `@warlock.js/ai-guard/escalate-block-to-human/SKILL.md`.'
 ---
 
 # Detect and redact PII (and moderate)

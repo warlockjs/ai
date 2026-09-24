@@ -1,6 +1,6 @@
 ---
 name: manage-ai-stores
-description: "Orchestrator stores — checkpoint vs snapshot in @warlock.js/ai; use when you need to manage ai stores."
+description: 'Durable orchestrator stores — ai.checkpoint.{memory,pg,redis}() for cross-turn SESSION STATE and ai.snapshot.{memory,pg,redis}() for in-flight SUPERVISOR/WORKFLOW run state. Two distinct contracts (CheckpointStore vs SnapshotStore), dev-owned pg/redis clients (no peer dep), never-auto-migrated schema(), global defaults via ai.config({defaultCheckpointStore, defaultSnapshotStore}). Triggers: `ai.checkpoint`, `ai.snapshot`, `checkpointStore`, `snapshotStore`, `CheckpointStore`, `SnapshotStore`, `CheckpointRecord`, `checkpoint.pg`, `checkpoint.redis`, `snapshot.pg`, `snapshot.redis`, `store.schema()`, `keepSnapshots`, `defaultCheckpointStore`, `defaultSnapshotStore`, `PgClientLike`, `RedisClientLike`; ''persist orchestrator sessions'', ''wire a pg checkpoint store'', ''run the store DDL'', ''checkpoint vs snapshot''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator lifecycle — `@warlock.js/ai/run-orchestrator/SKILL.md`; cache-backed snapshot resume / semanticCache store — `@warlock.js/ai/persist-ai-data/SKILL.md`; competing libs `temporal`, `inngest`.'
 ---
 
 # Orchestrator stores — checkpoint vs snapshot

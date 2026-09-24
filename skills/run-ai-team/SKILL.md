@@ -1,6 +1,6 @@
 ---
 name: run-ai-team
-description: "ai.team() — manager + members + a quality gate in @warlock.js/ai; use when you need to run ai team."
+description: 'Manager-led multi-agent teams with ai.team({...}) — transparent sugar over ai.supervisor that maps a manager → route/router, members → intents, and a gate → evaluate, returning a REAL SupervisorContract (no new loop, no new contract). Covers the built-in gate strings "quality" (review-then-fix) and "verify" (test-then-fix), a custom gate function, role mapping (roles / gateKey), and the verbatim supervisor pass-throughs (goal / output / state / maxIterations / snapshotStore / on / observe). Triggers: `ai.team`, `TeamConfig`, `TeamGate`, `TeamGateFn`, `TeamMemberValue`, `manager`, `members`, `gate`, `roles`, `gateKey`, `buildQualityGate`, `buildVerifyGate`, `SupervisorContract`, `ReportType`; ''build a team of agents'', ''manager that delegates to members'', ''review then fix loop'', ''test then fix loop'', ''quality gate for a multi-agent run'', ''report type team''; typical import `import { ai } from "@warlock.js/ai"`. Skip: routing one input to a fixed roster directly — `@warlock.js/ai/run-supervisor/SKILL.md` (team is sugar over it); durable cross-turn sessions — `@warlock.js/ai/run-orchestrator/SKILL.md`; LLM-generated plans — `@warlock.js/ai/run-planner/SKILL.md`; competing libs `crewai`, `autogen`.'
 ---
 
 # `ai.team()` — manager + members + a quality gate

@@ -1,6 +1,6 @@
 ---
 name: persist-ai-data
-description: "Persistence — @warlock.js/cache everywhere in @warlock.js/ai; use when you need to persist ai data."
+description: 'Persistence delegated to @warlock.js/cache — workflow + supervisor snapshot resume via snapshotStore (4.3.0: now a SnapshotStore from ai.snapshot.*, ⚠ moved off raw CacheDriver), semantic cache + memory via vector-capable CacheDriver, global defaults via ai.config({defaultStore}) + ai.config({defaultSnapshotStore}). Covers drift detection + three recovery paths. Triggers: `ai.config`, `defaultStore`, `defaultSnapshotStore`, `snapshotStore`, `ai.snapshot`, `wf.resume`, `supervisor.resume`, `WorkflowSnapshot`, `SupervisorSnapshot`, `WorkflowDriftError`, `SupervisorDriftError`, `force: true`; ''resume a workflow run'', ''configure snapshot store'', ''handle signature drift'', ''wire pg vector cache''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator checkpoint/snapshot store factories — `@warlock.js/ai/manage-ai-stores/SKILL.md`; cache driver catalog — `@warlock.js/cache/cache-basics/SKILL.md`; competing libs `temporal`, `inngest`.'
 ---
 
 # Persistence — `@warlock.js/cache` everywhere

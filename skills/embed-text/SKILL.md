@@ -1,6 +1,6 @@
 ---
 name: embed-text
-description: "Embeddings — peer primitive on the SDK adapter in @warlock.js/ai; use when you need to embed text."
+description: 'Text-to-vector via sdk.embedder({...}) — embed(string) for single, embedMany(string[]) for batch. Peer primitive on the SDK adapter, not wired into agents. Compose into RAG tools, workflow run steps, or ai.middleware.semanticCache. Triggers: `sdk.embedder`, `EmbedderContract`, `embedder.embed`, `embedder.embedMany`, `EmbeddingResult`, `EmbeddingBatchResult`, `dimensions`; ''embed text'', ''build RAG tool'', ''populate vector store'', ''embedding batch''; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: cache similarity — `@warlock.js/cache/use-cache-similarity/SKILL.md`; pgvector queries — `@warlock.js/cascade/search-by-vector/SKILL.md`; competing libs `langchain` embeddings, raw `openai.embeddings.create`.'
 ---
 
 # Embeddings — peer primitive on the SDK adapter

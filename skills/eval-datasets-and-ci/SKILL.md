@@ -1,6 +1,6 @@
 ---
 name: eval-datasets-and-ci
-description: "ai.dataset() + agent.eval() regression CI in @warlock.js/ai; use when you need to eval datasets and ci."
+description: 'Datasets + regression-gated eval CI with ai.dataset({...}) feeding agent.eval({cases,baseline,tolerance}). Covers the immutable filterable/shardable dataset (cases / fromFile JSONL), DatasetEntry tags, EvalReport.regression (regressed/added/removed/passed) against a baseline, and the ai.eval reporters toJUnit / toJSON / fromJSON for CI artifacts + committed baselines. Triggers: `ai.dataset`, `DatasetContract`, `DatasetEntry`, `DatasetOptions`, `dataset.filter`, `dataset.shard`, `fromFile`, `agent.eval`, `EvalOptions`, `EvalReport`, `EvalCaseResult`, `EvalRegression`, `baseline`, `tolerance`, `ai.eval.toJUnit`, `ai.eval.toJSON`, `ai.eval.fromJSON`, `diff`, JSONL; ''eval dataset from a JSONL file'', ''shard an eval suite across CI jobs'', ''fail CI on an eval regression'', ''emit a JUnit report'', ''snapshot an eval baseline''; typical import `import { ai } from "@warlock.js/ai"`. Skip: the scorers + LLM-as-judge + Vitest matchers themselves — `@warlock.js/ai/ai-dx-helpers/SKILL.md` (registerAiMatchers / ai.eval.exact|contains|predicate|judge); record/replay of model calls for deterministic tests — `@warlock.js/ai/record-replay-llm/SKILL.md`; competing libs `promptfoo`, `braintrust`.'
 ---
 
 # `ai.dataset()` + `agent.eval()` regression CI

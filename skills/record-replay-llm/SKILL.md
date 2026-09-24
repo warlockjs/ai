@@ -1,6 +1,6 @@
 ---
 name: record-replay-llm
-description: "ai.vcr() — record / replay any model in @warlock.js/ai; use when you need to record replay llm."
+description: 'Deterministic, offline LLM tests with ai.vcr(model,{path,mode}) — a record/replay decorator over ANY ModelContract that intercepts only complete()/stream(), delegates name/provider/capabilities/pricing to the inner model, and hashes each request against a JSON cassette on disk. Covers the three modes (record / replay / auto), the cassette format, save(), VcrCassetteMissError, streaming round-trip, hashOptions, and composing below fallbackModel. Triggers: `ai.vcr`, `vcr`, `VcrModel`, `VcrOptions`, `VcrMode`, `Cassette`, `CassetteEntry`, `VcrCassetteMissError`, `hashRequest`, `DEFAULT_HASH_OPTIONS`, `mode`, `path`, `hashOptions`, `save`, `cassette`, record, replay, cassette; ''record LLM responses for tests'', ''replay model calls offline in CI'', ''deterministic agent test without hitting the provider'', ''cassette for model calls''; typical import `import { ai } from "@warlock.js/ai"`. Skip: eval scoring + regression gating — `@warlock.js/ai/eval-datasets-and-ci/SKILL.md`; the Vitest matchers + mockRouter — `@warlock.js/ai/ai-dx-helpers/SKILL.md`; choosing a provider adapter — `@warlock.js/ai/pick-ai-provider/SKILL.md`; competing libs `nock`, `polly.js`.'
 ---
 
 # `ai.vcr()` — record / replay any model

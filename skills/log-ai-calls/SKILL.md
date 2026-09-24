@@ -1,6 +1,6 @@
 ---
 name: log-ai-calls
-description: "Logging — log from @warlock.js/logger in @warlock.js/ai; use when you need to log ai calls."
+description: 'Framework logging delegated to @warlock.js/logger — every primitive emits via the log singleton, configure channels / levels / redaction once at boot. Four-arg call convention (module, action, message, context). Triggers: `log.configure`, `log.setMinLevel`, `log.setChannels`, `ConsoleLog`, `FileLog`, `LogChannel`, `redact.paths`, `ai.agent.<name>` / `ai.workflow.<name>` / `ai.supervisor.<name>` modules; ''configure ai logging'', ''mask prompts in logs'', ''silence logs in tests'', ''capture log entries''; typical import `import { log } from "@warlock.js/logger"`. Skip: error hierarchy — `@warlock.js/ai/handle-ai-errors/SKILL.md`; competing libs `pino`, `winston`, `console.log`.'
 ---
 
 # Logging — `log` from `@warlock.js/logger`

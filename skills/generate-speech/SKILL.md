@@ -1,6 +1,6 @@
 ---
 name: generate-speech
-description: "Generate speech — the text-to-speech verb (ai.speech) in @warlock.js/ai; use when you need to generate speech."
+description: 'Text-to-speech via ai.speech({ model: sdk.speech({ name }), text }) — the audio-OUTPUT verb (Theme I), returning the uniform never-throws { data, error, usage, report } envelope with cost-truth + panoptic observation. Models come from an adapter''s speech() factory: OpenAI tts-1 / tts-1-hd (per-character) or gpt-4o-mini-tts (per-token). Synthesized audio is a discriminated GeneratedAudio = { type: "base64"; base64; mediaType }. Options: voice / format / speed / instructions / signal. Triggers: `ai.speech`, `sdk.speech`, `openai.speech`, `SpeechModelContract`, `GeneratedAudio`, `SpeechModelPricing`, `SpeechOptions`, `MockSpeechModel`; ''text to speech'', ''TTS'', ''synthesize voice'', ''read this aloud'', ''tts-1'', ''gpt-4o-mini-tts'', ''voice narration'', ''audio output'', ''speak this text''; typical import `import { ai } from "@warlock.js/ai"` + `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: speech-to-text / transcribing a voice note — [[transcribe-audio]]; image OUTPUT — [[generate-images]]; competing libs raw `openai.audio.speech.create`, `elevenlabs` SDK.'
 ---
 
 # Generate speech — the text-to-speech verb (`ai.speech`)

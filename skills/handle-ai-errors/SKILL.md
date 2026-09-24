@@ -1,6 +1,6 @@
 ---
 name: handle-ai-errors
-description: "Typed errors — AIError hierarchy in @warlock.js/ai; use when you need to handle ai errors."
+description: 'Typed AIError hierarchy with stable code strings + coarse category for retry-policy dispatch. execute() never throws — errors surface via result.error (the sole exception: OrchestratorConfigError throws at construction). Triggers: `AIError`, `ProviderRateLimitError`, `ProviderAuthError`, `ContextLengthExceededError`, `ContentFilterError`, `SchemaValidationError`, `ToolExecutionError`, `WorkflowDriftError`, `SupervisorDriftError`, `SupervisorFailedError`, `SupervisorRoutingError`, `OrchestratorFailedError`, `OrchestratorDriftError`, `OrchestratorConfigError`, `OrchestratorCancelledError`, `PlannerFailedError`, `PlannerPlanInvalidError`, `PlannerCancelledError`, `BudgetExceededError`, `GuardrailViolationError`, `error.code`, `error.category`; ''handle ai error'', ''retry on rate limit'', ''branch on error code'', ''ORCHESTRATOR_DRIFT'', ''PLANNER_PLAN_INVALID'', ''build fallback ladder''; typical import `import { AIError } from "@warlock.js/ai"`. Skip: log surfacing — `@warlock.js/ai/log-ai-calls/SKILL.md`; native `try / catch` on raw `openai`.'
 ---
 
 # Typed errors — `AIError` hierarchy

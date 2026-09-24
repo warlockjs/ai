@@ -1,6 +1,6 @@
 ---
 name: generate-images
-description: "Generate images — the image-output verb (ai.image) in @warlock.js/ai; use when you need to generate images."
+description: 'Text-to-image via ai.image({ model: sdk.image({ name }), prompt }) — the image-OUTPUT verb (Theme I), returning the uniform never-throws { data, error, usage, report } envelope with cost-truth + panoptic observation. Models come from an adapter''s image() factory: OpenAI gpt-image-* (token-metered) / dall-e-* (per-image), Google gemini-* (generateContent + responseModalities IMAGE, usage passed through) / imagen-* and every other id (per-image, generateImages — deprecated by Google); the id picks the transport and is never validated locally. Result images are a discriminated GeneratedImage = { type: "base64" } | { type: "url" }. Triggers: `ai.image`, `sdk.image`, `openai.image`, `google.image`, `ImageModelContract`, `GeneratedImage`, `ImageModelPricing`; ''generate an image'', ''text to image'', ''gpt-image'', ''dall-e'', ''imagen'', ''product thumbnail'', ''image output''; typical import `import { ai } from "@warlock.js/ai"` + `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: image INPUT / vision attachments to a chat agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; embeddings — `@warlock.js/ai/embed-text/SKILL.md`; competing libs raw `openai.images.generate`, `langchain` image tools.'
 ---
 
 # Generate images — the image-output verb (`ai.image`)
