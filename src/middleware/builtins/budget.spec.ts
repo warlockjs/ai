@@ -32,10 +32,8 @@ function makeAgent(
     })),
   });
 
-  return agent({
-    model: sdk.model({ name: "gpt-test" }),
-    middleware,
-  });
+  const model = sdk.model({ name: "gpt-test" });
+  return Object.assign(agent({ model, middleware }), { model });
 }
 
 describe("budget — token cap", () => {
@@ -113,9 +111,7 @@ describe("budget — USD cap", () => {
     expect((result.error as BudgetExceededError).unit).toBe("usd");
   });
 
-  it("warns (does not abort) when a USD cap is set but the running model has no pricing entry", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-
+  it("rejects an unpriced model before its first call and names the opt-out", async () => {
     const ai = makeAgent(
       [{ content: "no pricing", usage: { input: 1000, output: 1000 } }],
       [
@@ -128,13 +124,71 @@ describe("budget — USD cap", () => {
 
     const result = await ai.execute("hi");
 
-    // Still degrades (no abort) — but the silent fail-open is now surfaced
-    // once, naming the unmatched model, instead of quietly disabling the cap.
-    expect(result.error).toBeUndefined();
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0]?.[0]).toContain("gpt-test");
+    expect(result.error).toBeInstanceOf(BudgetExceededError);
+    expect(result.error?.message).toContain('"gpt-test"');
+    expect(result.error?.message).toContain('onUnpriced: "allow"');
+    expect(ai.model.callCount).toBe(0);
+  });
 
-    warn.mockRestore();
+  it("allows an unpriced model only when explicitly opted out", async () => {
+    const ai = makeAgent(
+      [{ content: "no pricing", usage: { input: 1000, output: 1000 } }],
+      [budget({ maxCostUSD: 0.0001, onUnpriced: "allow" })],
+    );
+
+    const result = await ai.execute("hi");
+
+    expect(result.error).toBeUndefined();
+    expect(ai.model.callCount).toBe(1);
+  });
+
+  it("uses model-level ModelPricing when the budget has no matching price entry", async () => {
+    const sdk = MockSDK({
+      responses: [{ content: "spendy", usage: { input: 1000, output: 1000, total: 2000 } }],
+    });
+    const ai = agent({
+      model: sdk.model({ name: "gpt-test", pricing: { input: 10, output: 20 } }),
+      middleware: [budget({ maxCostUSD: 0.01 })],
+    });
+
+    const result = await ai.execute("hi");
+
+    expect(result.error).toBeInstanceOf(BudgetExceededError);
+    expect((result.error as BudgetExceededError).unit).toBe("usd");
+  });
+
+  it("uses SDK-resolved ModelPricing when the budget has no matching price entry", async () => {
+    const sdk = MockSDK({
+      pricing: { input: 10, output: 20 },
+      responses: [{ content: "spendy", usage: { input: 1000, output: 1000, total: 2000 } }],
+    });
+    const ai = agent({
+      model: sdk.model({ name: "gpt-test" }),
+      middleware: [budget({ maxCostUSD: 0.01 })],
+    });
+
+    const result = await ai.execute("hi");
+
+    expect(result.error).toBeInstanceOf(BudgetExceededError);
+  });
+
+  it("keeps explicit budget pricing ahead of model pricing", async () => {
+    const sdk = MockSDK({
+      responses: [{ content: "spendy", usage: { input: 1000, output: 1000, total: 2000 } }],
+    });
+    const ai = agent({
+      model: sdk.model({ name: "gpt-test", pricing: { input: 0.001, output: 0.001 } }),
+      middleware: [
+        budget({
+          maxCostUSD: 0.01,
+          pricing: { "gpt-test": { inputPer1K: 0.01, outputPer1K: 0.02 } },
+        }),
+      ],
+    });
+
+    const result = await ai.execute("hi");
+
+    expect(result.error).toBeInstanceOf(BudgetExceededError);
   });
 });
 

@@ -60,6 +60,7 @@ export function MockSDK(config: MockSDKConfig = {}): Omit<SDKAdapterContract, "m
         modelConfig.name ?? config.defaultModelName ?? "mock-model",
         responses,
         config.capabilities,
+        modelConfig.pricing ?? config.pricing,
       );
       models.push(model);
       return model;

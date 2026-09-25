@@ -81,6 +81,7 @@ function post(
   const req = new EventEmitter() as unknown as IncomingMessage;
   req.method = "POST";
   req.headers = headers;
+  req.resume = (() => req) as IncomingMessage["resume"];
   const res = fakeRes();
   handler(req, res);
   req.emit("data", JSON.stringify(body));
@@ -134,5 +135,76 @@ describe("serve (A3)", () => {
     );
     await new Promise((r) => setTimeout(r, 10));
     expect(res.status).toBe(200);
+  });
+
+  it("ignores client session state and supplies only server-owned state", async () => {
+    let receivedOptions: Record<string, unknown> | undefined;
+    const executable: ServableExecutable = {
+      stream(_input, streamOptions) {
+        receivedOptions = streamOptions;
+        return fakeStream([], { ok: true });
+      },
+    };
+
+    post(
+      serve(executable, {
+        session: {
+          createId: () => "server-session",
+          loadHistory: () => [{ role: "user", content: "trusted" }],
+        },
+      }),
+      { input: "hello", sessionId: "client-session", history: ["untrusted"] },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(receivedOptions).toMatchObject({
+      sessionId: "server-session",
+      history: [{ role: "user", content: "trusted" }],
+    });
+    expect(receivedOptions?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("rejects request bodies over the configured byte limit", async () => {
+    const res = post(serve(mockAgent, { maxBodyBytes: 10 }), { input: "too large" });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(res.status).toBe(413);
+    expect(res.body).toContain("payload_too_large");
+  });
+
+  it("uses a 1 MiB default request-body limit", async () => {
+    const res = post(serve(mockAgent), { input: "x".repeat(1024 * 1024) });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(res.status).toBe(413);
+    expect(res.body).toContain("payload_too_large");
+  });
+
+  it("aborts the stream signal when the response closes before completion", async () => {
+    let receivedSignal: AbortSignal | undefined;
+    const executable: ServableExecutable = {
+      stream(_input, streamOptions) {
+        receivedSignal = streamOptions?.signal as AbortSignal;
+        return {
+          async *[Symbol.asyncIterator]() {
+            await new Promise<void>((resolve) => {
+              receivedSignal?.addEventListener("abort", () => resolve(), { once: true });
+            });
+          },
+        };
+      },
+    };
+    const req = new EventEmitter() as unknown as IncomingMessage;
+    req.method = "POST";
+    req.headers = {};
+    const res = fakeRes();
+    serve(executable)(req, res);
+    req.emit("data", JSON.stringify({ input: "hello" }));
+    req.emit("end");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    res.emit("close");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(receivedSignal?.aborted).toBe(true);
   });
 });

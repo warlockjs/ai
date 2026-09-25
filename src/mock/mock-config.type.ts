@@ -2,6 +2,7 @@ import type { FinishReason } from "../contracts/finish-reason.type";
 import type { ImageModelPricing } from "../contracts/image-model.contract";
 import type { ModelToolCallRequest } from "../contracts/model-tool-call-request.type";
 import type { ModelCapabilities } from "../contracts/model.contract";
+import type { ModelPricing } from "../contracts/result/model-pricing.type";
 import type { SpeechModelPricing } from "../contracts/speech-model.contract";
 import type { TranscriptionModelPricing } from "../contracts/transcription-model.contract";
 import type { MockImageResponse } from "./mock-image-model";
@@ -69,6 +70,8 @@ export type MockSDKConfig = {
    * a real provider.
    */
   capabilities?: ModelCapabilities;
+  /** SDK-level pricing resolved onto every mock text model unless overridden per model. */
+  pricing?: ModelPricing;
   /**
    * Scripted responses for `image()` models this mock SDK creates,
    * consumed in sequence (last repeats when exhausted). Omitted = a

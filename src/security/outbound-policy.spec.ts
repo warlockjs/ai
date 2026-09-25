@@ -35,6 +35,7 @@ describe("guardedFetch — SSRF guards (S1/S3 foundation)", () => {
       "https://169.254.169.254/latest/meta-data",
       "https://10.0.0.5/x",
       "https://[::1]/x",
+      "https://[::ffff:a9fe:a9fe]/latest/meta-data",
     ]) {
       await expect(guardedFetch(url, {}), url).rejects.toBeInstanceOf(OutboundPolicyError);
     }

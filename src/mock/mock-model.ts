@@ -6,6 +6,7 @@ import type {
   ModelResponse,
   ModelStreamChunk,
 } from "../contracts/model.contract";
+import type { ModelPricing } from "../contracts/result/model-pricing.type";
 import type { MockModelResponse } from "./mock-config.type";
 
 type RecordedCall = {
@@ -52,6 +53,7 @@ export class MockModel implements ModelContract {
     public readonly name: string,
     private readonly responses: MockModelResponse[],
     capabilities?: ModelCapabilities,
+    public readonly pricing?: ModelPricing,
   ) {
     this.capabilities = capabilities;
   }

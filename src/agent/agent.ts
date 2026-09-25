@@ -646,6 +646,7 @@ class Execution<TOutput> {
       model: {
         name: this.config.model.name,
         provider: this.config.model.provider,
+        pricing: this.config.model.pricing,
       },
       input: this.input,
       options: this.options as AgentExecuteOptions<unknown> | undefined,

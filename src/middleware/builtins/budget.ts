@@ -1,5 +1,7 @@
 import type { AgentMiddleware, MiddlewareExecuteContext } from "../../contracts/middleware";
+import type { ModelPricing } from "../../contracts/result/model-pricing.type";
 import { BudgetExceededError, ScopedBudgetExceededError, type BudgetUnit } from "../../errors";
+import { computeCost } from "../../utils/compute-cost";
 import { namespacedState } from "../utils";
 import type {
   BudgetContract,
@@ -51,6 +53,9 @@ export type BudgetPricing = Record<
   }
 >;
 
+/** Behavior when a USD-capped run has no price for its configured model. */
+export type BudgetUnpricedBehavior = "error" | "allow";
+
 /** A cross-execution token and/or cost limit for one UTC window. */
 export type ScopedBudgetOptions = {
   /** Application-owned identity, commonly a user or tenant id. */
@@ -88,6 +93,12 @@ export type BudgetOptions = {
    * agent's `ModelContract.name` exactly.
    */
   pricing?: BudgetPricing;
+  /**
+   * Behavior when a USD cap is configured but no pricing can be resolved
+   * for the running model. Defaults to `"error"` so dollar caps cannot
+   * silently fail open. Set `"allow"` only when that risk is intentional.
+   */
+  onUnpriced?: BudgetUnpricedBehavior;
   /**
    * Behavior when a cap is breached. `"abort"` throws
    * `BudgetExceededError` — surfaces on `result.error`, stops the
@@ -166,6 +177,55 @@ function breach(limit: number, actual: number, unit: BudgetUnit, name: string): 
     actual,
     unit,
   });
+}
+
+function unpricedModelBreach(name: string, modelName: string): never {
+  throw new BudgetExceededError(
+    `budget "${name}" cannot enforce a USD cap for unpriced model "${modelName}"; ` +
+      `configure pricing or set onUnpriced: "allow" to opt out`,
+    { limit: 0, actual: 0, unit: "usd", context: { model: modelName, reason: "unpriced" } },
+  );
+}
+
+function resolveTripCost(
+  context: MiddlewareExecuteContext,
+  usage: {
+    input: number;
+    output: number;
+    cachedTokens?: number;
+    cacheWriteTokens?: number;
+    reasoningTokens?: number;
+  },
+  budgetPricing: BudgetPricing | undefined,
+): number | undefined {
+  const explicitPricing = budgetPricing?.[context.model.name];
+
+  if (explicitPricing) {
+    return (
+      (usage.input / 1000) * explicitPricing.inputPer1K +
+      (usage.output / 1000) * explicitPricing.outputPer1K
+    );
+  }
+
+  const modelPricing: ModelPricing | undefined = context.model.pricing;
+
+  if (!modelPricing) {
+    return undefined;
+  }
+
+  const cost = computeCost({ ...usage, total: usage.input + usage.output }, modelPricing);
+
+  if (!cost) {
+    return undefined;
+  }
+
+  return (
+    cost.input +
+    cost.output +
+    (cost.cachedInput ?? 0) +
+    (cost.cachedOutput ?? 0) +
+    (cost.reasoning ?? 0)
+  );
 }
 
 function breachContract(
@@ -336,16 +396,22 @@ export function budget(options: BudgetOptions): AgentMiddleware {
   const hasContractTokenCap = typeof contract?.maxTokens === "number";
   const hasContractCostCap = typeof contract?.maxCostUSD === "number";
   const hasContractLatencyCap = typeof contract?.maxLatencyMs === "number";
-  const contractNeedsCost = hasCostCap || hasContractCostCap;
-  // Warn once per model when a cost cap is configured but the running model
-  // has no pricing entry — without this the USD cap silently never enforces
-  // (costUSD stays 0), a fail-open the JSDoc on `maxCostUSD` documents.
-  const warnedUnpricedModels = new Set<string>();
+  const hasScopedCostCap = typeof options.scoped?.maxCostUSD === "number";
+  const needsCost = hasCostCap || hasContractCostCap || hasScopedCostCap;
 
   return {
     name,
     execute: {
       before(context) {
+        if (
+          needsCost &&
+          options.onUnpriced !== "allow" &&
+          options.pricing?.[context.model.name] === undefined &&
+          context.model.pricing === undefined
+        ) {
+          unpricedModelBreach(name, context.model.name);
+        }
+
         const counters = namespacedState<BudgetCounters>(context, name);
         counters.set({
           tokens: 0,
@@ -371,25 +437,10 @@ export function budget(options: BudgetOptions): AgentMiddleware {
 
         counters.tokens += response.usage.total;
 
-        if (contractNeedsCost) {
-          const pricing = options.pricing?.[context.model.name];
+        const tripCost = resolveTripCost(context, response.usage, options.pricing);
 
-          if (pricing) {
-            const tripCost =
-              (response.usage.input / 1000) * pricing.inputPer1K +
-              (response.usage.output / 1000) * pricing.outputPer1K;
-            counters.costUSD += tripCost;
-          } else if (!warnedUnpricedModels.has(context.model.name)) {
-            // A cost cap is set but no pricing matched the running model, so
-            // costUSD can never grow and the USD cap silently never fires.
-            // Surface the fail-open once per model instead of swallowing it.
-            warnedUnpricedModels.add(context.model.name);
-            console.warn(
-              `ai.middleware.budget("${name}"): a USD cost cap is set but no pricing entry ` +
-                `matches the running model "${context.model.name}" — the cap cannot be enforced ` +
-                `for it. Add a pricing entry for "${context.model.name}" to options.pricing.`,
-            );
-          }
+        if (needsCost && tripCost !== undefined) {
+          counters.costUSD += tripCost;
         }
 
         if (options.scoped && counters.scopedKey && counters.scopedWindowStart !== undefined) {
@@ -401,17 +452,12 @@ export function budget(options: BudgetOptions): AgentMiddleware {
             response.usage.total,
           );
 
-          const pricing = options.pricing?.[context.model.name];
-          const tripCost = pricing
-            ? (response.usage.input / 1000) * pricing.inputPer1K +
-              (response.usage.output / 1000) * pricing.outputPer1K
-            : 0;
           await reserveScopedBudget(
             options.scoped,
             counters.scopedKey,
             counters.scopedWindowStart,
             "usd",
-            tripCost,
+            tripCost ?? 0,
           );
         }
 

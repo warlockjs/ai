@@ -38,6 +38,7 @@ describe("isPrivateOrReservedIp", () => {
       "fe80::1",
       "::ffff:127.0.0.1", // IPv4-mapped loopback
       "::ffff:169.254.169.254", // IPv4-mapped metadata
+      "::ffff:a9fe:a9fe", // IPv4-mapped metadata, encoded as IPv6 groups
     ];
     for (const ip of blocked) {
       expect(isPrivateOrReservedIp(ip), ip).toBe(true);

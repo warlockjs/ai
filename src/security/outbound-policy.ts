@@ -1,7 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { isPrivateOrReservedIp } from "@warlock.js/core";
 import { OutboundPolicyError } from "../errors";
-import { isPrivateOrReservedIp } from "./private-ip";
 import type { OutboundPolicy, ResolvedOutboundPolicy } from "./outbound-policy.type";
 
 /** 5 MiB — default cap on an outbound response body. */

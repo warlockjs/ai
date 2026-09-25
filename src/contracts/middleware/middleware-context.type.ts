@@ -4,6 +4,7 @@ import type { ModelToolCallRequest } from "../model-tool-call-request.type";
 import type { SupervisorExecuteOptions } from "../supervisor/supervisor-execute-options.type";
 import type { SupervisorInput } from "../supervisor/supervisor-input.type";
 import type { ToolMode } from "../tool.contract";
+import type { ModelPricing } from "../result/model-pricing.type";
 import type { MiddlewareState } from "./middleware-state.type";
 
 /**
@@ -26,6 +27,7 @@ export type MiddlewareAgentRef = {
 export type MiddlewareModelRef = {
   readonly name: string;
   readonly provider?: string;
+  readonly pricing?: ModelPricing;
 };
 
 /**

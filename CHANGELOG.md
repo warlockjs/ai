@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.22.0 - 2026-09-25
+
+### Changed
+
+- USD budgets reject unpriced models by default; `onUnpriced: "allow"` explicitly opts out. Model pricing reaches middleware.
+- `ai.serve` owns session IDs and history, limits request bodies, checks bearer tokens in constant time and aborts on disconnect.
+- SSRF address classification reuses the core classifier, including IPv4-mapped IPv6.
+
 ## 5.21.0 - 2026-09-25
 
 ### Changed

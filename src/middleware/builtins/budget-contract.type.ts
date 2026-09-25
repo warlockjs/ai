@@ -80,9 +80,9 @@ export type BudgetContractFallback = (
  *
  * **Clauses.** Every cap is optional; supply only the dimensions you
  * care about. A contract with no caps is inert. `maxCostUSD` still needs
- * a `pricing` entry on `budget()` for the running model — without one,
- * the cost clause silently degrades (tokens / latency clauses keep
- * enforcing).
+ * pricing from `budget()` or the running model. Without one, the run
+ * rejects before its first model call unless `onUnpriced: "allow"` is
+ * explicitly set on `budget()`.
  *
  * **Latency.** Wall-clock milliseconds measured from the first
  * `execute.before` to each `trip.after`. Has no `BudgetUnit`, so a
@@ -109,9 +109,9 @@ export type BudgetContract = {
    */
   maxTokens?: number;
   /**
-   * Cumulative USD-cost cap for the run. Requires `BudgetOptions.pricing`
-   * for the running model — degrades silently without it, same as the
-   * legacy cost cap.
+   * Cumulative USD-cost cap for the run. Pricing resolves from
+   * `BudgetOptions.pricing` or the running model; an unpriced model rejects
+   * before its first call unless `BudgetOptions.onUnpriced` is `"allow"`.
    */
   maxCostUSD?: number;
   /**
