@@ -83,8 +83,9 @@ export type BudgetOptions = {
   maxTokens?: number;
   /**
    * Hard cap on cumulative USD cost. Requires `pricing` for the
-   * agent's configured model — without a pricing entry the USD check
-   * silently skips (tokens-only enforcement still applies).
+   * agent's configured model. Without a pricing entry the run fails
+   * closed: `onUnpriced` (default `"error"`) refuses it unless set to
+   * `"allow"`, which skips the USD check (token caps still apply).
    */
   maxCostUSD?: number;
   /**
@@ -337,8 +338,9 @@ export function readBudgetFallbackSignal(
  *
  * **USD accounting.** When `maxCostUSD` + `pricing[modelName]` are
  * both present, the middleware converts per-trip input / output
- * tokens to USD and accumulates. Missing pricing silently degrades
- * to tokens-only — explicit rather than guessing.
+ * tokens to USD and accumulates. Missing pricing fails closed:
+ * `onUnpriced` defaults to `"error"` and refuses the run; only
+ * `onUnpriced: "allow"` skips the USD check (tokens-only).
  *
  * **Warn mode.** `onExceeded: "warn"` logs a single warning the first
  * time a cap is breached and lets the run continue. Useful for
