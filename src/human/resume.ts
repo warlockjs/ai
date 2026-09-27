@@ -38,8 +38,8 @@ function assertDecision(decision: ApprovalDecision): void {
 /**
  * Re-run the agent for a resumed interrupt with the decision pre-seeded.
  *
- * Stages the decision in the process-local seed registry (keyed by agent
- * name), then re-executes the original prompt. The agent's
+ * Stages the decision in the process-local seed registry keyed by the
+ * pending action's binding, then re-executes the original prompt. The agent's
  * `ai.human.approval(...)` middleware consumes the seed on the gated tool
  * call — so this time it resolves to the human's ruling instead of pausing
  * again. The seed is cleared in a `finally` so a re-run that errors before
@@ -60,10 +60,17 @@ async function rerun<TOutput>(
 
   const input = options.input ?? pending.request.context.originalInput ?? "";
 
-  seedDecision(agent.name, decision);
+  // The binding key includes the session, so the re-run must execute in the
+  // interrupted run's session unless the caller names one explicitly —
+  // otherwise the seed can never match and the call suspends again.
+  const sessionId = options.executeOptions?.sessionId ?? pending.request.context.sessionId;
+  const executeOptions =
+    sessionId === undefined ? options.executeOptions : { ...options.executeOptions, sessionId };
+
+  seedDecision(pending.request.bindingKey, decision);
 
   try {
-    const result = await agent.execute(input, options.executeOptions);
+    const result = await agent.execute(input, executeOptions);
 
     return {
       type: "applied",
@@ -75,7 +82,7 @@ async function rerun<TOutput>(
     // If the seeded call never fired (the re-run errored early, or the
     // policy no longer gates the tool), drop the stale seed so it cannot
     // leak into an unrelated later run of the same agent.
-    clearSeededDecision(agent.name);
+    clearSeededDecision(pending.request.bindingKey);
   }
 }
 

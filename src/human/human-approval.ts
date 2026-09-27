@@ -12,6 +12,7 @@ import type {
   PolicyContext,
 } from "./contracts";
 import { ApprovalRejectedError, InterruptSuspendedError } from "./errors";
+import { createApprovalBindingKey } from "./approval-binding";
 import { evaluatePolicy } from "./policy";
 import { takeSeededDecision } from "./resume-seed";
 
@@ -73,6 +74,12 @@ function buildRequest(
 ): ApprovalRequest {
   return {
     interruptId,
+    bindingKey: createApprovalBindingKey({
+      agentName: ctx.agent.name,
+      sessionId: ctx.options?.sessionId,
+      toolName: ctx.tool.name,
+      args: ctx.request.input,
+    }),
     toolName: ctx.tool.name,
     toolDescription: ctx.tool.description,
     args: ctx.request.input,
@@ -186,11 +193,11 @@ export function humanApproval(options: HumanApprovalOptions): AgentMiddleware {
         const request = buildRequest(ctx, interruptId, verdict.tags);
 
         // Durable resume: `ai.human.resume(...)` re-runs this same agent
-        // with the human's decision pre-seeded (keyed by agent name). On a
+        // with the human's decision pre-seeded (keyed by the exact call). On a
         // hit we replay the seeded decision exactly once and skip the
         // author's handler entirely — the gated call resolves to the
         // ruling instead of pausing again.
-        const seeded = takeSeededDecision(ctx.agent.name);
+        const seeded = takeSeededDecision(request.bindingKey);
 
         let decision: ApprovalDecision;
 

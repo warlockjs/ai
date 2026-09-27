@@ -60,6 +60,12 @@ export interface ApprovalRequest {
    */
   interruptId: string;
 
+  /**
+   * SHA-256 identity binding this approval to one exact agent session, tool,
+   * and argument payload. Durable resume consumes decisions only on a match.
+   */
+  readonly bindingKey: string;
+
   /** Registered name of the tool the model wants to invoke. */
   toolName: string;
 

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.23.3 - 2026-09-27
 
+### Security
+
+- Durable HITL approvals are now bound to the exact agent session, tool, and arguments they approved, preventing cross-run or cross-action replay. A decision that doesn't match the call being gated is never applied; the call asks for approval again. `resume()` re-runs in the interrupted session unless `executeOptions.sessionId` says otherwise. Approvals left pending by an earlier version must be approved again after upgrading.
+
 ### Changed
 
 - Lockstep patch release; package APIs are unchanged.

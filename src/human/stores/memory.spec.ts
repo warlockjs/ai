@@ -12,6 +12,7 @@ function makeInterrupt(overrides: Partial<PendingInterrupt> = {}): PendingInterr
     interruptId: "support.sess-1.0.abc",
     request: {
       interruptId: "support.sess-1.0.abc",
+      bindingKey: "fixture-binding-key",
       toolName: "refundCustomer",
       toolDescription: "Refund a customer order",
       args: { orderId: "4821", amount: 50 },

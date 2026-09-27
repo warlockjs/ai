@@ -5,6 +5,7 @@ import type { ToolInvokeResult } from "../tool/tool";
 import { describe, expect, it, vi } from "vitest";
 import type { ApprovalRequest, PendingInterrupt } from "./contracts";
 import { humanApproval } from "./human-approval";
+import { createApprovalBindingKey } from "./approval-binding";
 import { resume } from "./resume";
 import { memory } from "./stores/memory";
 
@@ -15,6 +16,12 @@ import { memory } from "./stores/memory";
 function makeInterrupt(overrides: Partial<PendingInterrupt> = {}): PendingInterrupt {
   const request: ApprovalRequest = {
     interruptId: "support.sess-1.0.abc",
+    bindingKey: createApprovalBindingKey({
+      agentName: "support",
+      sessionId: "sess-1",
+      toolName: "refundCustomer",
+      args: { orderId: "4821", amount: 50 },
+    }),
     toolName: "refundCustomer",
     toolDescription: "Refund a customer order",
     args: { orderId: "4821", amount: 50 },
@@ -42,20 +49,24 @@ function makeInterrupt(overrides: Partial<PendingInterrupt> = {}): PendingInterr
  * the fields the approval middleware reads are populated.
  */
 function makeToolContext(
-  overrides: { input?: string; agentName?: string } = {},
+  overrides: { input?: string; agentName?: string; sessionId?: string } = {},
 ): MiddlewareToolContext {
-  const { input = "Refund order #4821", agentName = "support" } = overrides;
+  const { input = "Refund order #4821", agentName = "support", sessionId = "sess-1" } = overrides;
 
   return {
     agent: { name: agentName, isAnonymous: false },
     model: { name: "mock-model" },
     input,
-    options: undefined,
+    options: { sessionId },
     state: new Map<string, unknown>(),
     tripIndex: 0,
     messages: [],
     tool: { name: "refundCustomer", description: "Refund a customer order" },
-    request: { id: "call_1", name: "refundCustomer", input: { amount: 50 } },
+    request: {
+      id: "call_1",
+      name: "refundCustomer",
+      input: { orderId: "4821", amount: 50 },
+    },
   };
 }
 
@@ -227,8 +238,9 @@ describe("resume", () => {
       const outcome = await resume("support.sess-1.0.abc", { type: "approve" }, { store, agent });
 
       expect(execute).toHaveBeenCalledTimes(1);
-      // Defaults the re-run prompt to the captured original input.
-      expect(execute).toHaveBeenCalledWith("Refund order #4821", undefined);
+      // Defaults the re-run prompt to the captured original input, and runs
+      // it in the interrupted session so the binding key can match.
+      expect(execute).toHaveBeenCalledWith("Refund order #4821", { sessionId: "sess-1" });
       expect(outcome.type).toBe("applied");
 
       if (outcome.type !== "applied") {
@@ -250,7 +262,24 @@ describe("resume", () => {
         { store, agent, input: "Refund order #4821 (approved by ops)" },
       );
 
-      expect(execute).toHaveBeenCalledWith("Refund order #4821 (approved by ops)", undefined);
+      expect(execute).toHaveBeenCalledWith("Refund order #4821 (approved by ops)", {
+        sessionId: "sess-1",
+      });
+    });
+
+    it("keeps an explicit executeOptions.sessionId over the interrupted session", async () => {
+      const store = memory();
+      await store.save(makeInterrupt());
+
+      const { agent, execute } = makeFakeAgent();
+
+      await resume(
+        "support.sess-1.0.abc",
+        { type: "approve" },
+        { store, agent, executeOptions: { sessionId: "sess-2" } },
+      );
+
+      expect(execute).toHaveBeenCalledWith("Refund order #4821", { sessionId: "sess-2" });
     });
 
     it("pre-seeds the decision so the gated tool call resolves to the ruling (edit)", async () => {
@@ -308,7 +337,7 @@ describe("resume", () => {
       expect(authorHandler).not.toHaveBeenCalled();
       // approve → void (real tool runs), args untouched.
       expect(beforeReturn).toBeUndefined();
-      expect(toolContext.request.input).toEqual({ amount: 50 });
+      expect(toolContext.request.input).toEqual({ orderId: "4821", amount: 50 });
     });
 
     it("deletes the pending record before the re-run", async () => {

@@ -25,9 +25,10 @@ export type ServeOptions<TInput = unknown> = {
    */
   toInput?: (body: Record<string, unknown>) => TInput;
   /**
-   * Map the parsed body to per-call stream options (e.g. an orchestrator
-   * `{ sessionId, history }` so a turn resumes the right session — A3
-   * wiring). Default: pass `sessionId` / `history` straight through.
+   * Add extra per-call stream options from the trusted request context.
+   * Default: none. `sessionId`, `history` and `signal` are always set by
+   * the server (from `session`) and override anything returned here — a
+   * client can never supply them through the request body.
    */
   toOptions?: (context: ServeRequestContext) => Record<string, unknown>;
   /** Server-owned conversation state. Defaults to a fresh ID and no history. */
@@ -69,7 +70,7 @@ class ClientDisconnectedError extends Error {
 /**
  * Turn an executable into a `node:http` request handler that streams its
  * run to the client as Server-Sent Events (A3) — the production-serving
- * primitive. POST a JSON body (`{ input, sessionId?, history? }`); the
+ * primitive. POST a JSON body (`{ input }`, capped by `maxBodyBytes`); the
  * response is an `text/event-stream` of the primitive's events, the final
  * `result`, then `[DONE]`. Absorbs the auth-token control; pair with a
  * `sessionLock` + an orchestrator for durable multi-turn serving.

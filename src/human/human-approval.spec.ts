@@ -148,6 +148,7 @@ describe("humanApproval", () => {
       },
     });
     expect(captured?.interruptId).toContain("support.sess-7.2.");
+    expect(captured?.bindingKey).toMatch(/^[a-f0-9]{64}$/);
     expect(typeof captured?.requestedAt).toBe("string");
   });
 
