@@ -1183,6 +1183,12 @@ if (outcome.type === "applied" && outcome.result) {
 
 `ai.human.resume(interruptId, decision, options)` loads the `PendingInterrupt`, validates the decision shape, deletes the record, and — when an `agent` is supplied — re-executes the original prompt with the decision **pre-seeded** so the gated tool call resolves to the ruling instead of pausing again. The prompt comes from `request.context.originalInput`; pass `options.input` to override (e.g. to append the reviewer's note), and `options.executeOptions` to forward history / output schema / signal to the re-run.
 
+### The ruling is bound to one exact call
+
+Every new `ApprovalRequest` has a SHA-256 `bindingKey`, calculated from the **agent name, sessionId, tool name, and arguments**. Resume seeds a decision under that key; the approval middleware consumes it only when the re-run reaches the same gated call. A decision for another agent/session/tool/payload is never applied — that call invokes the approval handler and asks again.
+
+The re-run uses the interrupted request's `sessionId` by default, because it is part of the binding. `executeOptions.sessionId` is the explicit override when intentionally re-running in another session (and therefore requires a new approval if the gated call is reached). Pending records written by versions before `bindingKey` cannot match a modern call, so they safely pause for approval again rather than applying an unbound historical ruling.
+
 ### Two resume shapes
 
 | Shape | Pass | Behavior |
