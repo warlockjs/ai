@@ -101,9 +101,13 @@ export type ModelCallOptions = {
  * Responses API). The OpenAI adapter forwards `"none"` verbatim so
  * tool-using agents work on those models; budget-based adapters
  * (Anthropic / Google `thinking`, Ollama `think`, Bedrock) read `"none"`
- * as "reasoning off" and disable the thinking channel.
+ * as "reasoning off" and disable the thinking channel. Adapters map every
+ * other level to the nearest value their provider/model accepts, clamping an
+ * unsupported higher level to that provider/model's highest accepted level;
+ * where `"minimal"` is unsupported it maps to `"low"`. They never reject a
+ * request solely because its effort level is unsupported.
  */
-export type ReasoningEffort = "low" | "medium" | "high" | "none";
+export type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 /**
  * Declarative feature flags a `ModelContract` may expose so the agent can

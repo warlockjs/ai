@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## Unreleased
+
+### Changed
+
+- `ReasoningEffort` now accepts `"none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"`. Adapters clamp unsupported values to their nearest supported provider level rather than rejecting a request.
+
 ## 5.25.0 - 2026-09-28
 
 ### Changed
