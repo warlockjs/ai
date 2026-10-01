@@ -1,6 +1,6 @@
 ---
 name: define-ai-tool
-description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`; ''define a tool'', ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — `@warlock.js/ai/run-ai-agent/SKILL.md`; supervisor artifacts — `@warlock.js/ai/run-supervisor/SKILL.md`; competing libs `langchain` tools, raw `openai` function-calling.'
+description: 'Define tools with ai.tool({...}) — typed validated async functions the model can call. Covers name / description / action / mode (feedback / silent) / input / execute, `ctx.artifacts` side-channel, `ToolExecutionError`. Triggers: `ai.tool`, `ToolContract`, `ToolContext`, `ToolCall`, `ToolExecutionError`, `artifactsSchema`, `mode: "silent"`, `workflow.asTool`; ''define a tool'', ''wire tool into agent'', ''tool input validation'', ''side-channel artifacts''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent loop — the `run-ai-agent` topic; supervisor artifacts — the `run-supervisor` topic; competing libs `langchain` tools, raw `openai` function-calling.'
 ---
 
 # `ai.tool()` — typed tool factory
@@ -113,7 +113,7 @@ ai.tool({
 });
 ```
 
-Under a supervisor: bag starts empty per iteration, accumulates writes from all tool calls, merges into state at iteration end (auto-spread by default; `finalizeArtifacts` for concat / dedupe). See [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md).
+Under a supervisor: bag starts empty per iteration, accumulates writes from all tool calls, merges into state at iteration end (auto-spread by default; `finalizeArtifacts` for concat / dedupe). See the `run-supervisor` topic.
 
 Standalone (no supervisor): framework supplies `{ artifacts: {} }`. Mutations are harmless no-ops.
 
@@ -141,7 +141,7 @@ ai.supervisor({
 
 `ToolExecutionError` carries `toolName` always; `tripIndex` is stamped by the agent that dispatched it. The validation failure is fed back to the model on the next trip so it can correct within the `maxTrips` loop.
 
-See [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md).
+See the `handle-ai-errors` topic.
 
 ## Inspecting tool calls
 
@@ -180,7 +180,7 @@ Workflow errors surface as `ToolExecutionError` with `cause` pointing at the ori
 
 ## See also
 
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — how tools plug into the trip loop
-- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — error hierarchy
-- [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) — artifacts under a supervisor
-- [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) — `workflow.asTool()` composition
+- The `run-ai-agent` topic — how tools plug into the trip loop
+- The `handle-ai-errors` topic — error hierarchy
+- The `run-supervisor` topic — artifacts under a supervisor
+- The `run-ai-workflow` topic — `workflow.asTool()` composition

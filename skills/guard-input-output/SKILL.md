@@ -1,6 +1,6 @@
 ---
 name: guard-input-output
-description: 'Build the composed guardrail middleware with @warlock.js/ai-guard and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail`) or `import { guard } from "@warlock.js/ai-guard"`. Skip: PII detection/redaction specifically — `@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md`; routing a block to a human — `@warlock.js/ai-guard/escalate-block-to-human/SKILL.md`; the core middleware pipeline / hook contract — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+description: 'Build the composed guardrail middleware with @warlock.js/ai-guard and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail`) or `import { guard } from "@warlock.js/ai-guard"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
 ---
 
 # Guard agent input, output, and tool args
@@ -61,7 +61,7 @@ if (result.error instanceof ai.errors.GuardrailViolationError) {
 
 ## Built-in detectors
 
-Three zero-dependency detectors ship (a fourth, `moderation`, is an optional `openai` peer — see [`detect-and-redact-pii/SKILL.md`](@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md)):
+Three zero-dependency detectors ship (a fourth, `moderation`, is an optional `openai` peer — see the `detect-and-redact-pii` topic):
 
 - **`ai.guardrail.injection(options?)`** — jailbreak / prompt-injection marker phrases. Extra `markers` (string | RegExp); `onMatch` defaults to `"flag"`, callers commonly use `"block"` on input.
 - **`ai.guardrail.topic(options)`** — `deny` (string substring | RegExp) and/or `allow` (allow-list miss triggers `onMatch`). `onMatch` is `"block" | "flag"`, default `"block"`.
@@ -112,6 +112,6 @@ A detector's `check()` **rejecting** is an infrastructure fault, not a content v
 
 ## See also
 
-- [`@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md`](@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md) — the `pii` detector (detect/redact/block), the `mask` template, and the optional `moderation` peer.
-- [`@warlock.js/ai-guard/escalate-block-to-human/SKILL.md`](@warlock.js/ai-guard/escalate-block-to-human/SKILL.md) — routing a `block` to a human-review surface via `escalation.onBlock`.
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent, the middleware pipeline, and the `GuardrailViolationError` on `result.error`.
+- The `detect-and-redact-pii` topic — the `pii` detector (detect/redact/block), the `mask` template, and the optional `moderation` peer.
+- The `escalate-block-to-human` topic — routing a `block` to a human-review surface via `escalation.onBlock`.
+- The `run-ai-agent` topic — running the agent, the middleware pipeline, and the `GuardrailViolationError` on `result.error`.

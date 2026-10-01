@@ -1,13 +1,13 @@
 ---
 name: eval-datasets-and-ci
-description: 'Datasets + regression-gated eval CI with ai.dataset({...}) feeding agent.eval({cases,baseline,tolerance}). Covers the immutable filterable/shardable dataset (cases / fromFile JSONL), DatasetEntry tags, EvalReport.regression (regressed/added/removed/passed) against a baseline, and the ai.eval reporters toJUnit / toJSON / fromJSON for CI artifacts + committed baselines. Triggers: `ai.dataset`, `DatasetContract`, `DatasetEntry`, `DatasetOptions`, `dataset.filter`, `dataset.shard`, `fromFile`, `agent.eval`, `EvalOptions`, `EvalReport`, `EvalCaseResult`, `EvalRegression`, `baseline`, `tolerance`, `ai.eval.toJUnit`, `ai.eval.toJSON`, `ai.eval.fromJSON`, `diff`, JSONL; ''eval dataset from a JSONL file'', ''shard an eval suite across CI jobs'', ''fail CI on an eval regression'', ''emit a JUnit report'', ''snapshot an eval baseline''; typical import `import { ai } from "@warlock.js/ai"`. Skip: the scorers + LLM-as-judge + Vitest matchers themselves — `@warlock.js/ai/ai-dx-helpers/SKILL.md` (registerAiMatchers / ai.eval.exact|contains|predicate|judge); record/replay of model calls for deterministic tests — `@warlock.js/ai/record-replay-llm/SKILL.md`; competing libs `promptfoo`, `braintrust`.'
+description: 'Datasets + regression-gated eval CI with ai.dataset({...}) feeding agent.eval({cases,baseline,tolerance}). Covers the immutable filterable/shardable dataset (cases / fromFile JSONL), DatasetEntry tags, EvalReport.regression (regressed/added/removed/passed) against a baseline, and the ai.eval reporters toJUnit / toJSON / fromJSON for CI artifacts + committed baselines. Triggers: `ai.dataset`, `DatasetContract`, `DatasetEntry`, `DatasetOptions`, `dataset.filter`, `dataset.shard`, `fromFile`, `agent.eval`, `EvalOptions`, `EvalReport`, `EvalCaseResult`, `EvalRegression`, `baseline`, `tolerance`, `ai.eval.toJUnit`, `ai.eval.toJSON`, `ai.eval.fromJSON`, `diff`, JSONL; ''eval dataset from a JSONL file'', ''shard an eval suite across CI jobs'', ''fail CI on an eval regression'', ''emit a JUnit report'', ''snapshot an eval baseline''; typical import `import { ai } from "@warlock.js/ai"`. Skip: the scorers + LLM-as-judge + Vitest matchers themselves — the `ai-dx-helpers` topic (registerAiMatchers / ai.eval.exact|contains|predicate|judge); record/replay of model calls for deterministic tests — the `record-replay-llm` topic; competing libs `promptfoo`, `braintrust`.'
 ---
 
 # `ai.dataset()` + `agent.eval()` regression CI
 
 Turn a corpus of cases into a regression-gated CI signal. `ai.dataset(...)` wraps cases into an immutable, filterable, shardable collection; `agent.eval({ cases, baseline, tolerance })` runs them, scores them, and diffs against a prior report; the `ai.eval.*` reporters serialize the result for CI ingestion and tomorrow's baseline.
 
-> This skill is the **dataset + CI** layer. The scorers, LLM-as-judge config, and Vitest matchers live in [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md); `agent.eval`'s core scoring loop is in [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md).
+> This skill is the **dataset + CI** layer. The scorers, LLM-as-judge config, and Vitest matchers live in the `ai-dx-helpers` topic; `agent.eval`'s core scoring loop is in the `run-ai-agent` topic.
 
 ## `ai.dataset()` — immutable, filterable, shardable
 
@@ -112,6 +112,6 @@ if (report.regression && !report.regression.passed) process.exit(1);
 
 ## See also
 
-- [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md) — `ai.eval.{exact,contains,predicate,judge}` scorers + Vitest matchers
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `agent.eval` scoring loop, `EvalCase` / `EvalJudge`
-- [`@warlock.js/ai/record-replay-llm/SKILL.md`](@warlock.js/ai/record-replay-llm/SKILL.md) — `ai.vcr` for deterministic, offline eval runs
+- The `ai-dx-helpers` topic — `ai.eval.{exact,contains,predicate,judge}` scorers + Vitest matchers
+- The `run-ai-agent` topic — `agent.eval` scoring loop, `EvalCase` / `EvalJudge`
+- The `record-replay-llm` topic — `ai.vcr` for deterministic, offline eval runs

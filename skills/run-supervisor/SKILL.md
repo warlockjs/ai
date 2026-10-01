@@ -1,6 +1,6 @@
 ---
 name: run-supervisor
-description: 'Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback, intents as agents / workflows / callbacks, fan-out, evaluate quality loop, ack receptionist, supervisor-level middleware. A callback that calls agent.execute() directly auto-nests agent → tool under the callback span (ambient RunFrame) with usage / cost rolled up — same for team members and orchestrator turns. Triggers: `ai.supervisor`, `ai.router`, `ai.fanOut`, `supervisor.execute`, `supervisor.resume`, `intents`, `router`, `route`, `classifier`, `evaluate`, `ack`, `artifactsSchema`, `middleware`, `END`, `ctx.intents.X.execute`, `ctx.run`, `RunFrame`, `callback span`, `children`, `parentRunId`, `rootRunId`, `trace nesting`, `sub-agent`; ''route one input across specialists'', ''multi-intent dispatch'', ''fan-out then evaluate'', ''classifier then router'', ''supervisor middleware'', ''self-consistency / voting'', ''why is my callback agent not nested / cost is $0'', ''nest a sub-agent under a callback''; typical import `import { ai } from "@warlock.js/ai"`. Skip: durable multi-turn sessions — `@warlock.js/ai/run-orchestrator/SKILL.md`; fixed pipelines — `@warlock.js/ai/run-ai-workflow/SKILL.md`; single agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: 'Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback, intents as agents / workflows / callbacks, fan-out, evaluate quality loop, ack receptionist, supervisor-level middleware. A callback that calls agent.execute() directly auto-nests agent → tool under the callback span (ambient RunFrame) with usage / cost rolled up — same for team members and orchestrator turns. Triggers: `ai.supervisor`, `ai.router`, `ai.fanOut`, `supervisor.execute`, `supervisor.resume`, `intents`, `router`, `route`, `classifier`, `evaluate`, `ack`, `artifactsSchema`, `middleware`, `END`, `ctx.intents.X.execute`, `ctx.run`, `RunFrame`, `callback span`, `children`, `parentRunId`, `rootRunId`, `trace nesting`, `sub-agent`; ''route one input across specialists'', ''multi-intent dispatch'', ''fan-out then evaluate'', ''classifier then router'', ''supervisor middleware'', ''self-consistency / voting'', ''why is my callback agent not nested / cost is $0'', ''nest a sub-agent under a callback''; typical import `import { ai } from "@warlock.js/ai"`. Skip: durable multi-turn sessions — the `run-orchestrator` topic; fixed pipelines — the `run-ai-workflow` topic; single agent — the `run-ai-agent` topic; competing libs `langgraph`, `crewai`.'
 ---
 
 # `ai.supervisor()` — multi-intent routing
@@ -12,7 +12,7 @@ A supervisor takes one input, picks which intent(s) handle it, runs them, option
 - **`agent`** — one model + tools, single task. Doesn't fit when the right specialist depends on the input.
 - **`workflow`** — fixed step order. Doesn't fit when routing decisions need an LLM or vary per request.
 - **`supervisor`** — when the right specialist is decided per-call and you may iterate to a goal.
-- **`orchestrator`** — when the *session* matters: long-running conversations with durable cross-turn state, history windowing/compaction, and mid-turn resume. See [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md).
+- **`orchestrator`** — when the *session* matters: long-running conversations with durable cross-turn state, history windowing/compaction, and mid-turn resume. See the `run-orchestrator` topic.
 
 ## Three dispatch surfaces
 
@@ -294,9 +294,9 @@ ai.supervisor({
 // report → callback("delegate") → agent("worker") → tool("echo"); usage flows up to the root.
 ```
 
-Same behavior across `ai.supervisor`, `ai.team` (member callbacks), and `ai.orchestrator` (turn callbacks) — and `sessionId` propagates onto the captured subtree. `ctx.run(agent)` is captured **exactly once** (the explicit path does not double-count via the ambient frame), and a standalone `agent.execute()` **outside** any callback keeps its own self-root (no frame leakage). This is what an `Observer` / panoptic sees — see [`@warlock.js/ai/observe-ai-flows/SKILL.md`](@warlock.js/ai/observe-ai-flows/SKILL.md).
+Same behavior across `ai.supervisor`, `ai.team` (member callbacks), and `ai.orchestrator` (turn callbacks) — and `sessionId` propagates onto the captured subtree. `ctx.run(agent)` is captured **exactly once** (the explicit path does not double-count via the ambient frame), and a standalone `agent.execute()` **outside** any callback keeps its own self-root (no frame leakage). This is what an `Observer` / panoptic sees — see the `observe-ai-flows` topic.
 
-`ai.workflow`'s `run` steps get the same ambient-frame treatment (see [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md#run-step-sub-agent-nesting)) — with one shape difference: workflow has no intermediate "callback" report node, so a `run` step's captured agent lands as a DIRECT child of the workflow report (same tree position `step.agent`'s report already occupies), not nested one level deeper under a step-named node.
+`ai.workflow`'s `run` steps get the same ambient-frame treatment (see the `run-ai-workflow` topic, "Run-step sub-agent nesting" section) — with one shape difference: workflow has no intermediate "callback" report node, so a `run` step's captured agent lands as a DIRECT child of the workflow report (same tree position `step.agent`'s report already occupies), not nested one level deeper under a step-named node.
 
 ## Per-call options
 
@@ -320,7 +320,7 @@ await supportBot.execute(message, {
 ai.supervisor({ name: "support", router, intents, middleware: [auditTrail] });
 ```
 
-Same onion semantics as the agent pipeline: `before` top-down (return a `SupervisorResult` to short-circuit, throw to abort), `after` / `onError` bottom-up. A middleware without a `supervisor` hook map is skipped — the SAME builtin objects (budget, guardrail, …) can be registered on agents AND here, each declaring whichever level applies. Each needs a unique `name`. See [`@warlock.js/ai/attach-ai-middleware/SKILL.md`](@warlock.js/ai/attach-ai-middleware/SKILL.md).
+Same onion semantics as the agent pipeline: `before` top-down (return a `SupervisorResult` to short-circuit, throw to abort), `after` / `onError` bottom-up. A middleware without a `supervisor` hook map is skipped — the SAME builtin objects (budget, guardrail, …) can be registered on agents AND here, each declaring whichever level applies. Each needs a unique `name`. See the `attach-ai-middleware` topic.
 
 ## Iteration model
 
@@ -359,7 +359,7 @@ await supportBot.execute(message, { runId: "support-7" });   // fresh
 await supportBot.resume("support-7");                          // after crash
 ```
 
-Signature drift detection throws `SupervisorDriftError` on shape mismatch — `force: true` bypasses. See [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md).
+Signature drift detection throws `SupervisorDriftError` on shape mismatch — `force: true` bypasses. See the `persist-ai-data` topic.
 
 ## `asTool()` — supervisor as a tool
 
@@ -378,8 +378,8 @@ const escalationAgent = ai.agent({ model, tools: [supportTool] });
 
 ## See also
 
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — dispatchable units
-- [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) — when steps are known up front
-- [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md) — `snapshotStore` + resume
-- [`@warlock.js/ai/attach-ai-middleware/SKILL.md`](@warlock.js/ai/attach-ai-middleware/SKILL.md) — `semanticCache` fits under each agent's middleware
-- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — tool artifacts side-channel
+- The `run-ai-agent` topic — dispatchable units
+- The `run-ai-workflow` topic — when steps are known up front
+- The `persist-ai-data` topic — `snapshotStore` + resume
+- The `attach-ai-middleware` topic — `semanticCache` fits under each agent's middleware
+- The `define-ai-tool` topic — tool artifacts side-channel

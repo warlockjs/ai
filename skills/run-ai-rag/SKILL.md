@@ -1,6 +1,6 @@
 ---
 name: run-ai-rag
-description: 'Retrieval-augmented generation with ai.rag({...}) — a chunk → embed → vector-store → retrieve → rerank → cite pipeline that reuses ai.embedder + a @warlock.js/cache CacheDriver. Covers index() / retrieve() / clear() / asTool(), chunking strategies (recursive | markdown | sentence | fixed), Citation / RetrievedChunk provenance, and the opt-in rerankers ai.rag.keywordReranker / ai.rag.llmReranker. Triggers: `ai.rag`, `rag.index`, `rag.retrieve`, `rag.clear`, `rag.asTool`, `RagConfig`, `RagDocument`, `RetrieveOptions`, `RetrieveResult`, `RetrievedChunk`, `Citation`, `ChunkOptions`, `ChunkType`, `ai.rag.keywordReranker`, `ai.rag.llmReranker`, `cacheVectorStore`, `VectorStore`, `topK`, `threshold`, `candidates`; ''build a knowledge base'', ''retrieve relevant chunks for a query'', ''cite the source of an answer'', ''chunk markdown for embedding'', ''rerank retrieval results'', ''expose retrieval as a tool''; typical import `import { ai } from "@warlock.js/ai"`. Skip: raw single-string embedding — `@warlock.js/ai/embed-text/SKILL.md`; exact + vector LLM-response cache — `@warlock.js/ai/attach-ai-middleware/SKILL.md` (ai.middleware.semanticCache); tool wiring — `@warlock.js/ai/define-ai-tool/SKILL.md`; competing libs `langchain`, `llamaindex`.'
+description: 'Retrieval-augmented generation with ai.rag({...}) — a chunk → embed → vector-store → retrieve → rerank → cite pipeline that reuses ai.embedder + a @warlock.js/cache CacheDriver. Covers index() / retrieve() / clear() / asTool(), chunking strategies (recursive | markdown | sentence | fixed), Citation / RetrievedChunk provenance, and the opt-in rerankers ai.rag.keywordReranker / ai.rag.llmReranker. Triggers: `ai.rag`, `rag.index`, `rag.retrieve`, `rag.clear`, `rag.asTool`, `RagConfig`, `RagDocument`, `RetrieveOptions`, `RetrieveResult`, `RetrievedChunk`, `Citation`, `ChunkOptions`, `ChunkType`, `ai.rag.keywordReranker`, `ai.rag.llmReranker`, `cacheVectorStore`, `VectorStore`, `topK`, `threshold`, `candidates`; ''build a knowledge base'', ''retrieve relevant chunks for a query'', ''cite the source of an answer'', ''chunk markdown for embedding'', ''rerank retrieval results'', ''expose retrieval as a tool''; typical import `import { ai } from "@warlock.js/ai"`. Skip: raw single-string embedding — the `embed-text` topic; exact + vector LLM-response cache — the `attach-ai-middleware` topic (ai.middleware.semanticCache); tool wiring — the `define-ai-tool` topic; competing libs `langchain`, `llamaindex`.'
 ---
 
 # `ai.rag()` — chunk → embed → retrieve → rerank → cite
@@ -134,6 +134,6 @@ await kb.clear(); // drops every entry written under this rag's namespace
 
 ## See also
 
-- [`@warlock.js/ai/embed-text/SKILL.md`](@warlock.js/ai/embed-text/SKILL.md) — the `sdk.embedder` primitive this consumes
-- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — what `asTool()` produces
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — wiring the retrieval tool into an agent
+- The `embed-text` topic — the `sdk.embedder` primitive this consumes
+- The `define-ai-tool` topic — what `asTool()` produces
+- The `run-ai-agent` topic — wiring the retrieval tool into an agent

@@ -1,6 +1,6 @@
 ---
 name: manage-ai-stores
-description: 'Durable orchestrator stores — ai.checkpoint.{memory,pg,redis}() for cross-turn SESSION STATE and ai.snapshot.{memory,pg,redis}() for in-flight SUPERVISOR/WORKFLOW run state. Two distinct contracts (CheckpointStore vs SnapshotStore), dev-owned pg/redis clients (no peer dep), never-auto-migrated schema(), global defaults via ai.config({defaultCheckpointStore, defaultSnapshotStore}). Triggers: `ai.checkpoint`, `ai.snapshot`, `checkpointStore`, `snapshotStore`, `CheckpointStore`, `SnapshotStore`, `CheckpointRecord`, `checkpoint.pg`, `checkpoint.redis`, `snapshot.pg`, `snapshot.redis`, `store.schema()`, `keepSnapshots`, `defaultCheckpointStore`, `defaultSnapshotStore`, `PgClientLike`, `RedisClientLike`; ''persist orchestrator sessions'', ''wire a pg checkpoint store'', ''run the store DDL'', ''checkpoint vs snapshot''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator lifecycle — `@warlock.js/ai/run-orchestrator/SKILL.md`; cache-backed snapshot resume / semanticCache store — `@warlock.js/ai/persist-ai-data/SKILL.md`; competing libs `temporal`, `inngest`.'
+description: 'Durable orchestrator stores — ai.checkpoint.{memory,pg,redis}() for cross-turn SESSION STATE and ai.snapshot.{memory,pg,redis}() for in-flight SUPERVISOR/WORKFLOW run state. Two distinct contracts (CheckpointStore vs SnapshotStore), dev-owned pg/redis clients (no peer dep), never-auto-migrated schema(), global defaults via ai.config({defaultCheckpointStore, defaultSnapshotStore}). Triggers: `ai.checkpoint`, `ai.snapshot`, `checkpointStore`, `snapshotStore`, `CheckpointStore`, `SnapshotStore`, `CheckpointRecord`, `checkpoint.pg`, `checkpoint.redis`, `snapshot.pg`, `snapshot.redis`, `store.schema()`, `keepSnapshots`, `defaultCheckpointStore`, `defaultSnapshotStore`, `PgClientLike`, `RedisClientLike`; ''persist orchestrator sessions'', ''wire a pg checkpoint store'', ''run the store DDL'', ''checkpoint vs snapshot''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator lifecycle — the `run-orchestrator` topic; cache-backed snapshot resume / semanticCache store — the `persist-ai-data` topic; competing libs `temporal`, `inngest`.'
 ---
 
 # Orchestrator stores — checkpoint vs snapshot
@@ -118,10 +118,10 @@ for (const sessionId of sessions) {
 
 ## Distinct from `@warlock.js/cache` snapshot resume
 
-A bare `ai.supervisor()` / `ai.workflow()` uses a `snapshotStore` for `resume(runId)`. That `SnapshotStore` was promoted from the historical `@warlock.js/cache` `CacheDriver` path. ⚠ The CacheDriver overload is deprecated for one minor — new code wires `ai.snapshot.*` stores. See [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md) for the supervisor/workflow side and the cache-backed semantic cache.
+A bare `ai.supervisor()` / `ai.workflow()` uses a `snapshotStore` for `resume(runId)`. That `SnapshotStore` was promoted from the historical `@warlock.js/cache` `CacheDriver` path. ⚠ The CacheDriver overload is deprecated for one minor — new code wires `ai.snapshot.*` stores. See the `persist-ai-data` topic for the supervisor/workflow side and the cache-backed semantic cache.
 
 ## See also
 
-- [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md) — the consumer of these stores
-- [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md) — supervisor/workflow snapshot resume + the SnapshotStore migration
-- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `OrchestratorDriftError` / `OrchestratorConfigError`
+- The `run-orchestrator` topic — the consumer of these stores
+- The `persist-ai-data` topic — supervisor/workflow snapshot resume + the SnapshotStore migration
+- The `handle-ai-errors` topic — `OrchestratorDriftError` / `OrchestratorConfigError`

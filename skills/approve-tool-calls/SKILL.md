@@ -1,6 +1,6 @@
 ---
 name: approve-tool-calls
-description: 'Gate an agent''s tool calls behind a human with `ai.human.approval(options)` (the `tool.before` approval-gate middleware) — ships in @warlock.js/ai core. Triggers: `ai.human.approval`, `humanApproval`, `HumanApprovalOptions`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalHandler`, `InterruptPolicy`, `evaluatePolicy`, `ApprovalRejectedError`, `policy: { type: "allowlist" | "denylist" | "predicate" }`, decision `{ type: "approve" | "reject" | "edit" }`; ''human in the loop'', ''approve a tool call before it runs'', ''ask a human before the agent sends/charges/deletes'', ''pause before a dangerous tool'', ''let an operator edit the tool args'', ''reject a tool call with a reason the model can self-correct from''. Typical import `import { ai } from "@warlock.js/ai"`. Skip: persisting the request and resuming hours later out-of-process — `@warlock.js/ai/durable-resume/SKILL.md`; the agent/middleware/tool primitives themselves — `@warlock.js/ai`.'
+description: 'Gate an agent''s tool calls behind a human with `ai.human.approval(options)` (the `tool.before` approval-gate middleware) — ships in @warlock.js/ai core. Triggers: `ai.human.approval`, `humanApproval`, `HumanApprovalOptions`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalHandler`, `InterruptPolicy`, `evaluatePolicy`, `ApprovalRejectedError`, `policy: { type: "allowlist" | "denylist" | "predicate" }`, decision `{ type: "approve" | "reject" | "edit" }`; ''human in the loop'', ''approve a tool call before it runs'', ''ask a human before the agent sends/charges/deletes'', ''pause before a dangerous tool'', ''let an operator edit the tool args'', ''reject a tool call with a reason the model can self-correct from''. Typical import `import { ai } from "@warlock.js/ai"`. Skip: persisting the request and resuming hours later out-of-process — the `durable-resume` topic; the agent/middleware/tool primitives themselves — `@warlock.js/ai`.'
 ---
 
 # Approve tool calls — the human-in-the-loop gate
@@ -106,7 +106,7 @@ interface ApprovalRequest {
 The handler runs in one of two modes that share this one signature:
 
 - **interactive** — return the decision (or a promise of it); the hook `await`s it in-process. The whole agent run stays on the stack — no store needed. This skill.
-- **durable** — persist the request and `throw` to suspend, resuming from another process later. See [`durable-resume/SKILL.md`](@warlock.js/ai/durable-resume/SKILL.md).
+- **durable** — persist the request and `throw` to suspend, resuming from another process later. See the `durable-resume` topic.
 
 ## It never throws out of the pipeline
 
@@ -130,5 +130,5 @@ Only a *handler bug* — a non-sentinel throw from your handler — propagates, 
 
 ## See also
 
-- [`@warlock.js/ai/durable-resume/SKILL.md`](@warlock.js/ai/durable-resume/SKILL.md) — persist the request, resume out-of-process hours later via `ai.human.resume(...)` and the `InterruptStore`.
+- The `durable-resume` topic — persist the request, resume out-of-process hours later via `ai.human.resume(...)` and the `InterruptStore`.
 - `@warlock.js/ai` — the `ai.agent(...)`, `AgentMiddleware`, `tool.before`, and `ToolInvokeResult` primitives this gate wraps.

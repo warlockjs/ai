@@ -1,6 +1,6 @@
 ---
 name: handle-ai-errors
-description: 'Typed AIError hierarchy with stable code strings + coarse category for retry-policy dispatch. execute() never throws — errors surface via result.error (the sole exception: OrchestratorConfigError throws at construction). Triggers: `AIError`, `ProviderRateLimitError`, `ProviderAuthError`, `ContextLengthExceededError`, `ContentFilterError`, `SchemaValidationError`, `ToolExecutionError`, `WorkflowDriftError`, `SupervisorDriftError`, `SupervisorFailedError`, `SupervisorRoutingError`, `OrchestratorFailedError`, `OrchestratorDriftError`, `OrchestratorConfigError`, `OrchestratorCancelledError`, `PlannerFailedError`, `PlannerPlanInvalidError`, `PlannerCancelledError`, `BudgetExceededError`, `GuardrailViolationError`, `error.code`, `error.category`; ''handle ai error'', ''retry on rate limit'', ''branch on error code'', ''ORCHESTRATOR_DRIFT'', ''PLANNER_PLAN_INVALID'', ''build fallback ladder''; typical import `import { AIError } from "@warlock.js/ai"`. Skip: log surfacing — `@warlock.js/ai/log-ai-calls/SKILL.md`; native `try / catch` on raw `openai`.'
+description: 'Typed AIError hierarchy with stable code strings + coarse category for retry-policy dispatch. execute() never throws — errors surface via result.error (the sole exception: OrchestratorConfigError throws at construction). Triggers: `AIError`, `ProviderRateLimitError`, `ProviderAuthError`, `ContextLengthExceededError`, `ContentFilterError`, `SchemaValidationError`, `ToolExecutionError`, `WorkflowDriftError`, `SupervisorDriftError`, `SupervisorFailedError`, `SupervisorRoutingError`, `OrchestratorFailedError`, `OrchestratorDriftError`, `OrchestratorConfigError`, `OrchestratorCancelledError`, `PlannerFailedError`, `PlannerPlanInvalidError`, `PlannerCancelledError`, `BudgetExceededError`, `GuardrailViolationError`, `error.code`, `error.category`; ''handle ai error'', ''retry on rate limit'', ''branch on error code'', ''ORCHESTRATOR_DRIFT'', ''PLANNER_PLAN_INVALID'', ''build fallback ladder''; typical import `import { AIError } from "@warlock.js/ai"`. Skip: log surfacing — the `log-ai-calls` topic; native `try / catch` on raw `openai`.'
 ---
 
 # Typed errors — `AIError` hierarchy
@@ -198,11 +198,11 @@ async function runWithFallbacks(input: string) {
 
 ## See also
 
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `AgentResult.error`
-- [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) — `WorkflowError` subclasses
-- [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) — `SupervisorFailedError` family + intent-validation codes
-- [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md) — `OrchestratorFailedError` family + `ORCHESTRATOR_CONFIG` boot-time throw
-- [`@warlock.js/ai/run-planner/SKILL.md`](@warlock.js/ai/run-planner/SKILL.md) — `PlannerFailedError` family + `PLANNER_PLAN_INVALID`
-- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — `ToolExecutionError` wrapping
-- [`@warlock.js/ai/log-ai-calls/SKILL.md`](@warlock.js/ai/log-ai-calls/SKILL.md) — error logging
+- The `run-ai-agent` topic — `AgentResult.error`
+- The `run-ai-workflow` topic — `WorkflowError` subclasses
+- The `run-supervisor` topic — `SupervisorFailedError` family + intent-validation codes
+- The `run-orchestrator` topic — `OrchestratorFailedError` family + `ORCHESTRATOR_CONFIG` boot-time throw
+- The `run-planner` topic — `PlannerFailedError` family + `PLANNER_PLAN_INVALID`
+- The `define-ai-tool` topic — `ToolExecutionError` wrapping
+- The `log-ai-calls` topic — error logging
 - `domains/ai/conventions/errors.md` — framework vs app error convention

@@ -1,6 +1,6 @@
 ---
 name: run-orchestrator
-description: 'Durable stateful sessions with ai.orchestrator({...}) — the capstone of the 4-primitive ladder. Wraps a supervisor with cross-turn session state (checkpointStore), per-turn windowing, drift detection, post-turn compaction, mid-turn resume (iterate: true + snapshotStore), per-turn memory, typed commands, asTool, and a 3-tier event model. Triggers: `ai.orchestrator`, `orchestrator.execute`, `orchestrator.resume`, `orchestrator.command`, `orchestrator.stream`, `OrchestratorConfig`, `OrchestratorResult`, `OrchestratorReport`, `OrchestratorContract`, `CheckpointStore`, `OrchestratorDriftError`, `sessionId`, `iterate`, `historyWindow`, `summarize`, `keepSnapshots`, `awaiting-input`, `turns[]`, `TurnSnapshot`, `CompactionResult`, `initialAgent`, `checkpointStore`; ''multi-turn conversation that persists'', ''durable session across calls'', ''resume an interrupted turn'', ''compact session history'', ''per-session memory''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a single routing turn with no session — `@warlock.js/ai/run-supervisor/SKILL.md`; a fixed pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; the store factories themselves — `@warlock.js/ai/manage-ai-stores/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: 'Durable stateful sessions with ai.orchestrator({...}) — the capstone of the 4-primitive ladder. Wraps a supervisor with cross-turn session state (checkpointStore), per-turn windowing, drift detection, post-turn compaction, mid-turn resume (iterate: true + snapshotStore), per-turn memory, typed commands, asTool, and a 3-tier event model. Triggers: `ai.orchestrator`, `orchestrator.execute`, `orchestrator.resume`, `orchestrator.command`, `orchestrator.stream`, `OrchestratorConfig`, `OrchestratorResult`, `OrchestratorReport`, `OrchestratorContract`, `CheckpointStore`, `OrchestratorDriftError`, `sessionId`, `iterate`, `historyWindow`, `summarize`, `keepSnapshots`, `awaiting-input`, `turns[]`, `TurnSnapshot`, `CompactionResult`, `initialAgent`, `checkpointStore`; ''multi-turn conversation that persists'', ''durable session across calls'', ''resume an interrupted turn'', ''compact session history'', ''per-session memory''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a single routing turn with no session — the `run-supervisor` topic; a fixed pipeline — the `run-ai-workflow` topic; the store factories themselves — the `manage-ai-stores` topic; competing libs `langgraph`, `crewai`.'
 ---
 
 # `ai.orchestrator()` — durable stateful sessions
@@ -86,7 +86,7 @@ result.compaction;                // CompactionResult when a turn compacted (and
 
 `report.children[]` carries ONLY the current turn's dispatched primitive reports. Full session history lives on `report.turns[]` — a `children[]` walker will NOT reach prior turns (intentional). Child `supervisor.*` / `agent.*` events bubble up unmodified under their own identity.
 
-A turn callback that calls `agent.execute()` **directly** (not via `ctx.run` / `ctx.intents`) still nests `callback → agent → tool` inside the turn's report tree, with usage rolled up and the session's `sessionId` stamped onto the captured subtree — an ambient `RunFrame` handles the self-attach. See [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md).
+A turn callback that calls `agent.execute()` **directly** (not via `ctx.run` / `ctx.intents`) still nests `callback → agent → tool` inside the turn's report tree, with usage rolled up and the session's `sessionId` stamped onto the captured subtree — an ambient `RunFrame` handles the self-attach. See the `run-supervisor` topic.
 
 **`awaiting-input` is the only non-terminal status across the unified result tree.** Code branching on `status === "completed"` MUST explicitly handle `"awaiting-input"` as a session-continues path, not a failure.
 
@@ -158,7 +158,7 @@ ai.orchestrator({
 
 **Memory is session-scoped by default (4.15.0).** One store instance backs every session of the orchestrator, so `scope` decides what a turn may read: `"session"` (default) keys recall + write-back to the executing `sessionId`, so one user can never recall another's remembered turns. `"shared"` pools every session into one namespace — the pre-4.15.0 behavior, safe only when every session is trusted to see every other's memories. `(sessionId) => key` derives your own boundary (e.g. a tenant id). Memories written before 4.15.0 are unscoped and are only visible under `scope: "shared"`.
 
-Recalled memories land in the per-turn `context` bag under `injectKey` (default `"memories"`) — every route / router / evaluate / dispatch callback reads them at `ctx.context.memories`. Memory never mutates the prompt itself; surfacing it stays explicit. Cancelled / failed turns never remember (they revert), regardless of `remember`. See [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md).
+Recalled memories land in the per-turn `context` bag under `injectKey` (default `"memories"`) — every route / router / evaluate / dispatch callback reads them at `ctx.context.memories`. Memory never mutates the prompt itself; surfacing it stays explicit. Cancelled / failed turns never remember (they revert), regardless of `remember`. See the `use-ai-memory` topic.
 
 ## `asTool()` — orchestrator as a tool
 
@@ -195,11 +195,11 @@ await orch.execute(input, { sessionId, history, on: { "orchestrator.drift.checke
 
 ## Stores
 
-`checkpointStore` (cross-turn session state) and `snapshotStore` (internal-supervisor run state for `iterate: true`) are distinct contracts with distinct factories. See [`@warlock.js/ai/manage-ai-stores/SKILL.md`](@warlock.js/ai/manage-ai-stores/SKILL.md).
+`checkpointStore` (cross-turn session state) and `snapshotStore` (internal-supervisor run state for `iterate: true`) are distinct contracts with distinct factories. See the `manage-ai-stores` topic.
 
 ## See also
 
-- [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) — the engine each turn delegates to
-- [`@warlock.js/ai/manage-ai-stores/SKILL.md`](@warlock.js/ai/manage-ai-stores/SKILL.md) — `ai.checkpoint.*` / `ai.snapshot.*`
-- [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md) — the `memory` field
-- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `OrchestratorDriftError` / `OrchestratorConfigError`
+- The `run-supervisor` topic — the engine each turn delegates to
+- The `manage-ai-stores` topic — `ai.checkpoint.*` / `ai.snapshot.*`
+- The `use-ai-memory` topic — the `memory` field
+- The `handle-ai-errors` topic — `OrchestratorDriftError` / `OrchestratorConfigError`

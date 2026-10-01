@@ -1,6 +1,6 @@
 ---
 name: embed-text
-description: 'Text-to-vector via sdk.embedder({...}) — embed(string) for single, embedMany(string[]) for batch. Peer primitive on the SDK adapter, not wired into agents. Compose into RAG tools, workflow run steps, or ai.middleware.semanticCache. Triggers: `sdk.embedder`, `EmbedderContract`, `embedder.embed`, `embedder.embedMany`, `EmbeddingResult`, `EmbeddingBatchResult`, `dimensions`; ''embed text'', ''build RAG tool'', ''populate vector store'', ''embedding batch''; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: cache similarity — `@warlock.js/cache/use-cache-similarity/SKILL.md`; pgvector queries — `@warlock.js/cascade/search-by-vector/SKILL.md`; competing libs `langchain` embeddings, raw `openai.embeddings.create`.'
+description: 'Text-to-vector via sdk.embedder({...}) — embed(string) for single, embedMany(string[]) for batch. Peer primitive on the SDK adapter, not wired into agents. Compose into RAG tools, workflow run steps, or ai.middleware.semanticCache. Triggers: `sdk.embedder`, `EmbedderContract`, `embedder.embed`, `embedder.embedMany`, `EmbeddingResult`, `EmbeddingBatchResult`, `dimensions`; ''embed text'', ''build RAG tool'', ''populate vector store'', ''embedding batch''; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: cache similarity — the `use-cache-similarity` topic of the `warlock-js-cache` skill; pgvector queries — the `search-by-vector` topic of the `warlock-js-cascade` skill; competing libs `langchain` embeddings, raw `openai.embeddings.create`.'
 ---
 
 # Embeddings — peer primitive on the SDK adapter
@@ -51,9 +51,9 @@ Embeddings are deliberately not automatic. Consumers obtain an embedder from the
 
 - **Retrieval tools** the agent can call (RAG pattern).
 - **`run` steps** in a workflow (vector ingest, catalog item embedding).
-- **Query vectors** for `ai.middleware.semanticCache` — see [`@warlock.js/ai/attach-ai-middleware/SKILL.md`](@warlock.js/ai/attach-ai-middleware/SKILL.md).
-- **Cascade vector columns** for native pgvector search — see [`@warlock.js/cascade/search-by-vector/SKILL.md`](@warlock.js/cascade/search-by-vector/SKILL.md).
-- **Cache similarity retrieval** via `cache.set({ vector })` + `cache.similar(...)` — see [`@warlock.js/cache/use-cache-similarity/SKILL.md`](@warlock.js/cache/use-cache-similarity/SKILL.md).
+- **Query vectors** for `ai.middleware.semanticCache` — see the `attach-ai-middleware` topic.
+- **Cascade vector columns** for native pgvector search — see the `search-by-vector` topic of the `warlock-js-cascade` skill.
+- **Cache similarity retrieval** via `cache.set({ vector })` + `cache.similar(...)` — see the `use-cache-similarity` topic of the `warlock-js-cache` skill.
 
 ## Usage example — workflow `run` step
 
@@ -98,8 +98,8 @@ No built-in vector store. Bring your own (pgvector / Qdrant / Pinecone / Chroma 
 
 ## See also
 
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — composing embedders into tools
-- [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) — embeddings inside `run` steps
-- [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md) — performance guidance on vector storage
-- [`@warlock.js/cache/use-cache-similarity/SKILL.md`](@warlock.js/cache/use-cache-similarity/SKILL.md) — cache as a vector store
-- [`@warlock.js/cascade/search-by-vector/SKILL.md`](@warlock.js/cascade/search-by-vector/SKILL.md) — cascade `similarTo` query method
+- The `run-ai-agent` topic — composing embedders into tools
+- The `run-ai-workflow` topic — embeddings inside `run` steps
+- The `persist-ai-data` topic — performance guidance on vector storage
+- The `use-cache-similarity` topic of the `warlock-js-cache` skill — cache as a vector store
+- The `search-by-vector` topic of the `warlock-js-cascade` skill — cascade `similarTo` query method

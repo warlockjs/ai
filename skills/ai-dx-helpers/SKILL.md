@@ -173,8 +173,8 @@ const concierge = ai.agent({
 
 ## See also
 
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `agent.eval`, `tools: []`, the agent the helpers wrap
-- [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) — `ai.router` / `ai.fanOut` / supervisor `middleware` / `mockRouter`
-- [`@warlock.js/ai/attach-ai-middleware/SKILL.md`](@warlock.js/ai/attach-ai-middleware/SKILL.md) — budget / guardrail / semanticCache basics
-- [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — `systemPrompt.fromFile` in context
-- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) — `fallbackModel` wraps these adapters; cost-truth tokens
+- The `run-ai-agent` topic — `agent.eval`, `tools: []`, the agent the helpers wrap
+- The `run-supervisor` topic — `ai.router` / `ai.fanOut` / supervisor `middleware` / `mockRouter`
+- The `attach-ai-middleware` topic — budget / guardrail / semanticCache basics
+- The `write-system-prompt` topic — `systemPrompt.fromFile` in context
+- The `pick-ai-provider` topic — `fallbackModel` wraps these adapters; cost-truth tokens

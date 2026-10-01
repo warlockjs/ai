@@ -1,6 +1,6 @@
 ---
 name: detect-and-redact-pii
-description: 'Detect and redact PII (and run model-graded moderation) with @warlock.js/ai-guard detectors — `ai.guardrail.pii(...)` and the optional `ai.guardrail.moderation(...)` peer. Triggers: `ai.guardrail.pii`, `piiDetector`, `PiiDetectorOptions`, `PiiCategory`, `mask`, `{label}`, `dictionary`, `onMatch`, `ai.guardrail.moderation`, `openAiModeration`, `OpenAiModerationOptions`, `blockOn`, `omni-moderation-latest`; ''redact PII from model output'', ''mask SSN / credit card / email / phone / IP'', ''stop PII leaking into a tool call'', ''scrub sensitive data'', ''add OpenAI moderation'', ''block violent / self-harm content''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail.pii` / `.moderation`) or `import { pii, moderation } from "@warlock.js/ai-guard"`. Skip: composing the guard / wiring it into an agent — `@warlock.js/ai-guard/guard-input-output/SKILL.md`; routing a block to a human — `@warlock.js/ai-guard/escalate-block-to-human/SKILL.md`.'
+description: 'Detect and redact PII (and run model-graded moderation) with @warlock.js/ai-guard detectors — `ai.guardrail.pii(...)` and the optional `ai.guardrail.moderation(...)` peer. Triggers: `ai.guardrail.pii`, `piiDetector`, `PiiDetectorOptions`, `PiiCategory`, `mask`, `{label}`, `dictionary`, `onMatch`, `ai.guardrail.moderation`, `openAiModeration`, `OpenAiModerationOptions`, `blockOn`, `omni-moderation-latest`; ''redact PII from model output'', ''mask SSN / credit card / email / phone / IP'', ''stop PII leaking into a tool call'', ''scrub sensitive data'', ''add OpenAI moderation'', ''block violent / self-harm content''; typical import `import "@warlock.js/ai-guard"` (registers `ai.guardrail.pii` / `.moderation`) or `import { pii, moderation } from "@warlock.js/ai-guard"`. Skip: composing the guard / wiring it into an agent — the `guard-input-output` topic; routing a block to a human — the `escalate-block-to-human` topic.'
 ---
 
 # Detect and redact PII (and moderate)
@@ -100,5 +100,5 @@ npm install openai
 
 ## See also
 
-- [`@warlock.js/ai-guard/guard-input-output/SKILL.md`](@warlock.js/ai-guard/guard-input-output/SKILL.md) — composing the guard, the verdict model, phases, and `toolNames` scoping.
-- [`@warlock.js/ai-guard/escalate-block-to-human/SKILL.md`](@warlock.js/ai-guard/escalate-block-to-human/SKILL.md) — escalating a hard `block` to a human-review surface.
+- The `guard-input-output` topic — composing the guard, the verdict model, phases, and `toolNames` scoping.
+- The `escalate-block-to-human` topic — escalating a hard `block` to a human-review surface.

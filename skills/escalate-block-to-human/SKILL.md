@@ -1,6 +1,6 @@
 ---
 name: escalate-block-to-human
-description: 'Route a hard guardrail block to a human-review surface with @warlock.js/ai-guard — the `escalation.onBlock` seam and an `escalate: true` verdict. Triggers: `escalation`, `onBlock`, `GuardrailEscalation`, `GuardrailBlockEvent`, `escalate: true`, `{ type: "block", escalate: true }`, ''escalate a block to a human'', ''human review queue for guardrail'', ''page an operator on a guardrail block'', ''human-in-the-loop guardrail'', ''compose a block with a review surface'', ''custom detector that escalates''; typical import `import "@warlock.js/ai-guard"` then `ai.guardrail({ escalation: { onBlock } })`. Skip: composing the guard / phases / verdict model — `@warlock.js/ai-guard/guard-input-output/SKILL.md`; PII/moderation detectors — `@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md`; durable suspend/resume human-step machinery (deferred) — not in this package.'
+description: 'Route a hard guardrail block to a human-review surface with @warlock.js/ai-guard — the `escalation.onBlock` seam and an `escalate: true` verdict. Triggers: `escalation`, `onBlock`, `GuardrailEscalation`, `GuardrailBlockEvent`, `escalate: true`, `{ type: "block", escalate: true }`, ''escalate a block to a human'', ''human review queue for guardrail'', ''page an operator on a guardrail block'', ''human-in-the-loop guardrail'', ''compose a block with a review surface'', ''custom detector that escalates''; typical import `import "@warlock.js/ai-guard"` then `ai.guardrail({ escalation: { onBlock } })`. Skip: composing the guard / phases / verdict model — the `guard-input-output` topic; PII/moderation detectors — the `detect-and-redact-pii` topic; durable suspend/resume human-step machinery (deferred) — not in this package.'
 ---
 
 # Escalate a block to a human
@@ -81,5 +81,5 @@ A `check()` may be sync or async (async = call an external service); the guard a
 
 ## See also
 
-- [`@warlock.js/ai-guard/guard-input-output/SKILL.md`](@warlock.js/ai-guard/guard-input-output/SKILL.md) — composing the guard, the phases, the verdict model, and how a `block` surfaces on `result.error`.
-- [`@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md`](@warlock.js/ai-guard/detect-and-redact-pii/SKILL.md) — the `pii` detector and the optional `moderation` peer that commonly drives an escalation.
+- The `guard-input-output` topic — composing the guard, the phases, the verdict model, and how a `block` surfaces on `result.error`.
+- The `detect-and-redact-pii` topic — the `pii` detector and the optional `moderation` peer that commonly drives an escalation.

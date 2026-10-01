@@ -1,6 +1,6 @@
 ---
 name: run-ai-workflow
-description: 'Build durable resumable pipelines with ai.workflow({...}) + ai.step({...}) — lifecycle (skip / before / run|agent|parallel / output / after / nextStep), retry, parallel groups, snapshot resume. Triggers: `ai.workflow`, `ai.step`, `wf.execute`, `wf.resume`, `WorkflowContext`, `WorkflowResult`, `StepSnapshot`, `nextStep`, `onFailure`, `WorkflowDriftError`; ''build a workflow'', ''define a step'', ''resume after crash'', ''parallel steps'', ''retry with backoff''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; supervisor — `@warlock.js/ai/run-supervisor/SKILL.md`; competing libs `temporal`, `inngest`, `bullmq`.'
+description: 'Build durable resumable pipelines with ai.workflow({...}) + ai.step({...}) — lifecycle (skip / before / run|agent|parallel / output / after / nextStep), retry, parallel groups, snapshot resume. Triggers: `ai.workflow`, `ai.step`, `wf.execute`, `wf.resume`, `WorkflowContext`, `WorkflowResult`, `StepSnapshot`, `nextStep`, `onFailure`, `WorkflowDriftError`; ''build a workflow'', ''define a step'', ''resume after crash'', ''parallel steps'', ''retry with backoff''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent — the `run-ai-agent` topic; supervisor — the `run-supervisor` topic; competing libs `temporal`, `inngest`, `bullmq`.'
 ---
 
 # `ai.workflow()` — static, deterministic pipelines
@@ -10,7 +10,7 @@ Second rung of the 4-primitive ladder. A named, ordered set of steps with a stab
 ## When NOT to use a workflow
 
 - Unknown shape at author time → wait for `ai.planner()` (v3)
-- Quality-loop until goal met → [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md)
+- Quality-loop until goal met → the `run-supervisor` topic
 - Multi-turn conversation with persistent session → orchestrator (v2)
 - Iterate a runtime list of items → `ai.batch()` utility wrapping a workflow
 
@@ -91,7 +91,7 @@ All failures funnel into `result.error`:
 - `WorkflowCancelledError` / `WORKFLOW_CANCELLED`
 - `MaxStepsExceededError` / `WORKFLOW_MAX_STEPS`
 
-See [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md).
+See the `handle-ai-errors` topic.
 
 ## Result shape
 
@@ -113,7 +113,7 @@ type WorkflowResult<TOutput> = {
 
 ### Run-step sub-agent nesting
 
-`report.children` collects every step's captured executable report — a `step.agent`'s report, AND (mirroring the supervisor/team/orchestrator callback pattern — [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md)) anything a `run` step's callback invoked DIRECTLY, e.g. `agent.execute(...)` rather than the declarative `agent` field:
+`report.children` collects every step's captured executable report — a `step.agent`'s report, AND (mirroring the supervisor/team/orchestrator callback pattern — the `run-supervisor` topic) anything a `run` step's callback invoked DIRECTLY, e.g. `agent.execute(...)` rather than the declarative `agent` field:
 
 ```ts
 ai.step({
@@ -251,7 +251,7 @@ Between-step cancellation is guaranteed. Mid-step is best-effort. `status: "canc
 
 ## Persistence & resume
 
-See [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md).
+See the `persist-ai-data` topic.
 
 ```ts
 await wf.execute({ input, runId: "ticket-123" });  // fresh run
@@ -272,6 +272,6 @@ Every payload carries `runId` and `rootRunId`.
 
 ## See also
 
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — agents inside steps
-- [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md) — snapshot resume + drift
-- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `WorkflowError` subclasses
+- The `run-ai-agent` topic — agents inside steps
+- The `persist-ai-data` topic — snapshot resume + drift
+- The `handle-ai-errors` topic — `WorkflowError` subclasses

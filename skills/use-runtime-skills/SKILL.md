@@ -1,6 +1,6 @@
 ---
 name: use-runtime-skills
-description: 'Progressive-disclosure agent skills with ai.skills({...}) and the first-class `skills` option on ai.agent — an always-injected cheap metadata catalog plus an on-demand loadSkill tool, backed by directory / url / store sources. Covers inject ("all" | {select:"semantic",topK,embedder}), maxLoadsPerRun, scope tags, the MockSkillsStore, semantic preload, and the inert-by-default Phase-2 self-authoring (saveSkill + default-DENY review gate → promote). Triggers: `ai.skills`, `SkillsConfig`, `SkillsContract`, `SkillSource`, `SkillInjectMode`, `SkillRecord`, `SkillCatalogEntry`, `loadSkill`, `loadSkillTool`, `saveSkill`, `saveSkillTool`, `SkillReviewGate`, `runReviewGate`, `MockSkillsStore`, `proceduralSkillStore`, `maxLoadsPerRun`, `inject`, `scope`, `review`, the agent `skills:` option; ''give an agent loadable skills'', ''progressive disclosure of instructions'', ''catalog of skills the model pulls on demand'', ''semantic preload of skill bodies'', ''let an agent author and review a skill''; typical import `import { ai } from "@warlock.js/ai"`. Skip: composing static system prompts — `@warlock.js/ai/write-system-prompt/SKILL.md`; durable agent memory tiers — `@warlock.js/ai/use-ai-memory/SKILL.md`; defining callable tools — `@warlock.js/ai/define-ai-tool/SKILL.md`.'
+description: 'Progressive-disclosure agent skills with ai.skills({...}) and the first-class `skills` option on ai.agent — an always-injected cheap metadata catalog plus an on-demand loadSkill tool, backed by directory / url / store sources. Covers inject ("all" | {select:"semantic",topK,embedder}), maxLoadsPerRun, scope tags, the MockSkillsStore, semantic preload, and the inert-by-default Phase-2 self-authoring (saveSkill + default-DENY review gate → promote). Triggers: `ai.skills`, `SkillsConfig`, `SkillsContract`, `SkillSource`, `SkillInjectMode`, `SkillRecord`, `SkillCatalogEntry`, `loadSkill`, `loadSkillTool`, `saveSkill`, `saveSkillTool`, `SkillReviewGate`, `runReviewGate`, `MockSkillsStore`, `proceduralSkillStore`, `maxLoadsPerRun`, `inject`, `scope`, `review`, the agent `skills:` option; ''give an agent loadable skills'', ''progressive disclosure of instructions'', ''catalog of skills the model pulls on demand'', ''semantic preload of skill bodies'', ''let an agent author and review a skill''; typical import `import { ai } from "@warlock.js/ai"`. Skip: composing static system prompts — the `write-system-prompt` topic; durable agent memory tiers — the `use-ai-memory` topic; defining callable tools — the `define-ai-tool` topic.'
 ---
 
 # `ai.skills()` — runtime skills with progressive disclosure
@@ -41,7 +41,7 @@ const lib = ai.skills({
 ### Sources — `SkillSource` (discriminated by `type`, never `kind`)
 
 - `{ type: "directory", path }` — reads `path/<folder>/SKILL.md` off disk (lazy `node:fs/promises`).
-- `{ type: "url", url, headers?, policy?, cacheTtlMs? }` — `urlSource(url, options)` fetches a JSON manifest of skills through the shared `guardedFetch` / `OutboundPolicy` guard (scheme/host allowlist, post-DNS private-IP deny, byte cap, timeout, per-hop redirect revalidation) — never a raw `fetch()`. A remote skill source is a prompt supply chain (bodies flow straight into model context), so every fetched record is also runtime-validated before it can be served. `policy` tunes the guard (e.g. `hostAllowlist`); see [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md). The result is cached for the source's lifetime, or `cacheTtlMs` when set.
+- `{ type: "url", url, headers?, policy?, cacheTtlMs? }` — `urlSource(url, options)` fetches a JSON manifest of skills through the shared `guardedFetch` / `OutboundPolicy` guard (scheme/host allowlist, post-DNS private-IP deny, byte cap, timeout, per-hop redirect revalidation) — never a raw `fetch()`. A remote skill source is a prompt supply chain (bodies flow straight into model context), so every fetched record is also runtime-validated before it can be served. `policy` tunes the guard (e.g. `hostAllowlist`); see the `secure-outbound-requests` topic. The result is cached for the source's lifetime, or `cacheTtlMs` when set.
 - `{ type: "store", store }` — any `SkillsStoreContract`, e.g. `MockSkillsStore`.
 
 Sources merge in order; a later source wins on a name collision.
@@ -101,7 +101,7 @@ The optional `analytics` sink fires `catalogued` / `loaded` / `used` / `saved` /
 
 ## See also
 
-- [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — static persona / instruction blocks (vs. dynamic loaded skills)
-- [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md) — the procedural memory tier `proceduralSkillStore` unifies with
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the agent the `skills` option attaches to
-- [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md) — the `guardedFetch` / `OutboundPolicy` guard the `url` source's manifest fetch runs through
+- The `write-system-prompt` topic — static persona / instruction blocks (vs. dynamic loaded skills)
+- The `use-ai-memory` topic — the procedural memory tier `proceduralSkillStore` unifies with
+- The `run-ai-agent` topic — the agent the `skills` option attaches to
+- The `secure-outbound-requests` topic — the `guardedFetch` / `OutboundPolicy` guard the `url` source's manifest fetch runs through

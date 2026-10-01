@@ -27,14 +27,14 @@ Beyond the ladder: `ai.planner()` (LLM-generated plans), `ai.memory()` (working 
 ## Foundations
 
 1. **Public API is functional factories.** Use `ai.agent({...})`, `ai.tool({...})`, `ai.workflow({...})`, `ai.step({...})`, `ai.supervisor({...})`, `ai.systemPrompt()`, `ai.persona()`, `ai.instruction()`. Never `new Agent()`.
-2. **Adapter entry points are classes.** `new OpenAISDK({ apiKey })` from [`@warlock.js/ai-openai/setup-openai/SKILL.md`](@warlock.js/ai-openai/setup-openai/SKILL.md).
-3. **Schemas everywhere are `StandardSchemaV1<T>`.** Recommended: [`@warlock.js/seal`](@warlock.js/seal/seal-basics/SKILL.md) — `v.object({...})`. Zod, Valibot, hand-rolled all interop.
-4. **`execute()` never throws.** Errors funnel into `result.error` as a typed `AIError` subclass. Same for `stream.result`, `workflow.execute()` / `resume()`, `supervisor.execute()` / `resume()`. See [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md).
+2. **Adapter entry points are classes.** `new OpenAISDK({ apiKey })` from the `setup-openai` topic of the `warlock-js-ai-openai` skill.
+3. **Schemas everywhere are `StandardSchemaV1<T>`.** Recommended: `@warlock.js/seal` (the `seal-basics` topic of the `warlock-js-seal` skill) — `v.object({...})`. Zod, Valibot, hand-rolled all interop.
+4. **`execute()` never throws.** Errors funnel into `result.error` as a typed `AIError` subclass. Same for `stream.result`, `workflow.execute()` / `resume()`, `supervisor.execute()` / `resume()`. See the `handle-ai-errors` topic.
 5. **Each `execute()` call is isolated.** Fresh internal execution instance per call.
 6. **Every error is an `AIError`.** Plain `Error` never leaks. Branch on `error.code` (stable string), `error.category` (coarse), or `instanceof`.
 7. **Result shape is uniform.** `{ data, error, usage, report }` across every primitive. `report` is a recursive `BaseReport` tree.
-8. **Persistence is delegated** to `@warlock.js/cache`. See [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md).
-9. **Logging is delegated** to `@warlock.js/logger`. See [`@warlock.js/ai/log-ai-calls/SKILL.md`](@warlock.js/ai/log-ai-calls/SKILL.md).
+8. **Persistence is delegated** to `@warlock.js/cache`. See the `persist-ai-data` topic.
+9. **Logging is delegated** to `@warlock.js/logger`. See the `log-ai-calls` topic.
 10. **`name` on agents is optional.** Anonymous agents get a deterministic `anon_<provider>_<model>` fingerprint.
 11. **Every report carries lineage** — `rootRunId` + `parentRunId` + `reportSchemaVersion: 1`.
 12. **`version` is dev-curated, `sessionId` is caller-supplied** — both propagate through nested reports.
@@ -60,23 +60,23 @@ console.log(text, usage.total, report.duration);
 
 | If the task is about… | Load |
 | --- | --- |
-| `ai.agent({...})` — single-LLM-turn primitive, structured output, streaming, attachments, `spawnSubAgent` | [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) |
-| `ai.tool({...})` — typed validated functions the model can call | [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) |
-| `ai.systemPrompt()` / `ai.persona()` / `ai.instruction()` — composable prompts with placeholders | [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) |
-| `ai.workflow({...})` — durable resumable pipelines with steps, routing, retry | [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) |
-| `ai.supervisor({...})` — multi-intent routing, fan-out, evaluate loops | [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) |
-| `ai.orchestrator({...})` — durable stateful sessions, drift, compaction, resume | [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md) |
-| `ai.planner({...})` — LLM-generated plans over registered capabilities | [`@warlock.js/ai/run-planner/SKILL.md`](@warlock.js/ai/run-planner/SKILL.md) |
-| `ai.memory({...})` — working + semantic recall for agents / sessions | [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md) |
-| `ai.checkpoint.*` / `ai.snapshot.*` — orchestrator session + run stores | [`@warlock.js/ai/manage-ai-stores/SKILL.md`](@warlock.js/ai/manage-ai-stores/SKILL.md) |
-| DX helpers — `batch` / `fallbackModel` / `eval` + matchers / SLO contracts / `fromFile` | [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md) |
-| `sdk.embedder({...})` — text-to-vector for RAG tools, vector ingest | [`@warlock.js/ai/embed-text/SKILL.md`](@warlock.js/ai/embed-text/SKILL.md) |
-| Agent + supervisor middleware — `budget` / `guardrail` / `semanticCache` + custom hooks | [`@warlock.js/ai/attach-ai-middleware/SKILL.md`](@warlock.js/ai/attach-ai-middleware/SKILL.md) |
-| Snapshot resume + semantic cache via `@warlock.js/cache` | [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md) |
-| Configuring framework logging | [`@warlock.js/ai/log-ai-calls/SKILL.md`](@warlock.js/ai/log-ai-calls/SKILL.md) |
-| `AIError` hierarchy, `error.code` / `error.category`, retry patterns (incl. `ORCHESTRATOR_*` / `PLANNER_*` families) | [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) |
-| Provider adapters + cost truth (pricing / cache + reasoning tokens / capabilities) | [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) |
-| Observability — `panoptic()` subscriber, queryable trace store, OTEL / Langfuse / console / file exporters | [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) |
+| `ai.agent({...})` — single-LLM-turn primitive, structured output, streaming, attachments, `spawnSubAgent` | the `run-ai-agent` topic |
+| `ai.tool({...})` — typed validated functions the model can call | the `define-ai-tool` topic |
+| `ai.systemPrompt()` / `ai.persona()` / `ai.instruction()` — composable prompts with placeholders | the `write-system-prompt` topic |
+| `ai.workflow({...})` — durable resumable pipelines with steps, routing, retry | the `run-ai-workflow` topic |
+| `ai.supervisor({...})` — multi-intent routing, fan-out, evaluate loops | the `run-supervisor` topic |
+| `ai.orchestrator({...})` — durable stateful sessions, drift, compaction, resume | the `run-orchestrator` topic |
+| `ai.planner({...})` — LLM-generated plans over registered capabilities | the `run-planner` topic |
+| `ai.memory({...})` — working + semantic recall for agents / sessions | the `use-ai-memory` topic |
+| `ai.checkpoint.*` / `ai.snapshot.*` — orchestrator session + run stores | the `manage-ai-stores` topic |
+| DX helpers — `batch` / `fallbackModel` / `eval` + matchers / SLO contracts / `fromFile` | the `ai-dx-helpers` topic |
+| `sdk.embedder({...})` — text-to-vector for RAG tools, vector ingest | the `embed-text` topic |
+| Agent + supervisor middleware — `budget` / `guardrail` / `semanticCache` + custom hooks | the `attach-ai-middleware` topic |
+| Snapshot resume + semantic cache via `@warlock.js/cache` | the `persist-ai-data` topic |
+| Configuring framework logging | the `log-ai-calls` topic |
+| `AIError` hierarchy, `error.code` / `error.category`, retry patterns (incl. `ORCHESTRATOR_*` / `PLANNER_*` families) | the `handle-ai-errors` topic |
+| Provider adapters + cost truth (pricing / cache + reasoning tokens / capabilities) | the `pick-ai-provider` topic |
+| Observability — `panoptic()` subscriber, queryable trace store, OTEL / Langfuse / console / file exporters | the `observe-with-panoptic` topic of the `warlock-js-ai-panoptic` skill |
 
 ## Package layout
 
@@ -90,7 +90,7 @@ console.log(text, usage.total, report.duration);
 @warlock.js/ai-panoptic      — observability sidecar: panoptic() subscriber → collector → queryable trace store + console / file / OTEL / Langfuse exporters
 ```
 
-The observability sidecar is OPTIONAL and lives in its own package — it subscribes to the report tree every primitive already emits, so you wire `panoptic(...)` once and never touch primitive code. Load [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) for collecting / querying traces and [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) for OTEL / Langfuse / console / file exporters.
+The observability sidecar is OPTIONAL and lives in its own package — it subscribes to the report tree every primitive already emits, so you wire `panoptic(...)` once and never touch primitive code. Load the `observe-with-panoptic` topic of the `warlock-js-ai-panoptic` skill for collecting / querying traces and the `export-traces` topic of the `warlock-js-ai-panoptic` skill for OTEL / Langfuse / console / file exporters.
 
 Runtime deps: `@warlock.js/cache` (persistence), `@warlock.js/logger` (logging), `@warlock.js/seal` (recommended schema lib).
 

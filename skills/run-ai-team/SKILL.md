@@ -1,6 +1,6 @@
 ---
 name: run-ai-team
-description: 'Manager-led multi-agent teams with ai.team({...}) — transparent sugar over ai.supervisor that maps a manager → route/router, members → intents, and a gate → evaluate, returning a REAL SupervisorContract (no new loop, no new contract). Covers the built-in gate strings "quality" (review-then-fix) and "verify" (test-then-fix), a custom gate function, role mapping (roles / gateKey), and the verbatim supervisor pass-throughs (goal / output / state / maxIterations / snapshotStore / on / observe). Triggers: `ai.team`, `TeamConfig`, `TeamGate`, `TeamGateFn`, `TeamMemberValue`, `manager`, `members`, `gate`, `roles`, `gateKey`, `buildQualityGate`, `buildVerifyGate`, `SupervisorContract`, `ReportType`; ''build a team of agents'', ''manager that delegates to members'', ''review then fix loop'', ''test then fix loop'', ''quality gate for a multi-agent run'', ''report type team''; typical import `import { ai } from "@warlock.js/ai"`. Skip: routing one input to a fixed roster directly — `@warlock.js/ai/run-supervisor/SKILL.md` (team is sugar over it); durable cross-turn sessions — `@warlock.js/ai/run-orchestrator/SKILL.md`; LLM-generated plans — `@warlock.js/ai/run-planner/SKILL.md`; competing libs `crewai`, `autogen`.'
+description: 'Manager-led multi-agent teams with ai.team({...}) — transparent sugar over ai.supervisor that maps a manager → route/router, members → intents, and a gate → evaluate, returning a REAL SupervisorContract (no new loop, no new contract). Covers the built-in gate strings "quality" (review-then-fix) and "verify" (test-then-fix), a custom gate function, role mapping (roles / gateKey), and the verbatim supervisor pass-throughs (goal / output / state / maxIterations / snapshotStore / on / observe). Triggers: `ai.team`, `TeamConfig`, `TeamGate`, `TeamGateFn`, `TeamMemberValue`, `manager`, `members`, `gate`, `roles`, `gateKey`, `buildQualityGate`, `buildVerifyGate`, `SupervisorContract`, `ReportType`; ''build a team of agents'', ''manager that delegates to members'', ''review then fix loop'', ''test then fix loop'', ''quality gate for a multi-agent run'', ''report type team''; typical import `import { ai } from "@warlock.js/ai"`. Skip: routing one input to a fixed roster directly — the `run-supervisor` topic (team is sugar over it); durable cross-turn sessions — the `run-orchestrator` topic; LLM-generated plans — the `run-planner` topic; competing libs `crewai`, `autogen`.'
 ---
 
 # `ai.team()` — manager + members + a quality gate
@@ -98,10 +98,10 @@ ai.team({
 
 The one behavioural difference from a bare supervisor: a team stamps **`type: "team"`** on both its report (a first-class `ReportType`, was `"supervisor"`) and its result, so Panoptic and any `Observer` can distinguish, group, filter, and label team runs as their own type rather than folding them into plain supervisor runs. Everything else passes through 1:1.
 
-A member callback that calls `agent.execute()` **directly** still nests `member → agent → tool` under the member span with usage rolled up — the same ambient-`RunFrame` auto-nesting as a bare supervisor. See [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md).
+A member callback that calls `agent.execute()` **directly** still nests `member → agent → tool` under the member span with usage rolled up — the same ambient-`RunFrame` auto-nesting as a bare supervisor. See the `run-supervisor` topic.
 
 ## See also
 
-- [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) — the primitive team desugars into (intents, route/router, evaluate, ctx.intents)
-- [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md) — wrap a team in durable cross-turn session state
-- [`@warlock.js/ai/observe-ai-flows/SKILL.md`](@warlock.js/ai/observe-ai-flows/SKILL.md) — the `observe` seam a team inherits
+- The `run-supervisor` topic — the primitive team desugars into (intents, route/router, evaluate, ctx.intents)
+- The `run-orchestrator` topic — wrap a team in durable cross-turn session state
+- The `observe-ai-flows` topic — the `observe` seam a team inherits

@@ -1,6 +1,6 @@
 ---
 name: attach-ai-middleware
-description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — `@warlock.js/ai/run-ai-agent/SKILL.md`; cache drivers — `@warlock.js/ai/persist-ai-data/SKILL.md`; competing libs `langchain` callbacks.'
+description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
 ---
 
 # Middleware — agent-level pipeline
@@ -70,7 +70,7 @@ ai.middleware.budget({
 });
 ```
 
-Every clause optional (no caps = inert). `"fallback"` can't itself swap models — it records a typed `BudgetContractViolation` and fires `fallback`; an outer layer reads it via `readBudgetFallbackSignal(ctx.state)` and degrades the next run. A latency breach has no `BudgetUnit` — read its numbers from the thrown error's `context.dimension`. Full coverage in [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md).
+Every clause optional (no caps = inert). `"fallback"` can't itself swap models — it records a typed `BudgetContractViolation` and fires `fallback`; an outer layer reads it via `readBudgetFallbackSignal(ctx.state)` and degrades the next run. A latency breach has no `BudgetUnit` — read its numbers from the thrown error's `context.dimension`. Full coverage in the `ai-dx-helpers` topic.
 
 ## `ai.middleware.guardrail(options)`
 
@@ -214,7 +214,7 @@ const scoped = ai.middleware.forTool(["paid_api", "expensive_db"], toolRateLimit
 ai.supervisor({ name: "support", router, intents, middleware: [auditTrail] });
 ```
 
-Same onion semantics: `before` top-down (return a `SupervisorResult` to short-circuit, throw to abort), `after` / `onError` bottom-up. A middleware WITHOUT a `supervisor` hook map is skipped — so the SAME builtin objects (budget, guardrail, …) can be registered on agents AND on the supervisor, each declaring whichever level applies. Each needs a unique `name`. See [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md).
+Same onion semantics: `before` top-down (return a `SupervisorResult` to short-circuit, throw to abort), `after` / `onError` bottom-up. A middleware WITHOUT a `supervisor` hook map is skipped — so the SAME builtin objects (budget, guardrail, …) can be registered on agents AND on the supervisor, each declaring whichever level applies. Each needs a unique `name`. See the `ai-dx-helpers` topic.
 
 ## Workflow + middleware — what works today
 
@@ -224,6 +224,6 @@ Same onion semantics: `before` top-down (return a `SupervisorResult` to short-ci
 
 ## See also
 
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — agent lifecycle the middleware wraps
-- [`@warlock.js/ai/persist-ai-data/SKILL.md`](@warlock.js/ai/persist-ai-data/SKILL.md) — `defaultStore` for semantic cache
-- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `BudgetExceededError` / `GuardrailViolationError`
+- The `run-ai-agent` topic — agent lifecycle the middleware wraps
+- The `persist-ai-data` topic — `defaultStore` for semantic cache
+- The `handle-ai-errors` topic — `BudgetExceededError` / `GuardrailViolationError`

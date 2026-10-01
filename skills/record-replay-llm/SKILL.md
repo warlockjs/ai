@@ -1,6 +1,6 @@
 ---
 name: record-replay-llm
-description: 'Deterministic, offline LLM tests with ai.vcr(model,{path,mode}) — a record/replay decorator over ANY ModelContract that intercepts only complete()/stream(), delegates name/provider/capabilities/pricing to the inner model, and hashes each request against a JSON cassette on disk. Covers the three modes (record / replay / auto), the cassette format, save(), VcrCassetteMissError, streaming round-trip, hashOptions, and composing below fallbackModel. Triggers: `ai.vcr`, `vcr`, `VcrModel`, `VcrOptions`, `VcrMode`, `Cassette`, `CassetteEntry`, `VcrCassetteMissError`, `hashRequest`, `DEFAULT_HASH_OPTIONS`, `mode`, `path`, `hashOptions`, `save`, `cassette`, record, replay, cassette; ''record LLM responses for tests'', ''replay model calls offline in CI'', ''deterministic agent test without hitting the provider'', ''cassette for model calls''; typical import `import { ai } from "@warlock.js/ai"`. Skip: eval scoring + regression gating — `@warlock.js/ai/eval-datasets-and-ci/SKILL.md`; the Vitest matchers + mockRouter — `@warlock.js/ai/ai-dx-helpers/SKILL.md`; choosing a provider adapter — `@warlock.js/ai/pick-ai-provider/SKILL.md`; competing libs `nock`, `polly.js`.'
+description: 'Deterministic, offline LLM tests with ai.vcr(model,{path,mode}) — a record/replay decorator over ANY ModelContract that intercepts only complete()/stream(), delegates name/provider/capabilities/pricing to the inner model, and hashes each request against a JSON cassette on disk. Covers the three modes (record / replay / auto), the cassette format, save(), VcrCassetteMissError, streaming round-trip, hashOptions, and composing below fallbackModel. Triggers: `ai.vcr`, `vcr`, `VcrModel`, `VcrOptions`, `VcrMode`, `Cassette`, `CassetteEntry`, `VcrCassetteMissError`, `hashRequest`, `DEFAULT_HASH_OPTIONS`, `mode`, `path`, `hashOptions`, `save`, `cassette`, record, replay, cassette; ''record LLM responses for tests'', ''replay model calls offline in CI'', ''deterministic agent test without hitting the provider'', ''cassette for model calls''; typical import `import { ai } from "@warlock.js/ai"`. Skip: eval scoring + regression gating — the `eval-datasets-and-ci` topic; the Vitest matchers + mockRouter — the `ai-dx-helpers` topic; choosing a provider adapter — the `pick-ai-provider` topic; competing libs `nock`, `polly.js`.'
 ---
 
 # `ai.vcr()` — record / replay any model
@@ -87,6 +87,6 @@ VCR composes **below** `ai.fallbackModel` and works with any adapter. Wrap the l
 
 ## See also
 
-- [`@warlock.js/ai/eval-datasets-and-ci/SKILL.md`](@warlock.js/ai/eval-datasets-and-ci/SKILL.md) — pair a cassette with a dataset for fully offline eval CI
-- [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md) — `ai.mockRouter` + Vitest matchers for the rest of the test surface
-- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) — the adapters whose models VCR wraps
+- The `eval-datasets-and-ci` topic — pair a cassette with a dataset for fully offline eval CI
+- The `ai-dx-helpers` topic — `ai.mockRouter` + Vitest matchers for the rest of the test surface
+- The `pick-ai-provider` topic — the adapters whose models VCR wraps

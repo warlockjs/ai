@@ -1,6 +1,6 @@
 ---
 name: secure-outbound-requests
-description: 'The shared SSRF / resource-exhaustion guard every server-side outbound HTTP request in the framework goes through — `guardedFetch(url, policy, init?)`, `OutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`. Scheme allowlist (https-only default), host allowlist, post-DNS private/loopback/link-local/metadata-address deny, byte cap, timeout, and (4.15.0) per-hop redirect revalidation with a `maxRedirects` cap and cross-origin credential stripping. Consumed by `ai.rag.loadWeb`, remote text attachments (`prepareAttachmentPart`), and the skills `urlSource` manifest fetch — never a raw `fetch()` on a caller-influenced URL. Triggers: `guardedFetch`, `OutboundPolicy`, `ResolvedOutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`, `resolveOutboundPolicy`, `OutboundPolicyError`, `maxRedirects`, `denyPrivateIPsAfterDNS`, `hostAllowlist`, `allowedSchemes`, `maxBytes`, `SSRF`, `redirect: "manual"`, `redirect: "error"`; ''SSRF-safe fetch'', ''block a redirect into a private IP'', ''fetch a URL an agent gave me'', ''cap outbound response size'', ''allowlist hosts for outbound requests'', ''strip auth headers on a cross-origin redirect''; typical import `import { guardedFetch, assertUrlAllowed } from "@warlock.js/ai"` (also re-exported per call site). Skip: the RAG loader that wraps this for `loadWeb` — `@warlock.js/ai/rag-loaders-and-stores/SKILL.md`; the skills manifest source that wraps this for `urlSource` — `@warlock.js/ai/use-runtime-skills/SKILL.md`; prompt-injection / content guardrails (a different trust boundary) — `@warlock.js/ai/guard-input-output/SKILL.md` (ai-guard package).'
+description: 'The shared SSRF / resource-exhaustion guard every server-side outbound HTTP request in the framework goes through — `guardedFetch(url, policy, init?)`, `OutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`. Scheme allowlist (https-only default), host allowlist, post-DNS private/loopback/link-local/metadata-address deny, byte cap, timeout, and (4.15.0) per-hop redirect revalidation with a `maxRedirects` cap and cross-origin credential stripping. Consumed by `ai.rag.loadWeb`, remote text attachments (`prepareAttachmentPart`), and the skills `urlSource` manifest fetch — never a raw `fetch()` on a caller-influenced URL. Triggers: `guardedFetch`, `OutboundPolicy`, `ResolvedOutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`, `resolveOutboundPolicy`, `OutboundPolicyError`, `maxRedirects`, `denyPrivateIPsAfterDNS`, `hostAllowlist`, `allowedSchemes`, `maxBytes`, `SSRF`, `redirect: "manual"`, `redirect: "error"`; ''SSRF-safe fetch'', ''block a redirect into a private IP'', ''fetch a URL an agent gave me'', ''cap outbound response size'', ''allowlist hosts for outbound requests'', ''strip auth headers on a cross-origin redirect''; typical import `import { guardedFetch, assertUrlAllowed } from "@warlock.js/ai"` (also re-exported per call site). Skip: the RAG loader that wraps this for `loadWeb` — the `rag-loaders-and-stores` topic; the skills manifest source that wraps this for `urlSource` — the `use-runtime-skills` topic; prompt-injection / content guardrails (a different trust boundary) — the `guard-input-output` topic (ai-guard package).'
 ---
 
 # Outbound request policy — the SSRF guard
@@ -67,9 +67,9 @@ if (!ok) throw new Error(`fetch failed: ${status}`);
 
 | Call site | Entry point | Notes |
 | --- | --- | --- |
-| RAG web loader | `ai.rag.loadWeb(url, { policy })` | [`@warlock.js/ai/rag-loaders-and-stores/SKILL.md`](@warlock.js/ai/rag-loaders-and-stores/SKILL.md) |
+| RAG web loader | `ai.rag.loadWeb(url, { policy })` | the `rag-loaders-and-stores` topic |
 | Remote text attachment | `prepareAttachmentPart` via `agent.execute({ attachments })` | default-DENY — requires `attachmentPolicy.allowRemoteFetch: true`; policy travels as `attachmentPolicy.outbound`. URL *image* attachments are handed to the provider as a URL and never fetched server-side, so they carry no SSRF surface here |
-| Skills catalog manifest | `ai.skills({ sources: [urlSource(url, { policy })] })` | [`@warlock.js/ai/use-runtime-skills/SKILL.md`](@warlock.js/ai/use-runtime-skills/SKILL.md) — the fetched manifest is also runtime-validated record-by-record before being trusted |
+| Skills catalog manifest | `ai.skills({ sources: [urlSource(url, { policy })] })` | the `use-runtime-skills` topic — the fetched manifest is also runtime-validated record-by-record before being trusted |
 
 Each call site passes its own `policy` (or `{}` for the strict defaults) — there is no global policy singleton, so tune per source (e.g. `hostAllowlist` for a known-good docs domain vs. an open web crawl).
 
@@ -79,7 +79,7 @@ Inject a stubbed `policy.fetch` (`(url, init) => Response`) instead of hitting t
 
 ## See also
 
-- [`@warlock.js/ai/rag-loaders-and-stores/SKILL.md`](@warlock.js/ai/rag-loaders-and-stores/SKILL.md) — `loadWeb`, the primary consumer
-- [`@warlock.js/ai/use-runtime-skills/SKILL.md`](@warlock.js/ai/use-runtime-skills/SKILL.md) — `urlSource`'s manifest fetch
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `attachments`, including the remote-text fetch path
-- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `OutboundPolicyError`
+- The `rag-loaders-and-stores` topic — `loadWeb`, the primary consumer
+- The `use-runtime-skills` topic — `urlSource`'s manifest fetch
+- The `run-ai-agent` topic — `attachments`, including the remote-text fetch path
+- The `handle-ai-errors` topic — `OutboundPolicyError`

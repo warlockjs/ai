@@ -1,6 +1,6 @@
 ---
 name: persist-ai-data
-description: 'Persistence delegated to @warlock.js/cache — workflow + supervisor snapshot resume via snapshotStore (4.3.0: now a SnapshotStore from ai.snapshot.*, ⚠ moved off raw CacheDriver), semantic cache + memory via vector-capable CacheDriver, global defaults via ai.config({defaultStore}) + ai.config({defaultSnapshotStore}). Covers drift detection + three recovery paths. Triggers: `ai.config`, `defaultStore`, `defaultSnapshotStore`, `snapshotStore`, `ai.snapshot`, `wf.resume`, `supervisor.resume`, `WorkflowSnapshot`, `SupervisorSnapshot`, `WorkflowDriftError`, `SupervisorDriftError`, `force: true`; ''resume a workflow run'', ''configure snapshot store'', ''handle signature drift'', ''wire pg vector cache''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator checkpoint/snapshot store factories — `@warlock.js/ai/manage-ai-stores/SKILL.md`; cache driver catalog — `@warlock.js/cache/cache-basics/SKILL.md`; competing libs `temporal`, `inngest`.'
+description: 'Persistence delegated to @warlock.js/cache — workflow + supervisor snapshot resume via snapshotStore (4.3.0: now a SnapshotStore from ai.snapshot.*, ⚠ moved off raw CacheDriver), semantic cache + memory via vector-capable CacheDriver, global defaults via ai.config({defaultStore}) + ai.config({defaultSnapshotStore}). Covers drift detection + three recovery paths. Triggers: `ai.config`, `defaultStore`, `defaultSnapshotStore`, `snapshotStore`, `ai.snapshot`, `wf.resume`, `supervisor.resume`, `WorkflowSnapshot`, `SupervisorSnapshot`, `WorkflowDriftError`, `SupervisorDriftError`, `force: true`; ''resume a workflow run'', ''configure snapshot store'', ''handle signature drift'', ''wire pg vector cache''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator checkpoint/snapshot store factories — the `manage-ai-stores` topic; cache driver catalog — the `cache-basics` topic of the `warlock-js-cache` skill; competing libs `temporal`, `inngest`.'
 ---
 
 # Persistence — `@warlock.js/cache` everywhere
@@ -64,7 +64,7 @@ Brute-force memory drivers carry an `O(N)` similarity scan — fine up to a few 
 
 ## Snapshot resume — workflow + supervisor
 
-> ⚠ **BREAKING (4.3.0): supervisor + workflow snapshot persistence moved `CacheDriver` → `SnapshotStore`.** A `snapshotStore` is now a `SnapshotStore` built with `ai.snapshot.{memory,pg,redis}()`, not a raw `cache.driver(...)`. The framework still ships a deprecated `CacheDriver` overload for ONE minor so existing wiring keeps working, but new code uses the dedicated store factories. The `defaultSnapshotStore` resolution is via `ai.config({ defaultSnapshotStore })` (a `SnapshotStore`), separate from `defaultStore` (a `CacheDriver`, still used for `semanticCache` + memory). See [`@warlock.js/ai/manage-ai-stores/SKILL.md`](@warlock.js/ai/manage-ai-stores/SKILL.md).
+> ⚠ **BREAKING (4.3.0): supervisor + workflow snapshot persistence moved `CacheDriver` → `SnapshotStore`.** A `snapshotStore` is now a `SnapshotStore` built with `ai.snapshot.{memory,pg,redis}()`, not a raw `cache.driver(...)`. The framework still ships a deprecated `CacheDriver` overload for ONE minor so existing wiring keeps working, but new code uses the dedicated store factories. The `defaultSnapshotStore` resolution is via `ai.config({ defaultSnapshotStore })` (a `SnapshotStore`), separate from `defaultStore` (a `CacheDriver`, still used for `semanticCache` + memory). See the `manage-ai-stores` topic.
 
 ### Wiring (new)
 
@@ -206,13 +206,13 @@ const myAgent = ai.agent({
 });
 ```
 
-The driver must support `similar()`. Without similarity → `CacheUnsupportedError`. See [`@warlock.js/ai/attach-ai-middleware/SKILL.md`](@warlock.js/ai/attach-ai-middleware/SKILL.md).
+The driver must support `similar()`. Without similarity → `CacheUnsupportedError`. See the `attach-ai-middleware` topic.
 
 ## See also
 
-- [`@warlock.js/ai/manage-ai-stores/SKILL.md`](@warlock.js/ai/manage-ai-stores/SKILL.md) — `ai.snapshot.*` + `ai.checkpoint.*` store factories, schema(), drivers
-- [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) — `snapshotStore` + `resume()`
-- [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) — same on supervisor
-- [`@warlock.js/ai/attach-ai-middleware/SKILL.md`](@warlock.js/ai/attach-ai-middleware/SKILL.md) — `semanticCache` middleware
-- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — drift errors
-- [`@warlock.js/cache/cache-basics/SKILL.md`](@warlock.js/cache/cache-basics/SKILL.md) — driver catalog
+- The `manage-ai-stores` topic — `ai.snapshot.*` + `ai.checkpoint.*` store factories, schema(), drivers
+- The `run-ai-workflow` topic — `snapshotStore` + `resume()`
+- The `run-supervisor` topic — same on supervisor
+- The `attach-ai-middleware` topic — `semanticCache` middleware
+- The `handle-ai-errors` topic — drift errors
+- The `cache-basics` topic of the `warlock-js-cache` skill — driver catalog

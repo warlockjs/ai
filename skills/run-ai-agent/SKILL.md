@@ -1,6 +1,6 @@
 ---
 name: run-ai-agent
-description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `ai.agent`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — `@warlock.js/ai/define-ai-tool/SKILL.md`; workflows — `@warlock.js/ai/run-ai-workflow/SKILL.md`; eval matchers / batch / fallback detail — `@warlock.js/ai/ai-dx-helpers/SKILL.md`; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
+description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `ai.agent`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
 ---
 
 # `ai.agent()` — single-turn primitive
@@ -238,7 +238,7 @@ if (result.error) {
 
 `ai.agent.judge(config, judge?)` is sugar for `ai.agent({ ...config, judge })`; the bare `ai.agent({ judge: true })` option does the same. `judge: {}` ≡ `judge: true` (every field falls back to its resilient default); `judge: { repairAttempts: 0 }` keeps the lenient parser + never-throw guarantee but disables repair.
 
-**Trade-off — resilience over strictness.** The lenient parse can recover JSON the strict parser would (correctly) reject — leave `judge` **off** for normal structured output, where a hard parse failure is a useful signal. Off by default; omitting it parses strictly and never auto-enables repair, byte-for-byte as before. (This is the same Nova-safe judge the unified prompt `validate()` uses — see [`@warlock.js/ai/manage-prompts/SKILL.md`](@warlock.js/ai/manage-prompts/SKILL.md).)
+**Trade-off — resilience over strictness.** The lenient parse can recover JSON the strict parser would (correctly) reject — leave `judge` **off** for normal structured output, where a hard parse failure is a useful signal. Off by default; omitting it parses strictly and never auto-enables repair, byte-for-byte as before. (This is the same Nova-safe judge the unified prompt `validate()` uses — see the `manage-prompts` topic.)
 
 ## Pattern — image attachments
 
@@ -259,7 +259,7 @@ attachments: [
 
 Model must declare `capabilities.vision`. OpenAI adapter auto-infers from name; override with `openai.model({ name, vision: true })`.
 
-A URL _image_ attachment is passed to the provider as a URL — the provider fetches it, not the framework, so there's no server-side SSRF surface. A **remote `{ type: "text", source: <url> }` attachment IS fetched server-side** (the adapter needs the raw text inline) and is default-DENY: it throws unless `attachmentPolicy.allowRemoteFetch: true`, and when enabled runs through the shared `guardedFetch` / `OutboundPolicy` guard — see [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md).
+A URL _image_ attachment is passed to the provider as a URL — the provider fetches it, not the framework, so there's no server-side SSRF surface. A **remote `{ type: "text", source: <url> }` attachment IS fetched server-side** (the adapter needs the raw text inline) and is default-DENY: it throws unless `attachmentPolicy.allowRemoteFetch: true`, and when enabled runs through the shared `guardedFetch` / `OutboundPolicy` guard — see the `secure-outbound-requests` topic.
 
 ## Pattern — streaming
 
@@ -325,7 +325,7 @@ const concierge = ai.agent({
 });
 ```
 
-`.asTool()` still works and takes precedence when you need a custom name / schema per use. A supervisor/orchestrator needs `inputSchema` on its config to drop straight into `tools: []`. See [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md).
+`.asTool()` still works and takes precedence when you need a custom name / schema per use. A supervisor/orchestrator needs `inputSchema` on its config to drop straight into `tools: []`. See the `define-ai-tool` topic.
 
 ## `agent.eval(options)` — score the agent against a suite
 
@@ -343,7 +343,7 @@ const report = await myAgent.eval({
 expect(report.passed).toBe(true); // true only when EVERY case passed
 ```
 
-Each case runs through `execute(input)`; scorer precedence is per-case `scorers` → suite `scorers` → synthesized `judge` (throws at author time if a case resolves none). Built-in scorers on `ai.eval.*`: `exact()`, `contains()`, `predicate(fn)`, `judge(config)`. Full coverage — plus the Vitest matchers (`registerAiMatchers` / `toRouteTo` / `toConverge` / `toPassStep` / `toOutputShape`) — in [`@warlock.js/ai/ai-dx-helpers/SKILL.md`](@warlock.js/ai/ai-dx-helpers/SKILL.md).
+Each case runs through `execute(input)`; scorer precedence is per-case `scorers` → suite `scorers` → synthesized `judge` (throws at author time if a case resolves none). Built-in scorers on `ai.eval.*`: `exact()`, `contains()`, `predicate(fn)`, `judge(config)`. Full coverage — plus the Vitest matchers (`registerAiMatchers` / `toRouteTo` / `toConverge` / `toPassStep` / `toOutputShape`) — in the `ai-dx-helpers` topic.
 
 ## `ai.spawnSubAgent()` — one-shot delegation with a budget
 
@@ -365,12 +365,12 @@ The one field a bare agent config doesn't surface ergonomically is `budget` (`Bu
 
 ## When NOT to use this primitive
 
-- Multi-step pipeline with a fixed shape → [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md)
-- Multi-agent routing with iteration → [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md)
+- Multi-step pipeline with a fixed shape → the `run-ai-workflow` topic
+- Multi-agent routing with iteration → the `run-supervisor` topic
 
 ## See also
 
-- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — tool wiring + schema validation
-- [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — persona / instruction builders
-- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `AIError` hierarchy
-- [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md) — the `guardedFetch` / `OutboundPolicy` guard behind a remote text attachment fetch
+- The `define-ai-tool` topic — tool wiring + schema validation
+- The `write-system-prompt` topic — persona / instruction builders
+- The `handle-ai-errors` topic — `AIError` hierarchy
+- The `secure-outbound-requests` topic — the `guardedFetch` / `OutboundPolicy` guard behind a remote text attachment fetch

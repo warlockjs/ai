@@ -1,6 +1,6 @@
 ---
 name: write-system-prompt
-description: 'Compose system prompts via ai.systemPrompt() / ai.persona() / ai.instruction() — immutable builders with {{placeholder}} substitution, plus ai.systemPrompt.fromFile(path) to seed from a file read once at construction. Carry identity with .meta({ name, version, description, required }) (a name auto-registers in ai.prompts) and compose with merge(...blocks) / merge(contract) / merge(name, { fromVersion }) (provenance in meta.composedFrom). Triggers: `ai.systemPrompt`, `ai.systemPrompt.fromFile`, `ai.persona`, `ai.instruction`, `SystemPromptBlockContract`, `SystemPromptContract`, `SystemPromptMeta`, `SystemPromptMergeOptions`, `PersonaContract`, `InstructionContract`, `meta`, `merge`, `composedFrom`, `fromVersion`, `placeholders`, `{{placeholder|default}}`, `InvalidRequestError`; ''write a system prompt'', ''compose persona + instructions'', ''prompt from a file'', ''name and version a prompt'', ''merge prompts together'', ''per-call prompt override'', ''mustache placeholder''; typical import `import { ai } from "@warlock.js/ai"`. Skip: the named/versioned prompt registry (register / resolve / tag / diff / export / validate) — `@warlock.js/ai/manage-prompts/SKILL.md`; agent factory wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langchain` `PromptTemplate`, raw f-strings.'
+description: 'Compose system prompts via ai.systemPrompt() / ai.persona() / ai.instruction() — immutable builders with {{placeholder}} substitution, plus ai.systemPrompt.fromFile(path) to seed from a file read once at construction. Carry identity with .meta({ name, version, description, required }) (a name auto-registers in ai.prompts) and compose with merge(...blocks) / merge(contract) / merge(name, { fromVersion }) (provenance in meta.composedFrom). Triggers: `ai.systemPrompt`, `ai.systemPrompt.fromFile`, `ai.persona`, `ai.instruction`, `SystemPromptBlockContract`, `SystemPromptContract`, `SystemPromptMeta`, `SystemPromptMergeOptions`, `PersonaContract`, `InstructionContract`, `meta`, `merge`, `composedFrom`, `fromVersion`, `placeholders`, `{{placeholder|default}}`, `InvalidRequestError`; ''write a system prompt'', ''compose persona + instructions'', ''prompt from a file'', ''name and version a prompt'', ''merge prompts together'', ''per-call prompt override'', ''mustache placeholder''; typical import `import { ai } from "@warlock.js/ai"`. Skip: the named/versioned prompt registry (register / resolve / tag / diff / export / validate) — the `manage-prompts` topic; agent factory wiring — the `run-ai-agent` topic; competing libs `langchain` `PromptTemplate`, raw f-strings.'
 ---
 
 # System prompts — immutable builders
@@ -131,7 +131,7 @@ merged.meta()?.composedFrom;       // deterministic source labels, e.g. ["base@2
 const composed = ai.systemPrompt("You are support.").merge("global", { fromVersion: "1" });
 ```
 
-The name / contract / registry-name forms are the registry's composition surface — full coverage (register / resolve / version / tag / diff / validate) in [`@warlock.js/ai/manage-prompts/SKILL.md`](@warlock.js/ai/manage-prompts/SKILL.md).
+The name / contract / registry-name forms are the registry's composition surface — full coverage (register / resolve / version / tag / diff / validate) in the `manage-prompts` topic.
 
 `.validate(options?)` is per-builder sugar over `ai.prompts.validate(this, options)` — the deterministic missing-placeholder check plus an optional Nova-safe LLM-judge.
 
@@ -166,7 +166,7 @@ Three distinct prompts, one common foundation. Base is immutable — safe to sha
 
 ## See also
 
-- [`@warlock.js/ai/manage-prompts/SKILL.md`](@warlock.js/ai/manage-prompts/SKILL.md) — the `ai.prompts` registry these named prompts auto-register into (resolve / version / tag / diff / export / validate)
-- [`@warlock.js/ai/refine-prompts/SKILL.md`](@warlock.js/ai/refine-prompts/SKILL.md) — `.refined({ model, criteria, store })`, the prompt compiler: lazily rewrite this builder into a model-optimized version, pinned like a lockfile
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `systemPrompt` on factory + per-call override
-- [`@warlock.js/ai/run-ai-workflow/SKILL.md`](@warlock.js/ai/run-ai-workflow/SKILL.md) — per-step agent references inherit their own system prompt
+- The `manage-prompts` topic — the `ai.prompts` registry these named prompts auto-register into (resolve / version / tag / diff / export / validate)
+- The `refine-prompts` topic — `.refined({ model, criteria, store })`, the prompt compiler: lazily rewrite this builder into a model-optimized version, pinned like a lockfile
+- The `run-ai-agent` topic — `systemPrompt` on factory + per-call override
+- The `run-ai-workflow` topic — per-step agent references inherit their own system prompt

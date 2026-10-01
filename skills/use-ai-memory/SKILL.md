@@ -1,6 +1,6 @@
 ---
 name: use-ai-memory
-description: 'Agent memory with ai.memory({...}) — a provider-neutral store with FOUR tiers: WORKING (in-run scratch, recalled by recency), SEMANTIC (durable facts by cosine similarity over a @warlock.js/cache vector driver via .similar()), EPISODIC (durable events, similarity blended with recency), and PROCEDURAL (durable how-tos, similarity blended with reinforcement). remember() / recall() / clear(); wire it into ai.orchestrator({ memory }). Triggers: `ai.memory`, `memory.remember`, `memory.recall`, `memory.clear`, `MemoryContract`, `MemoryConfig`, `MemoryItem`, `RecalledMemory`, `MemoryTier`, `SemanticMemoryConfig`, `EpisodicMemoryConfig`, `ProceduralMemoryConfig`, `working`, `semantic`, `episodic`, `procedural`, `defaultTier`, `threshold`, `recencyWeight`, `halfLifeMs`, `reinforcementWeight`, `injectKey`, `maxItems`, `scope`, `RecallOptions.scope`; ''give the agent memory'', ''remember user preferences'', ''semantic recall'', ''per-session working memory'', ''episodic / event memory'', ''procedural / how-to memory'', ''recency-weighted recall'', ''reinforce a procedure'', ''cap working memory size'', ''isolate memory per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator wiring of the memory — `@warlock.js/ai/run-orchestrator/SKILL.md`; the vector cache driver itself — `@warlock.js/cache/cache-basics/SKILL.md`; embeddings primitive — `@warlock.js/ai/embed-text/SKILL.md`; competing libs `mem0`, `langchain` memory.'
+description: 'Agent memory with ai.memory({...}) — a provider-neutral store with FOUR tiers: WORKING (in-run scratch, recalled by recency), SEMANTIC (durable facts by cosine similarity over a @warlock.js/cache vector driver via .similar()), EPISODIC (durable events, similarity blended with recency), and PROCEDURAL (durable how-tos, similarity blended with reinforcement). remember() / recall() / clear(); wire it into ai.orchestrator({ memory }). Triggers: `ai.memory`, `memory.remember`, `memory.recall`, `memory.clear`, `MemoryContract`, `MemoryConfig`, `MemoryItem`, `RecalledMemory`, `MemoryTier`, `SemanticMemoryConfig`, `EpisodicMemoryConfig`, `ProceduralMemoryConfig`, `working`, `semantic`, `episodic`, `procedural`, `defaultTier`, `threshold`, `recencyWeight`, `halfLifeMs`, `reinforcementWeight`, `injectKey`, `maxItems`, `scope`, `RecallOptions.scope`; ''give the agent memory'', ''remember user preferences'', ''semantic recall'', ''per-session working memory'', ''episodic / event memory'', ''procedural / how-to memory'', ''recency-weighted recall'', ''reinforce a procedure'', ''cap working memory size'', ''isolate memory per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator wiring of the memory — the `run-orchestrator` topic; the vector cache driver itself — the `cache-basics` topic of the `warlock-js-cache` skill; embeddings primitive — the `embed-text` topic; competing libs `mem0`, `langchain` memory.'
 ---
 
 # `ai.memory()` — agent memory store
@@ -113,7 +113,7 @@ await mem.recall("what is my email?");                        // only the UNSCOP
 - The match is **exact equality**, enforced inside every tier (`working` / `semantic` / `episodic` / `procedural`) before hits are scored, merged, or sliced — not something the caller filters afterward.
 - Omitting `scope` is **not** a wildcard: an unscoped recall reads only unscoped entries. There is no "all scopes" query.
 - Identical text under two scopes stays two independent entries (including the procedural tier's reinforcement counter).
-- `ai.orchestrator({ memory })` sets this automatically from the turn's `sessionId` — see [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md).
+- `ai.orchestrator({ memory })` sets this automatically from the turn's `sessionId` — see the `run-orchestrator` topic.
 - `clear(tier?)` is scope-agnostic: it drops the tier for every scope.
 
 ### Working-memory cap — `working: { maxItems }` (4.15.0)
@@ -139,7 +139,7 @@ await mem.clear("working");   // just working — e.g. at session end, keeping d
 
 ## Wiring into an orchestrator
 
-Pass the store as `ai.orchestrator({ memory })` to recall before each turn's dispatch and remember the settled outcome after. Recalled memories land in `ctx.context[injectKey]` (default `"memories"`). See [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md) for the per-turn `memory` field, `recall.k: 0` (write-only), `remember: false` (read-only), and `rememberTier`.
+Pass the store as `ai.orchestrator({ memory })` to recall before each turn's dispatch and remember the settled outcome after. Recalled memories land in `ctx.context[injectKey]` (default `"memories"`). See the `run-orchestrator` topic for the per-turn `memory` field, `recall.k: 0` (write-only), `remember: false` (read-only), and `rememberTier`.
 
 ## Picking a vector driver
 
@@ -147,11 +147,11 @@ The semantic tier delegates similarity entirely to the `CacheDriver`:
 - **Dev / tests** — `new MemoryCacheDriver()` (zero config, O(N) scan; fine up to a few thousand entries).
 - **Production** — a driver with a real ANN index: `pg` with pgvector, `redis` with RediSearch.
 
-Drivers without similarity support throw `CacheUnsupportedError` from `set({ vector })` / `similar()`. See [`@warlock.js/cache/cache-basics/SKILL.md`](@warlock.js/cache/cache-basics/SKILL.md).
+Drivers without similarity support throw `CacheUnsupportedError` from `set({ vector })` / `similar()`. See the `cache-basics` topic of the `warlock-js-cache` skill.
 
 ## See also
 
-- [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md) — the `memory` field on a session
-- [`@warlock.js/ai/embed-text/SKILL.md`](@warlock.js/ai/embed-text/SKILL.md) — the embedder the semantic tier needs
-- [`@warlock.js/ai/attach-ai-middleware/SKILL.md`](@warlock.js/ai/attach-ai-middleware/SKILL.md) — `semanticCache`, the sibling `.similar()` consumer
-- [`@warlock.js/cache/cache-basics/SKILL.md`](@warlock.js/cache/cache-basics/SKILL.md) — vector driver catalog
+- The `run-orchestrator` topic — the `memory` field on a session
+- The `embed-text` topic — the embedder the semantic tier needs
+- The `attach-ai-middleware` topic — `semanticCache`, the sibling `.similar()` consumer
+- The `cache-basics` topic of the `warlock-js-cache` skill — vector driver catalog

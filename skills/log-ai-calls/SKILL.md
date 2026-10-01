@@ -1,11 +1,11 @@
 ---
 name: log-ai-calls
-description: 'Framework logging delegated to @warlock.js/logger — every primitive emits via the log singleton, configure channels / levels / redaction once at boot. Four-arg call convention (module, action, message, context). Triggers: `log.configure`, `log.setMinLevel`, `log.setChannels`, `ConsoleLog`, `FileLog`, `LogChannel`, `redact.paths`, `ai.agent.<name>` / `ai.workflow.<name>` / `ai.supervisor.<name>` modules; ''configure ai logging'', ''mask prompts in logs'', ''silence logs in tests'', ''capture log entries''; typical import `import { log } from "@warlock.js/logger"`. Skip: error hierarchy — `@warlock.js/ai/handle-ai-errors/SKILL.md`; competing libs `pino`, `winston`, `console.log`.'
+description: 'Framework logging delegated to @warlock.js/logger — every primitive emits via the log singleton, configure channels / levels / redaction once at boot. Four-arg call convention (module, action, message, context). Triggers: `log.configure`, `log.setMinLevel`, `log.setChannels`, `ConsoleLog`, `FileLog`, `LogChannel`, `redact.paths`, `ai.agent.<name>` / `ai.workflow.<name>` / `ai.supervisor.<name>` modules; ''configure ai logging'', ''mask prompts in logs'', ''silence logs in tests'', ''capture log entries''; typical import `import { log } from "@warlock.js/logger"`. Skip: error hierarchy — the `handle-ai-errors` topic; competing libs `pino`, `winston`, `console.log`.'
 ---
 
 # Logging — `log` from `@warlock.js/logger`
 
-`@warlock.js/ai` does not own a logger contract. Every primitive imports the `log` singleton from [`@warlock.js/logger`](@warlock.js/logger/logger-basics/SKILL.md) directly and emits structured entries through it. Configuration — channels, levels, redaction — lives entirely on the logger.
+`@warlock.js/ai` does not own a logger contract. Every primitive imports the `log` singleton from `@warlock.js/logger` (the `logger-basics` topic of the `warlock-js-logger` skill) directly and emits structured entries through it. Configuration — channels, levels, redaction — lives entirely on the logger.
 
 **No `ai.config({ logger })`. No per-primitive `logger:` override.** Configure once at app boot; the framework picks it up.
 
@@ -97,7 +97,7 @@ log.configure({
 });
 ```
 
-See [`@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md) for the full redaction surface.
+See the `redact-sensitive-log-fields` topic of the `warlock-js-logger` skill for the full redaction surface.
 
 ## Events vs. logs — two channels, one source
 
@@ -131,11 +131,11 @@ const capture = new Capture();
 log.setChannels([capture]);
 ```
 
-See [`@warlock.js/logger/test-logging-code/SKILL.md`](@warlock.js/logger/test-logging-code/SKILL.md) for the test patterns.
+See the `test-logging-code` topic of the `warlock-js-logger` skill for the test patterns.
 
 ## See also
 
-- [`@warlock.js/logger/logger-basics/SKILL.md`](@warlock.js/logger/logger-basics/SKILL.md) — logger foundations
-- [`@warlock.js/logger/configure-logger/SKILL.md`](@warlock.js/logger/configure-logger/SKILL.md) — startup setup
-- [`@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md) — redaction
-- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — what lands on the `error` channel
+- The `logger-basics` topic of the `warlock-js-logger` skill — logger foundations
+- The `configure-logger` topic of the `warlock-js-logger` skill — startup setup
+- The `redact-sensitive-log-fields` topic of the `warlock-js-logger` skill — redaction
+- The `handle-ai-errors` topic — what lands on the `error` channel
